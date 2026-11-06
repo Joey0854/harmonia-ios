@@ -700,6 +700,13 @@ Object.defineProperty(NativeAudio.prototype, 'currentTime', {
     nativePost({ cmd: 'seek', t: this.T });
   }
 });
+/* The app reports the position about four times a second; between two reports the position is
+   worked out from the clock, so that what moves with the music is not up to a quarter second late. */
+NativeAudio.prototype.pos = function () {
+  if (this.paused || !this.TT) return this.T;
+  var dt = (performance.now() - this.TT) / 1000;
+  return this.T + (dt > 0 && dt < 0.6 ? dt : 0);
+};
 var audioA = new NativeAudio();
 var audio = audioA;
 
@@ -1413,6 +1420,7 @@ window.__ytmNativeEvent = function (e) {
   if (e.type === 'time') {
     if (a.seekHold && Date.now() < a.seekHold) return;
     a.T = e.t;
+    a.TT = performance.now();
     if (e.dur > 0) a.duration = e.dur;
     a.emit('timeupdate');
   } else if (e.type === 'state') {
@@ -1964,7 +1972,8 @@ function lyrLoad(id) {
 /* How far the sound reaching the ears is behind what the player reports, in seconds: the
    listener's own setting for the current profile (wireless headphones, car). The picture is held
    back by this much. */
-function avLagUser() { return Math.max(0, Math.min(800, Number(lsGet('ytm_avlag' + psuf())) || 0)) / 1000; }
+/* seconds; negative = the picture is shown earlier than the position the player reports */
+function avLagUser() { return Math.max(-300, Math.min(800, Number(lsGet('ytm_avlag' + psuf())) || 0)) / 1000; }
 function avLag() { return avLagUser(); }
 /* Called as the song moves on: picks the line and where the text should be. */
 function lyrTick(cur, dur) {
@@ -2306,7 +2315,8 @@ function fxFrameBody(now) {
   if (S.vid) {
     if (ENV.id !== S.vid) envLoad(S.vid);
     else if (ENV.data) {
-      var ek = Math.floor(Math.max(0, audio.currentTime) * 30) * 2;
+      var fxT = (audio.pos ? audio.pos() : audio.currentTime) + (avLag() < 0 ? -avLag() : 0);
+      var ek = Math.floor(Math.max(0, fxT) * 30) * 2;
       if (ek + 1 < ENV.data.length) {
         var e1 = ENV.data[ek] / 255, e2 = ENV.data[ek + 1] / 255;
         bass = e1 * e1 * e1 * e1;
@@ -2924,17 +2934,17 @@ function buildSheet() {
   panel.appendChild(el('h3', null, '畫面與聲音對齊（' + (isCar() ? '車用' : '耳機') + '）'));
   var lagNow = Math.round(avLagUser() * 1000);
   var lagLabel = el('p', null, '');
-  var lagText = function (v) { lagLabel.textContent = '畫面延後 ' + v + ' 毫秒'; };
+  var lagText = function (v) { lagLabel.textContent = v < 0 ? '畫面提前 ' + (-v) + ' 毫秒' : '畫面延後 ' + v + ' 毫秒'; };
   lagText(lagNow);
   var lagIn = document.createElement('input');
-  lagIn.type = 'range'; lagIn.min = '0'; lagIn.max = '600'; lagIn.step = '10'; lagIn.value = String(lagNow);
+  lagIn.type = 'range'; lagIn.min = '-300'; lagIn.max = '600'; lagIn.step = '10'; lagIn.value = String(lagNow);
   lagIn.setAttribute('aria-label', '畫面延後');
   lagIn.style.width = '100%';
   lagIn.addEventListener('input', function () { lsSet('ytm_avlag' + psuf(), lagIn.value); lagText(Number(lagIn.value)); });
   lagIn.addEventListener('change', function () { dbg('I', 'setting', { pictureLagMs: Number(lagIn.value), profile: isCar() ? 'car' : 'head' }); });
   panel.appendChild(lagIn);
   panel.appendChild(lagLabel);
-  panel.appendChild(el('p', null, '藍牙耳機或車機的聲音會比畫面晚。開著歌詞模式播一首有逐句歌詞的歌，往右拉到歌詞和光效跟聲音對上為止。耳機和車用各記一組。'));
+  panel.appendChild(el('p', null, '藍牙耳機或車機的聲音會比畫面晚。開著歌詞模式播一首有逐句歌詞的歌，光效或歌詞比聲音慢就往左拉（提前），比聲音快就往右拉（延後），拉到對上為止。耳機和車用各記一組。'));
   /* the app's own items (ambient light, account, diagnostics) go here; the close button is last */
   if (window.__ytmGlue && window.__ytmGlue.diag) window.__ytmGlue.diag(panel);
   var row = el('div', 'sheetbtns');
