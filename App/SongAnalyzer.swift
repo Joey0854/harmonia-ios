@@ -88,16 +88,19 @@ final class SongAnalyzer {
                 var maker: EnvelopeMaker?
                 var lightMaker: LightEnvelopeMaker?
                 var track: LevelTrack?
+                var down: Mono11k?
                 while let piece = try decoder.next() {
                     if meter == nil {
                         meter = LoudnessMeter(sampleRate: decoder.sampleRate)
                         if needEnvelope { maker = EnvelopeMaker(sampleRate: Int(decoder.sampleRate.rounded())) }
                         if lightFile != nil { lightMaker = LightEnvelopeMaker(sampleRate: decoder.sampleRate) }
                         track = LevelTrack(sampleRate: decoder.sampleRate)
+                        down = Mono11k(sampleRate: decoder.sampleRate)
                     }
                     meter?.add(left: piece.left, right: piece.right)
                     lightMaker?.add(left: piece.left, right: piece.right)
                     track?.add(left: piece.left, right: piece.right)
+                    down?.add(left: piece.left, right: piece.right)
                     if let m = maker {
                         var mono = [Float](repeating: 0, count: piece.left.count)
                         for i in 0..<mono.count { mono[i] = (piece.left[i] + piece.right[i]) / 2 }
@@ -105,7 +108,9 @@ final class SongAnalyzer {
                     }
                 }
                 lufs = meter?.integrated()
-                if let t = track { structure = MixStructure.analyze(levels: t.finish()) }
+                /* tempo, beats and parts as the PC found them; the loudness alone when that fails */
+                if let m = down { structure = MixAnalyzer.analyze(m.samples) }
+                if structure == nil, let t = track { structure = MixStructure.analyze(levels: t.finish()) }
                 if decoder.sampleRate > 0 { seconds = Double(decoder.framesRead) / decoder.sampleRate }
                 if let m = maker {
                     let bytes = m.finish()

@@ -147,7 +147,7 @@ final class NativePlayer: NSObject {
         SongAnalyzer.shared.onStructure = { [weak self] id, info in
             guard let self = self, self.mixInfo[id] == nil else { return }
             self.remember(info, of: id)
-            Diag.shared.log(String(format: "mix: parts found, main part %.1f-%.1f s, last sound %.1f s", info.bodyStart ?? 0, info.bodyEnd ?? 0, info.tailEnd ?? 0), song: id)
+            Diag.shared.log(String(format: "mix: analysed, %.1f bpm (sure %.1f), main part %.1f-%.1f s, last sound %.1f s", info.bpm ?? 0, info.conf ?? 0, info.bodyStart ?? 0, info.bodyEnd ?? 0, info.tailEnd ?? 0), song: id)
             self.updateMixPlan()
         }
         SongAnalyzer.shared.onLength = { [weak self] id, seconds in
