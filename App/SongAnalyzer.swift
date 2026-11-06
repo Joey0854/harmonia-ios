@@ -14,6 +14,9 @@ final class SongAnalyzer {
     var onLength: ((String, Double) -> Void)?
     /// A song's light envelope has just been written (id). Only when `wantLight` is on.
     var onLight: ((String) -> Void)?
+    /// A song's parts (where its main part starts and ends ...) have been found, for mixing.
+    var onStructure: ((String, MixAnalysis) -> Void)?
+    private var structured = Set<String>()
     /// The music light is on: also make each song's light envelope (`Caches/lightenv/<id>.bin`).
     /// Off = nothing about the analysis changes.
     var wantLight = false
@@ -69,7 +72,7 @@ final class SongAnalyzer {
         let lightFile: URL? = wantLight ? SongAnalyzer.lightURL(id).flatMap {
             FileManager.default.fileExists(atPath: $0.path) ? nil : $0
         } : nil
-        if known[id] != nil && !needEnvelope && lengths[id] != nil && lightFile == nil { return }
+        if known[id] != nil && !needEnvelope && lengths[id] != nil && lightFile == nil && structured.contains(id) { return }
         busy.insert(id)
         queue.async {
             let started = Date()
@@ -77,20 +80,24 @@ final class SongAnalyzer {
             var seconds = 0.0
             var problem: String?
             var lightNote: String?
+            var structure: MixAnalysis?
             do {
                 let decoder = try SongDecoder(url: file)
                 decoder.onReopen = { message in Diag.shared.log("analysis: " + message, song: id) }
                 var meter: LoudnessMeter?
                 var maker: EnvelopeMaker?
                 var lightMaker: LightEnvelopeMaker?
+                var track: LevelTrack?
                 while let piece = try decoder.next() {
                     if meter == nil {
                         meter = LoudnessMeter(sampleRate: decoder.sampleRate)
                         if needEnvelope { maker = EnvelopeMaker(sampleRate: Int(decoder.sampleRate.rounded())) }
                         if lightFile != nil { lightMaker = LightEnvelopeMaker(sampleRate: decoder.sampleRate) }
+                        track = LevelTrack(sampleRate: decoder.sampleRate)
                     }
                     meter?.add(left: piece.left, right: piece.right)
                     lightMaker?.add(left: piece.left, right: piece.right)
+                    track?.add(left: piece.left, right: piece.right)
                     if let m = maker {
                         var mono = [Float](repeating: 0, count: piece.left.count)
                         for i in 0..<mono.count { mono[i] = (piece.left[i] + piece.right[i]) / 2 }
@@ -98,6 +105,7 @@ final class SongAnalyzer {
                     }
                 }
                 lufs = meter?.integrated()
+                if let t = track { structure = MixStructure.analyze(levels: t.finish()) }
                 if decoder.sampleRate > 0 { seconds = Double(decoder.framesRead) / decoder.sampleRate }
                 if let m = maker {
                     let bytes = m.finish()
@@ -135,6 +143,10 @@ final class SongAnalyzer {
                 if let note = lightNote {
                     Diag.shared.log("light " + note, song: id)
                     self.onLight?(id)
+                }
+                if let s = structure {
+                    self.structured.insert(id)
+                    self.onStructure?(id, s)
                 }
                 if seconds > 1 {
                     if self.lengths.count >= SongAnalyzer.maxRemembered { self.lengths.removeAll() }

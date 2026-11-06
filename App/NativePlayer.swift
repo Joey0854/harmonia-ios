@@ -142,6 +142,14 @@ final class NativePlayer: NSObject {
             self.onEvent?(["type": "lufs", "id": id, "lufs": lufs])
             if id == self.currentID || id == self.incoming?.id { self.applyLoudnessGain(of: id, smooth: true) }
         }
+        /* The app finds the parts of each song itself, so mixing needs no PC. What a PC says about
+           a song (which also has its tempo) takes the place of this. */
+        SongAnalyzer.shared.onStructure = { [weak self] id, info in
+            guard let self = self, self.mixInfo[id] == nil else { return }
+            self.remember(info, of: id)
+            Diag.shared.log(String(format: "mix: parts found, main part %.1f-%.1f s, last sound %.1f s", info.bodyStart ?? 0, info.bodyEnd ?? 0, info.tailEnd ?? 0), song: id)
+            self.updateMixPlan()
+        }
         SongAnalyzer.shared.onLength = { [weak self] id, seconds in
             self?.adoptLength(seconds, of: id)
             self?.updateMixPlan()
