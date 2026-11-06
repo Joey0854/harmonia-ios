@@ -3869,12 +3869,39 @@ function parseQueue(json) {
   return items.filter((i) => (seen.has(i.videoId) ? false : seen.add(i.videoId)));
 }
 
+/* The same song in another version (live, cover, MV, a bracketed tag, a '/ covered by ...' tail) has
+   the same key. "SOS /covered by X" and "SOS" are one song. */
+function sameSongKey(title) {
+  let s = String(title || '').toLowerCase();
+  /* bracketed tags: (Live) [MV] （合作演出：X） 【公式】 */
+  s = s.replace(/[(\[（【「『〔][^)\]）】」』〕]*[)\]）】」』〕]/g, ' ');
+  /* a tail after a slash or a spaced dash: "SOS /covered by X", "Song - Remastered" */
+  s = s.replace(/\s*(?:[\/／|｜]|\s[-–—]\s).*$/, ' ');
+  /* only letters and digits of any script count */
+  const key = s.replace(/[^\p{L}\p{N}]+/gu, '');
+  return key || String(title || '').toLowerCase().replace(/\s+/g, '');
+}
+/* The automatic queue after a song should lead to other songs, not to the same one again. */
+function withoutSameSong(items) {
+  if (items.length < 3) return items;
+  const seen = new Set([sameSongKey(items[0].title)]);
+  const out = [items[0]];
+  for (let i = 1; i < items.length; i++) {
+    const k = sameSongKey(items[i].title);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(items[i]);
+  }
+  return out.length >= 3 ? out : items;
+}
 async function getQueue(videoId, playlistId) {
   const body = { enablePersistentPlaylistPanel: true, isAudioOnly: true, tunerSettingValue: 'AUTOMIX_SETTING_NORMAL' };
   if (videoId) body.videoId = videoId;
   body.playlistId = playlistId || (videoId ? 'RDAMVM' + videoId : '');
   const { json } = await ytApi('next', body);
-  return parseQueue(json);
+  const items = parseQueue(json);
+  /* a playlist the user chose is played as it is; only the automatic radio is thinned out */
+  return playlistId ? items : withoutSameSong(items);
 }
 
 // ---------------------------------------------------------------- audio cache

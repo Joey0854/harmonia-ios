@@ -1555,6 +1555,14 @@ function realDur(a) {
 
 /* When only a couple of songs are left, append related ones, like autoplay in YT Music. */
 var extending = false;
+/* The same song in another version (a bracketed tag, a tail after a slash or dash) has the same key. */
+function songKey(title) {
+  var s = String(title || '').toLowerCase();
+  s = s.replace(/[(\[（【「『〔][^)\]）】」』〕]*[)\]）】」』〕]/g, ' ');
+  s = s.replace(/\s*(?:[\/／|｜]|\s[-–—]\s).*$/, ' ');
+  var k = s.replace(/[^\p{L}\p{N}]+/gu, '');
+  return k || String(title || '').toLowerCase().replace(/\s+/g, '');
+}
 function extendQueue() {
   /* With "repeat all" the queue loops instead of growing. */
   if (S.repeat === 'all') return;
@@ -1565,10 +1573,11 @@ function extendQueue() {
   extending = true;
   api('/api/queue?videoId=' + enc(last.videoId)).then(function (d) {
     if (S.queue !== q) return;
-    var have = {};
-    q.forEach(function (x) { have[x.videoId] = 1; });
+    var have = {}, haveTitle = {};
+    q.forEach(function (x) { have[x.videoId] = 1; haveTitle[songKey(x.title)] = 1; });
     ((d && d.items) || []).forEach(function (x) {
-      if (isSong(x) && !have[x.videoId]) { have[x.videoId] = 1; q.push(x); }
+      /* the same song in another version is not queued again */
+      if (isSong(x) && !have[x.videoId] && !haveTitle[songKey(x.title)]) { have[x.videoId] = 1; haveTitle[songKey(x.title)] = 1; q.push(x); }
     });
     if (S.shuffle) shuffleUpcoming();
     renderQueue();
