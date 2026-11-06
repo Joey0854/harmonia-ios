@@ -1,0 +1,85 @@
+{
+  "built": "2026-11-06T12:59:22.675Z",
+  "source": {
+    "server.js": "9b96e12045f71ea8081cda183b8e9869ef0238a7",
+    "src/page.html": "ff8a89a38152895596694420a9cbf960af47a412",
+    "live index.html (not used, for reference)": "85c4343ffe3d85af00f965beeb8b5c08d722c73d"
+  },
+  "files": [
+    {
+      "file": "index.html",
+      "bytes": 152558,
+      "sha1": "ff8a89a38152895596694420a9cbf960af47a412"
+    },
+    {
+      "file": "backend.js",
+      "bytes": 197332,
+      "sha1": "b309200709b19c7057b643919853a8dd6b3b8102"
+    },
+    {
+      "file": "standalone.js",
+      "bytes": 61729,
+      "sha1": "7639ff997265ffbddebdb1041f9cfc168da15359"
+    },
+    {
+      "file": "data/hrir-atmos.wav",
+      "bytes": 288416,
+      "sha1": "4e49b2a52cd97eeea9e42d287c856fc18f09ca19"
+    },
+    {
+      "file": "data/hrir-dh_plus_plus.wav",
+      "bytes": 403384,
+      "sha1": "2c290672058e541bb50ba9b33479810649ad6c10"
+    },
+    {
+      "file": "data/hrir-dh_plus.wav",
+      "bytes": 394704,
+      "sha1": "8e60a09e3f2f007e98a44e7bc35b98dac52399d4"
+    },
+    {
+      "file": "data/hrir-dht.wav",
+      "bytes": 484024,
+      "sha1": "f05b2afc7f48fe6973651babb0dd342561916f55"
+    },
+    {
+      "file": "data/hrir-dtshx.wav",
+      "bytes": 67384,
+      "sha1": "e5027c6f41d4a4b9539eb2a95edf662916d570cf"
+    },
+    {
+      "file": "data/hrir-gsx_plus_plus.wav",
+      "bytes": 618424,
+      "sha1": "f9a04a0b046ecf387e0e35a0d2c280b3f8c51016"
+    },
+    {
+      "file": "data/hrir-sbx67.wav",
+      "bytes": 268984,
+      "sha1": "d5373341bb86ee57104f67b7be280562c27d81b1"
+    },
+    {
+      "file": "data/hrir-waves.wav",
+      "bytes": 484024,
+      "sha1": "0fcfbcde6a30c37f45977eff40d0e6e6de0bdaac"
+    },
+    {
+      "file": "data/kemar-elev0-L0e030a.wav",
+      "bytes": 1068,
+      "sha1": "00213a51375630e51b05e902af2ba03db979b0da"
+    },
+    {
+      "file": "data/kemar-elev0-L0e330a.wav",
+      "bytes": 1068,
+      "sha1": "efe9c519cf7b2c696a02ceb61f06222e9a4a233c"
+    },
+    {
+      "file": "data/kemar-elev50-L50e032a.wav",
+      "bytes": 1068,
+      "sha1": "026464fb7bd7c6376073987b4fb43448075f651f"
+    },
+    {
+      "file": "data/kemar-elev50-L50e328a.wav",
+      "bytes": 1068,
+      "sha1": "000353c22dbcadc3d3ebd36cec9806d2a5a27579"
+    }
+  ]
+}

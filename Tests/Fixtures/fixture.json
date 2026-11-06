@@ -1,0 +1,13 @@
+{
+  "made": "2026-10-11T16:03:12.460Z",
+  "ffmpeg": "ffmpeg version 8.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+  "sampleRate": 48000,
+  "frames": 288000,
+  "checksum": 4017779941,
+  "surroundFrames": 288000,
+  "surroundScale": 19401.138496927797,
+  "lufs": -9.5,
+  "lufsCommand": "ffmpeg -i signal.wav -af ebur128=framelog=quiet -f null -",
+  "envSteps": 180,
+  "irQuery": "?b=dh&w=40&v=50&h=85&t=120&o=30&g=30"
+}

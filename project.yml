@@ -1,0 +1,67 @@
+name: YTMRemote
+options:
+  bundleIdPrefix: io.pymone
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  YTMRemote:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      # Folder reference: copied into the app as-is, sub-folders included.
+      - path: Web
+        type: folder
+        buildPhase: resources
+      # The Python runtime (standard library, yt-dlp, our modules). Made by
+      # tools/build-python.py before the project is generated; a folder reference so
+      # that Python finds exactly the layout it was built with.
+      - path: PythonRuntime
+        type: folder
+        buildPhase: resources
+    dependencies:
+      # CPython for iOS. Embedded in Frameworks/, loaded by the app itself.
+      - framework: vendor/Python.framework
+        embed: true
+        codeSign: false
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: HeSuVi Music
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "40"
+        UILaunchScreen: {}
+        UIBackgroundModes:
+          - audio
+          - bluetooth-central
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        NSBluetoothAlwaysUsageDescription: 用來連接車上的氛圍燈
+        NSLocalNetworkUsageDescription: Sends debug logs to your PC when one is set up.
+        ServerURL: "http://127.0.0.1:8787"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.pymone.ytmremote
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGN_IDENTITY: ""
+        # The CPython C API, for App/PythonBridge.swift.
+        SWIFT_OBJC_BRIDGING_HEADER: App/YTMRemote-Bridging-Header.h
+        FRAMEWORK_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/vendor
+        HEADER_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/vendor/Python.framework/Headers
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -framework
+          - Python
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/Frameworks"

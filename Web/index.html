@@ -1,0 +1,3547 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="darkreader-lock">
+<meta name="theme-color" content="#030303">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HeSuVi Music">
+<title>HeSuVi Music</title>
+<style>
+:root{
+  --bg:#030303;--bg2:#161616;--bg3:#232323;--fg:#fff;--fg2:#aaa;--line:rgba(255,255,255,.1);
+  --accent:#ff4e45;
+  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
+  --nav-h:56px;--mini-h:64px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);overflow-x:hidden;overscroll-behavior:none}
+body{font:15px/1.4 -apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang TC","Noto Sans TC",sans-serif;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+svg{width:24px;height:24px;fill:currentColor;display:block}
+#view{position:fixed;left:0;right:0;top:0;bottom:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-top:var(--sat);padding-bottom:calc(var(--nav-h) + var(--mini-h) + var(--sab) + 32px)}
+.page{padding:0 16px 8px;min-width:0;position:relative}
+.page.home::before{content:"";position:absolute;left:0;right:0;top:calc(-1 * var(--sat));height:calc(440px + var(--sat));pointer-events:none;z-index:0;background:radial-gradient(120% 90% at 0% 0%,rgba(36,78,96,.55),transparent 62%),radial-gradient(110% 85% at 100% 8%,rgba(78,50,118,.5),transparent 64%),linear-gradient(rgba(22,34,38,.65),transparent)}
+.page.home>*{position:relative;z-index:1}
+.topbar{display:flex;align-items:center;gap:8px;min-height:56px}
+.topbar h1{font-size:22px;margin:0;font-weight:700;flex:1;min-width:0}
+.page.home .topbar{min-height:60px;margin-right:-8px}
+.page.home .topbar h1{font-size:26px;font-weight:800;letter-spacing:.01em}
+.iconbtn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:none}
+.iconbtn:active{background:var(--bg3)}
+.notice{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--fg2);font-size:13px;margin:4px 0 12px}
+.sec{margin:26px 0 8px}
+.sec-h{display:flex;align-items:center;gap:12px;min-height:44px;margin:0 0 8px}
+.sec-t{font-size:22px;line-height:1.2;font-weight:700;margin:0;flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.pillbtn{flex:none;min-height:44px;min-width:44px;display:flex;align-items:center}
+.pillbtn span{display:flex;align-items:center;height:32px;padding:0 14px;border:1px solid rgba(255,255,255,.22);border-radius:16px;font-size:13px;font-weight:500;white-space:nowrap}
+.pillbtn:active span{background:rgba(255,255,255,.12)}
+.qp{display:flex;gap:16px;overflow-x:auto;margin:0 -16px;padding:0 16px;scroll-snap-type:x mandatory;scroll-padding-left:16px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.qp::-webkit-scrollbar{display:none}
+.qpage{flex:none;width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-content:start;scroll-snap-align:start}
+.qtile{position:relative;padding-top:100%;border-radius:6px;overflow:hidden;background:var(--bg3);cursor:pointer;min-width:0}
+.qtile .thumb{position:absolute;left:0;top:0;width:100%;height:100%;background:none}
+.qtile::after{content:"";position:absolute;left:0;right:0;bottom:0;height:55%;background:linear-gradient(transparent,rgba(0,0,0,.82));pointer-events:none}
+.qtile .qtt{position:absolute;left:8px;right:8px;bottom:6px;z-index:1;font-size:13px;line-height:1.25;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.qtile:active{opacity:.75}
+.qdots{display:flex;justify-content:center;gap:6px;margin-top:12px;height:8px}
+.qdots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.3)}
+.qdots i.on{background:#fff}
+.hscroll{display:flex;gap:12px;overflow-x:auto;margin:0 -16px;padding:0 16px 4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.hscroll::-webkit-scrollbar,.qgrid::-webkit-scrollbar{display:none}
+.card{flex:none;width:152px;min-height:44px;cursor:pointer}
+.card .thumb{width:152px;height:152px;border-radius:8px}
+.card.round .thumb{border-radius:50%}
+.card.round .ct,.card.round .cs{text-align:center}
+.ct{font-size:15px;line-height:1.3;font-weight:500;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.cs{font-size:13px;margin-top:2px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thumb{position:relative;background:var(--bg3);overflow:hidden;flex:none}
+.thumb img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;display:block}
+.qgrid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(4,64px);grid-auto-columns:min(88%,360px);column-gap:12px;overflow-x:auto;margin:0 -16px;padding:0 16px;scroll-snap-type:x mandatory;scroll-padding-left:16px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.qgrid .row{scroll-snap-align:start}
+.row{display:flex;align-items:center;gap:12px;min-height:56px;padding:4px 0;cursor:pointer;min-width:0}
+.row .thumb{width:48px;height:48px;border-radius:4px}
+.row.round .thumb{border-radius:50%}
+.row .txt{flex:1;min-width:0}
+.row .rt{font-size:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .rs{font-size:13.5px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .rd{font-size:12px;color:var(--fg2);flex:none;padding-left:4px}
+.row:active{background:rgba(255,255,255,.06)}
+.now .rt,.now .ct,.now .qt,.now .qtt{color:var(--accent)}
+.songlist{margin:0}
+.skel{padding:8px 0}
+.skel i{display:block;height:16px;border-radius:8px;margin:14px 0;background:linear-gradient(90deg,var(--bg2),var(--bg3),var(--bg2));background-size:200% 100%;animation:sh 1.2s linear infinite}
+.skel i:nth-child(3n){width:60%}
+.skel i.big{height:140px;border-radius:10px}
+@keyframes sh{from{background-position:200% 0}to{background-position:-200% 0}}
+.errbox{padding:28px 8px;text-align:center;color:var(--fg2)}
+.errbox p{margin:0 0 14px;word-break:break-word}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 22px;border-radius:22px;background:var(--fg);color:#000;font-weight:700}
+.btn.ghost{background:var(--bg3);color:var(--fg)}
+.btn:disabled{opacity:.4}
+.hint{color:var(--fg2);text-align:center;padding:32px 8px}
+.sform{display:flex;gap:8px;padding:8px 0 4px}
+.sform input{flex:1;min-width:0;height:44px;border-radius:22px;border:1px solid var(--line);background:var(--bg2);color:var(--fg);padding:0 16px;font:inherit;font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
+.sform input:focus{border-color:#666}
+.bhead{display:flex;flex-direction:column;align-items:center;text-align:center;padding:4px 0 12px}
+.bhead .thumb{width:min(60vw,220px);height:min(60vw,220px);border-radius:8px}
+.bhead h2{margin:14px 0 2px;font-size:22px;word-break:break-word}
+.bhead p{margin:0 0 14px;color:var(--fg2);font-size:13px}
+#mini{position:fixed;left:0;right:0;bottom:calc(var(--nav-h) + var(--sab));height:var(--mini-h);background:#212121;display:flex;align-items:center;z-index:20;overflow:hidden;padding-right:4px}
+#mini[hidden]{display:none}
+#mini .mbar{position:absolute;left:0;right:0;top:0;height:2px;background:rgba(255,255,255,.15)}
+#mini .mbar i{display:block;height:100%;width:0;background:var(--fg)}
+#mini .mopen{flex:1;min-width:0;display:flex;align-items:center;gap:12px;height:100%;padding:0 0 0 16px;text-align:left}
+#mini .thumb{width:44px;height:44px;border-radius:4px}
+#mini .txt{flex:1;min-width:0}
+#mini .mt{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mini .ms{font-size:13px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mini .iconbtn{width:48px;height:48px}
+#nav{position:fixed;left:0;right:0;bottom:0;height:calc(var(--nav-h) + var(--sab));padding-bottom:var(--sab);background:#0f0f0f;border-top:1px solid var(--line);display:flex;z-index:21}
+#nav::after{content:"";position:absolute;left:0;right:0;top:100%;height:160px;background:#0f0f0f}
+#nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--fg2);text-decoration:none;font-size:10.5px;min-height:44px}
+#nav a svg{width:26px;height:26px}
+#nav a.on{color:var(--fg)}
+#full{position:fixed;left:0;right:0;top:0;bottom:0;background:linear-gradient(#262626,#030303 70%);z-index:50;transform:translateY(100%);visibility:hidden;transition:transform .28s ease,visibility 0s .28s;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:calc(var(--sat) + 4px) 20px calc(var(--sab) + 24px)}
+#full.open{transform:none;visibility:visible;transition:transform .28s ease}
+.fhead{display:flex;align-items:center;justify-content:space-between;min-height:48px}
+.fhead span{font-size:13px;color:var(--fg2)}
+.fart{width:min(84vw,46vh,420px);height:min(84vw,46vh,420px);margin:8px auto 18px;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.6)}
+.finfo{display:block}
+.ftitle{font-size:20px;font-weight:700;word-break:break-word}
+.fsub{font-size:14px;color:var(--fg2);margin-top:2px;word-break:break-word}
+.fstatrow{display:flex;align-items:center;gap:10px;margin-top:6px;min-height:44px}
+.fstat{font-size:12px;color:var(--accent);flex:1;min-width:0;word-break:break-word}
+.fstatrow .btn{min-height:44px;padding:0 16px;font-size:13px}
+.fstatrow .btn[hidden]{display:none}
+.seekrow{margin-top:4px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;margin:0;padding:0;background:transparent;touch-action:pan-y;display:block}
+input[type=range]:focus{outline:none}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(to right,#fff var(--p,0%),rgba(255,255,255,.25) var(--p,0%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;margin-top:-5px}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:rgba(255,255,255,.25)}
+input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:#fff}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:50%;background:#fff}
+input[type=range]:disabled{opacity:.45}
+.times{display:flex;justify-content:space-between;font-size:12px;color:var(--fg2);margin-top:-2px}
+.ctrls{display:flex;align-items:center;justify-content:center;gap:22px;margin:14px 0 22px}
+.ctrls .iconbtn{width:56px;height:56px}
+.ctrls .iconbtn svg{width:34px;height:34px}
+.ctrls .big{width:72px;height:72px;background:#fff;color:#000}
+.ctrls .big:active{background:#ddd}
+.ctrls .big svg{width:40px;height:40px}
+.qh{font-size:16px;font-weight:700;margin:6px 0 4px;border-top:1px solid var(--line);padding-top:14px}
+#qlist .row{min-height:52px}
+#qlist .row .thumb{width:44px;height:44px}
+#qlist .qt{color:inherit}
+#sheet{position:fixed;left:0;right:0;top:0;bottom:0;z-index:70;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+#sheet[hidden]{display:none}
+#sheet .panel{width:100%;max-width:520px;background:#1c1c1c;border-radius:16px 16px 0 0;padding:18px 18px calc(var(--sab) + 18px);max-height:85vh;overflow-y:auto}
+#sheet h3{margin:0 0 12px;font-size:18px}
+#sheet p{margin:8px 0;color:var(--fg2);font-size:13px;word-break:break-word}
+.seg{display:flex;gap:8px;margin:8px 0}
+.seg button{flex:1;min-height:48px;border-radius:12px;background:var(--bg3);font-weight:600}
+.seg button.on{background:#fff;color:#000}
+.sheetbtns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+/* Home-screen app on iOS: the page area ends one status-bar height above the real bottom of the
+   screen, which left a black strip under the bottom bar. Making the page that much taller fills it. */
+@media (display-mode: standalone){html{min-height:calc(100% + env(safe-area-inset-top))}}
+.ftitle{font-size:22px;font-weight:700;line-height:1.25}
+.fsub{font-size:16px}
+.fchips{display:flex;gap:8px;overflow-x:auto;padding:14px 0 6px;scrollbar-width:none}
+.fchips::-webkit-scrollbar{display:none}
+.chipbtn{flex:none;display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 16px;border:0;border-radius:22px;background:rgba(255,255,255,.1);color:var(--fg);font:inherit;font-size:14px;font-weight:500;white-space:nowrap}
+.chipbtn svg{width:20px;height:20px;fill:currentColor}
+.chipbtn.off{color:var(--fg2)}
+.chipbtn:disabled{opacity:.5}
+.ctrls{display:flex;align-items:center;justify-content:space-between;padding:10px 4px 4px}
+.ctrls .iconbtn{width:52px;height:52px;color:var(--fg)}
+.ctrls .iconbtn svg{width:30px;height:30px}
+.ctrls .iconbtn.big{width:76px;height:76px;border-radius:50%;background:#fff;color:#000}
+.ctrls .iconbtn.big svg{width:40px;height:40px}
+.ctrls .iconbtn.tog{color:rgba(255,255,255,.45)}
+.ctrls .iconbtn.tog.on{color:#fff}
+.ctrls .iconbtn.tog svg{width:26px;height:26px}
+.chipbtn.on{background:#fff;color:#000}
+.chipbtn.icononly{padding:0 14px}
+#sheet .panel{max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.plrow{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:52px;padding:0 4px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--fg);font:inherit;font-size:16px;text-align:left}
+.plrow span:last-child{color:var(--fg2);font-size:13px;flex:none}
+.cmt{padding:12px 0;border-bottom:1px solid var(--line)}
+.cmt .ca{font-size:13px;color:var(--fg2);margin-bottom:4px}
+.cmt .cx{font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+#toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + var(--mini-h) + var(--sab) + 20px);transform:translateX(-50%);max-width:86vw;padding:10px 16px;border-radius:10px;background:#f1f1f1;color:#0f0f0f;font-size:14px;z-index:90;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+#ptr{position:fixed;left:0;right:0;top:calc(var(--sat) + 6px);display:flex;justify-content:center;z-index:15;pointer-events:none;opacity:0;transition:opacity .15s}
+#ptr.show{opacity:1}
+#ptr span{padding:7px 14px;border-radius:16px;background:#212121;color:var(--fg);font-size:13px}
+.page.home::before{-webkit-mask-image:linear-gradient(transparent,#000 120px);mask-image:linear-gradient(transparent,#000 120px)}
+#full{background:linear-gradient(#030303,#262626 150px,#030303 75%)}
+#full.dragging{transition:none}
+/* Player screen: everything down to the transport buttons fits one screen. The artwork takes
+   whatever height is left after the fixed-height rows, and long titles are cut to one line. */
+.fart{--fa:min(84vw,420px,calc(100vh - 372px - var(--sat) - var(--sab)));width:var(--fa);height:var(--fa);margin:4px auto 14px}
+@supports (height:100dvh){.fart{--fa:min(84vw,420px,calc(100dvh - 372px - var(--sat) - var(--sab)))}}
+.ftitle,.fsub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal}
+.fsub{font-size:15px;margin-top:3px}
+.fstatrow{min-height:22px;margin-top:4px}
+.fchips{margin:0 -20px;padding:10px 20px 4px;scroll-padding:0 20px}
+.seekrow{margin-top:2px}
+.ctrls{padding:6px 4px 10px}
+/* Player v2: one fixed screen. The artwork spans the same width as the text below it and takes
+   the height that is left; the "up next" bar sits at the bottom; the queue slides over it. */
+#full{display:flex;flex-direction:column;overflow:hidden;overflow:clip;background:#030303}
+#full>*{flex:none}
+#fullBg{position:absolute;left:-15%;right:-15%;top:-10%;bottom:-10%;z-index:-1;background-size:cover;background-position:center;filter:blur(60px) saturate(1.8) brightness(.62);opacity:0;transition:opacity .7s;pointer-events:none}
+#fullBg.on{opacity:1}
+#full{transition:transform .28s ease,visibility 0s .28s,background-color .8s ease}
+#fullBg2{position:absolute;left:-30%;right:-30%;top:-20%;bottom:-20%;z-index:-1;background-size:cover;background-position:center;filter:blur(70px) saturate(2.2) brightness(.8);opacity:0;pointer-events:none}
+#fullPulse{position:absolute;left:-20%;right:-20%;top:-10%;height:80%;z-index:-1;background:radial-gradient(closest-side,rgba(255,255,255,.55),rgba(255,255,255,0));opacity:0;pointer-events:none}
+#full::after{content:"";position:absolute;left:0;right:0;top:0;bottom:0;z-index:-1;pointer-events:none;background:linear-gradient(var(--bar,rgba(3,3,3,0)),rgba(3,3,3,0) 120px),linear-gradient(rgba(3,3,3,.38),rgba(3,3,3,.2) 170px,rgba(3,3,3,.45) 62%,rgba(3,3,3,.88))}
+#full .fart{flex:1 1 0;min-height:0;width:100%;height:auto;max-height:calc(100vw - 40px);margin:4px 0 14px;border-radius:12px}
+.nextbar{margin-top:auto;display:flex;align-items:center;gap:12px;width:100%;min-height:62px;padding:8px 0;border:0;border-top:1px solid rgba(255,255,255,.14);background:none;color:var(--fg);font:inherit;text-align:left}
+.nextbar .thumb{width:44px;height:44px;border-radius:4px}
+.nextbar .txt{flex:1;min-width:0}
+.nextbar .nl{font-size:12px;color:var(--fg2)}
+.nextbar .nt{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nextbar .chev{flex:none;display:flex;color:var(--fg2)}
+.nextbar .chev svg{width:26px;height:26px;fill:currentColor}
+#qpanel{position:absolute;left:0;right:0;bottom:0;top:calc(var(--sat) + 56px);z-index:3;background:#161616;border-radius:16px 16px 0 0;transform:translateY(103%);transition:transform .25s ease;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 12px calc(var(--sab) + 16px)}
+#qpanel{visibility:hidden}
+#qpanel.open{transform:none;visibility:visible}
+.qhead{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;min-height:54px;padding-left:8px;background:#161616;font-size:16px;font-weight:700}
+.eqrow{padding:8px 0 2px}
+.eqrow .eql{display:flex;justify-content:space-between;font-size:14px}
+.eqrow .eql span:last-child{color:var(--fg2);font-variant-numeric:tabular-nums}
+.eqrow input[type=range]{width:100%;height:30px;margin:0;accent-color:#fff;touch-action:pan-y}
+/* An older rule still gave the transport row a 22px gap between buttons. On a narrow screen the
+   five buttons plus gaps were wider than the row and spilled out to the right, which pushed the
+   play button off centre. No fixed gap: the buttons are spread evenly instead. */
+.ctrls{gap:0;margin:0}
+#qlist .row{position:relative;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:transform .16s ease,opacity .16s ease;border-radius:8px}
+#qlist .row.swiping{transition:none}
+#qlist .row.lifted{transition:none;z-index:2;background:#2c2c2c;box-shadow:0 6px 18px rgba(0,0,0,.6)}
+#qpanel .qtip{font-size:12px;color:var(--fg2);padding:0 8px 8px}
+.stylesel{width:100%;min-height:44px;margin-top:4px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:#222;color:var(--fg);font:inherit;font-size:15px}
+.eqrow input[type=range]:disabled{opacity:.35}
+.hchips{display:flex;gap:8px;overflow-x:auto;margin:0 -16px 6px;padding:2px 16px 6px;scrollbar-width:none;position:relative;z-index:1}
+.hchips::-webkit-scrollbar{display:none}
+.hchip{flex:none;min-height:44px;padding:0 14px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:var(--fg);font:inherit;font-size:14px;font-weight:500;white-space:nowrap}
+.hchip.on{background:#fff;color:#000}
+.dlside{display:flex;align-items:center;gap:4px;flex:none;color:rgba(255,255,255,.6);font-size:13px}
+.dldel{min-width:44px;min-height:44px;border:0;background:none;color:rgba(255,255,255,.7);border-radius:22px;font:inherit;font-size:13px}
+.dldel.arm{color:#ff6b6b;font-weight:700}
+.dlbar{display:flex;gap:10px;align-items:center;margin:4px 0 10px}
+.dlbar .hint{margin:0;flex:1}
+.scene{display:block;width:100%;height:260px;margin:10px 0 6px;border-radius:12px;background:#141414;touch-action:none}
+.scenetip{font-size:12px;color:rgba(255,255,255,.55);margin:0 0 8px}
+/* ---------- player buttons in groups ---------- */
+.fchips[hidden]{display:none}
+.fchips.sub{margin-top:8px;flex-wrap:wrap;overflow-x:visible}
+.fchips.sub .chipbtn>[data-icon]{display:none}
+.fchips.sub .chipbtn{background:rgba(255,255,255,.16)}
+.fchips.sub .chipbtn.on{background:#fff;color:#000}
+.chipbtn.grp{gap:4px;padding-right:10px}
+.chipbtn.grp .car{display:inline-flex;transition:transform .2s ease}
+.chipbtn.grp .car svg{width:18px;height:18px}
+.chipbtn.grp[aria-expanded="true"]{background:rgba(255,255,255,.28)}
+.chipbtn.grp[aria-expanded="true"] .car{transform:rotate(180deg)}
+/* ---------- motion ---------- */
+body.calm *,body.calm *::before,body.calm *::after{animation:none!important}
+@keyframes pgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes itemIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes artIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.28)}100%{transform:scale(1)}}
+@keyframes sheetUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@keyframes dim{from{opacity:0}to{opacity:1}}
+@keyframes bars{0%{background-size:4px 30%,4px 75%,4px 45%}33%{background-size:4px 80%,4px 35%,4px 65%}66%{background-size:4px 45%,4px 90%,4px 30%}100%{background-size:4px 30%,4px 75%,4px 45%}}
+/* a page arriving: the whole page, then its sections and rows one after another */
+.page.enter{animation:pgIn .26s ease both}
+.page.enter .sec,.page.enter>div>.row,.page.enter .hchips,.page.enter .dlbar{animation:itemIn .38s cubic-bezier(.2,.8,.3,1) both}
+.page.enter .sec:nth-child(2),.page.enter>div>.row:nth-child(2){animation-delay:.04s}
+.page.enter .sec:nth-child(3),.page.enter>div>.row:nth-child(3){animation-delay:.08s}
+.page.enter .sec:nth-child(4),.page.enter>div>.row:nth-child(4){animation-delay:.12s}
+.page.enter .sec:nth-child(5),.page.enter>div>.row:nth-child(5){animation-delay:.16s}
+.page.enter .sec:nth-child(6),.page.enter>div>.row:nth-child(6){animation-delay:.2s}
+.page.enter .sec:nth-child(n+7),.page.enter>div>.row:nth-child(n+7){animation-delay:.24s}
+/* things give a little under the finger */
+.row,.card,.chipbtn,.hchip,.btn,.iconbtn,#nav a,.dldel{transition:transform .14s ease,background-color .2s ease,color .2s ease}
+/* queue rows are moved by the finger directly, so they must follow it without easing */
+#qlist .row{transition:none}
+.row:active{transform:scale(.985)}
+.card:active{transform:scale(.96)}
+.chipbtn:active,.hchip:active,.btn:active{transform:scale(.94)}
+.iconbtn:active,#nav a:active{transform:scale(.88)}
+/* pictures fade in as they arrive */
+.thumb img.in{animation:dim .35s ease both}
+/* the song that is playing shows moving bars over its picture */
+.now .thumb::after{content:"";position:absolute;left:0;top:0;right:0;bottom:0;background-color:rgba(0,0,0,.55);background-image:linear-gradient(#fff,#fff),linear-gradient(#fff,#fff),linear-gradient(#fff,#fff);background-repeat:no-repeat;background-position:calc(50% - 8px) 68%,50% 68%,calc(50% + 8px) 68%;background-size:4px 30%,4px 75%,4px 45%;animation:bars .9s ease-in-out infinite;animation-play-state:paused}
+.card.now .thumb::after{background-size:6px 30%,6px 75%,6px 45%}
+body.playing .now .thumb::after{animation-play-state:running}
+/* the big picture settles back when paused and comes forward when playing */
+#fullArt{transition:transform .5s cubic-bezier(.3,1.5,.5,1)}
+body:not(.playing) #fullArt{transform:scale(.9)}
+#fullArt img{animation:artIn .45s ease both}
+#fPlay{transition:transform .16s ease}
+#fPlay:active{transform:scale(.9)}
+.chipbtn.on svg,#nav a.on svg{animation:pop .32s ease}
+/* sheets rise from the bottom */
+#sheet.enter{animation:dim .2s ease both}
+#sheet.enter .panel{animation:sheetUp .3s cubic-bezier(.2,.9,.3,1) both}
+#toast{transition:opacity .2s,transform .25s cubic-bezier(.2,.9,.3,1);transform:translateX(-50%) translateY(10px)}
+#toast.show{transform:translateX(-50%)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}body:not(.playing) #fullArt{transform:none}}
+/* title that travels when it is too long for one line */
+@keyframes mq{0%,18%{transform:translateX(0)}50%,68%{transform:translateX(var(--mq))}100%{transform:translateX(0)}}
+.ftitle{text-overflow:clip}
+.ftitle .mqt{display:inline-block;white-space:nowrap;will-change:transform}
+.ftitle.long .mqt{animation:mq var(--mqs) ease-in-out infinite}
+.ftitle.tap,.fsub .lk{cursor:pointer}
+.fsub{padding:6px 0;margin-top:0}
+.fsub .lk{color:var(--fg);text-decoration:none;font-weight:500;padding:8px 0}
+.fsub .lk:active,.ftitle.tap:active{opacity:.6}
+.lyrics{white-space:pre-wrap;font-size:17px;line-height:1.75;color:var(--fg);word-break:break-word}
+.lyricsrc{margin-top:14px;font-size:12px;color:var(--fg2)}
+/* ---------- lyrics mode ---------- */
+#full.lyr #fullArt{display:none}
+#full:not(.lyr) #lyrView{display:none}
+#lyrView{flex:1 1 0;min-height:200px;margin:2px 0 8px;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;-webkit-mask-image:linear-gradient(transparent,#000 16%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 16%,#000 70%,transparent)}
+#lyrView::-webkit-scrollbar{display:none}
+#lyrBody{padding:34% 4px 62%}
+.lyl{font-size:27px;line-height:1.28;font-weight:800;padding:10px 0;color:rgba(255,255,255,.3);transform-origin:left center;transition:color .4s ease,transform .4s ease;word-break:break-word}
+.lyl.cur{color:#fff;transform:scale(1.04)}
+.lyl.past{color:rgba(255,255,255,.18)}
+.lyl.gap{padding:14px 0}
+#lyrBody.flat .lyl{color:rgba(255,255,255,.82)}
+#lyrBody.sync .lyl{cursor:pointer}
+.lyhint{font-size:12px;color:rgba(255,255,255,.5);padding:0 0 12px}
+</style>
+</head>
+<body>
+<main id="view"></main>
+
+<div id="mini" hidden>
+  <div class="mbar"><i id="mbarFill"></i></div>
+  <button class="mopen" id="miniOpen" type="button" aria-label="展開播放頁">
+    <div class="thumb" id="miniArt"></div>
+    <div class="txt"><div class="mt" id="miniTitle"></div><div class="ms" id="miniSub"></div></div>
+  </button>
+  <button class="iconbtn" id="miniPlay" type="button" aria-label="播放或暫停" data-icon="play"></button>
+  <button class="iconbtn" id="miniNext" type="button" aria-label="下一首" data-icon="next"></button>
+</div>
+
+<nav id="nav">
+  <a href="#/home" data-tab="home"><span data-icon="home"></span><span>首頁</span></a>
+  <a href="#/search" data-tab="search"><span data-icon="search"></span><span>搜尋</span></a>
+  <a href="#/downloads" data-tab="downloads"><span data-icon="dlIcon"></span><span>下載</span></a>
+  <a href="#/history" data-tab="history"><span data-icon="histIcon"></span><span>紀錄</span></a>
+</nav>
+
+<section id="full" aria-hidden="true">
+  <div class="fhead">
+    <button class="iconbtn" id="fullClose" type="button" aria-label="收合" data-icon="down"></button>
+    <span>正在播放</span>
+    <button class="iconbtn" id="fullGear" type="button" aria-label="設定" data-icon="gear"></button>
+  </div>
+  <div class="thumb fart" id="fullArt"></div>
+  <div id="lyrView" aria-label="歌詞"><div id="lyrBody"></div></div>
+  <div class="finfo">
+    <div class="ftitle" id="fullTitle"></div>
+    <div class="fsub" id="fullSub"></div>
+    <div class="fstatrow"><div class="fstat" id="fullStat"></div><button class="btn ghost" id="fRetry" type="button" hidden>重試</button></div>
+  </div>
+  <div class="fchips" id="rowMain">
+    <button class="chipbtn icononly" id="fLike" type="button" aria-label="喜歡" aria-pressed="false"><span data-icon="thumbUp"></span></button>
+    <button class="chipbtn icononly" id="fDislike" type="button" aria-label="不喜歡" aria-pressed="false"><span data-icon="thumbDown"></span></button>
+    <button class="chipbtn" id="fLyrics" type="button"><span>歌詞</span></button>
+    <button class="chipbtn grp" id="fGrpSound" type="button" aria-expanded="false" aria-controls="rowSound"><span>音效</span><span class="car" data-icon="down"></span></button>
+    <button class="chipbtn grp" id="fGrpMore" type="button" aria-expanded="false" aria-controls="rowMore"><span>更多</span><span class="car" data-icon="down"></span></button>
+  </div>
+  <div class="fchips sub" id="rowSound" hidden>
+    <button class="chipbtn" id="fSurround" type="button" aria-pressed="true"><span data-icon="headset"></span><span id="fSurroundTxt">環繞 開</span></button>
+    <button class="chipbtn" id="fProfile" type="button" aria-pressed="false"><span id="fProfileTxt">耳機</span></button>
+    <button class="chipbtn" id="fMix" type="button" aria-pressed="false"><span>混音</span></button>
+    <button class="chipbtn" id="fStyle" type="button"><span id="fStyleTxt">風格</span></button>
+    <button class="chipbtn" id="fEq" type="button"><span id="fEqTxt">EQ</span></button>
+  </div>
+  <div class="fchips sub" id="rowMore" hidden>
+    <button class="chipbtn" id="fDl" type="button"><span data-icon="dlIcon"></span><span id="fDlTxt">下載</span></button>
+    <button class="chipbtn" id="fComments" type="button"><span data-icon="comment"></span><span>留言</span></button>
+    <button class="chipbtn" id="fSave" type="button"><span data-icon="playlistAdd"></span><span>儲存</span></button>
+    <button class="chipbtn" id="fShare" type="button"><span data-icon="share"></span><span>分享</span></button>
+  </div>
+  <div class="seekrow">
+    <input type="range" id="seek" min="0" max="1" step="0.1" value="0" aria-label="播放進度">
+    <div class="times"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+  </div>
+  <div class="ctrls">
+    <button class="iconbtn tog" id="fShuffle" type="button" aria-label="隨機播放" aria-pressed="false" data-icon="shuffle"></button>
+    <button class="iconbtn" id="fPrev" type="button" aria-label="上一首" data-icon="prev"></button>
+    <button class="iconbtn big" id="fPlay" type="button" aria-label="播放或暫停" data-icon="play"></button>
+    <button class="iconbtn" id="fNext" type="button" aria-label="下一首" data-icon="next"></button>
+    <button class="iconbtn tog" id="fRepeat" type="button" aria-label="重複播放" data-icon="repeat"></button>
+  </div>
+  <button class="nextbar" id="nextBar" type="button" aria-label="開啟即將播放清單">
+    <div class="thumb" id="nextArt"></div>
+    <div class="txt"><div class="nl">即將播放</div><div class="nt" id="nextTitle"></div></div>
+    <span class="chev" data-icon="up"></span>
+  </button>
+  <div id="qpanel" aria-hidden="true">
+    <div class="qhead"><span>即將播放</span><button class="iconbtn" id="qClose" type="button" aria-label="關閉清單" data-icon="down"></button></div>
+    <div class="qtip">左右滑動移除，長按後拖曳可改順序</div>
+    <div id="qlist"></div>
+  </div>
+  <div id="fullBg" aria-hidden="true"></div>
+  <div id="fullBg2" aria-hidden="true"></div>
+  <div id="fullPulse" aria-hidden="true"></div>
+</section>
+
+<div id="sheet" hidden></div>
+<div id="toast" role="status"></div>
+<div id="ptr"><span id="ptrTxt">下拉以更新</span></div>
+
+
+<script src="backend.js"></script>
+<script src="standalone.js"></script>
+<script>
+(function () {
+'use strict';
+
+var ICONS = {
+  histIcon: 'M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z',
+  dlIcon: 'M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z',
+  trashIcon: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+  play: 'M8 5v14l11-7z',
+  pause: 'M6 19h4V5H6v14zm8-14v14h4V5h-4z',
+  next: 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z',
+  prev: 'M6 6h2v12H6zm3.5 6l8.5 6V6z',
+  home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+  search: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
+  down: 'M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z',
+  back: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
+  up: 'M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z',
+  thumbUp: 'M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z',
+  thumbDown: 'M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z',
+  comment: 'M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18zM18 14H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z',
+  playlistAdd: 'M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z',
+  share: 'M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z',
+  shuffle: 'M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z',
+  repeat: 'M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z',
+  repeatOne: 'M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z',
+  headset: 'M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-4v8h3c1.66 0 3-1.34 3-3v-7c0-4.97-4.03-9-9-9z',
+  gear: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-1.99-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'
+};
+var SVGNS = 'http://www.w3.org/2000/svg';
+
+function $(id) { return document.getElementById(id); }
+function enc(s) { return encodeURIComponent(s); }
+function el(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function icon(name) {
+  var svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  var p = document.createElementNS(SVGNS, 'path');
+  p.setAttribute('d', ICONS[name]);
+  svg.appendChild(p);
+  return svg;
+}
+function setIcon(node, name) {
+  var p = node.querySelector('path');
+  if (p) p.setAttribute('d', ICONS[name]);
+}
+function initIcons() {
+  var nodes = document.querySelectorAll('[data-icon]');
+  for (var i = 0; i < nodes.length; i++) {
+    nodes[i].appendChild(icon(nodes[i].getAttribute('data-icon')));
+  }
+}
+function fmt(s) {
+  s = Math.max(0, Math.floor(+s || 0));
+  var m = Math.floor(s / 60), r = s % 60;
+  return m + ':' + (r < 10 ? '0' : '') + r;
+}
+function lsGet(k) {
+  try { return localStorage.getItem(k); } catch (e) { return null; }
+}
+function lsSet(k, v) {
+  try { localStorage.setItem(k, v); } catch (e) {}
+}
+
+function api(path, method, body) {
+  var opt = { method: method || 'GET', headers: {} };
+  if (body !== undefined) {
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify(body);
+  }
+  return fetch(path, opt).then(function (r) {
+    return r.text().then(function (t) {
+      var j = null;
+      try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
+      if (!r.ok) {
+        dbg(r.status >= 500 && r.status !== 503 ? 'E' : 'W', 'api', { p: String(path).slice(0, 70), s: r.status });
+        var err = new Error((j && j.error) || ('HTTP ' + r.status));
+        err.status = r.status;
+        throw err;
+      }
+      return j || {};
+    });
+  });
+}
+
+function isSong(it) {
+  return !!it && (it.kind === 'song' || it.kind === 'video') && !!it.videoId;
+}
+function thumbUrl(it) {
+  if (!it) return '';
+  if (it.thumb) return it.thumb;
+  if (it.videoId && (it.kind === 'song' || it.kind === 'video')) return 'https://i.ytimg.com/vi/' + it.videoId + '/mqdefault.jpg';
+  return '';
+}
+function makeThumb(it, cls) {
+  var d = el('div', 'thumb' + (cls ? ' ' + cls : ''));
+  setThumb(d, thumbUrl(it));
+  return d;
+}
+function setThumb(box, url) {
+  box.textContent = '';
+  if (!url) return;
+  var img = document.createElement('img');
+  img.loading = 'lazy';
+  img.alt = '';
+  img.addEventListener('error', function () { img.style.display = 'none'; });
+  img.src = url;
+  box.appendChild(img);
+}
+
+/* ---------- state ---------- */
+/* ---------- reporting what happens to the PC (debug.log there) ---------- */
+var DBG = { q: [], sid: Math.random().toString(36).slice(2, 8), seq: 0, timer: null };
+/* level: E = something went wrong, W = worth a look, I = ordinary event */
+function dbg(level, kind, data) {
+  try {
+    var e = { t: Date.now(), n: ++DBG.seq, l: level, k: kind, d: data || null };
+    try {
+      e.v = S.vid || '';
+      e.ct = Math.round((audio.currentTime || 0) * 10) / 10;
+      e.p = audio.paused ? 1 : 0;
+      e.rs = audio.readyState;
+      e.h = document.hidden ? 1 : 0;
+      e.c = 'app';
+      e.f = (S.ready ? 'r' : '') + (S.loading ? 'l' : '') + (S.wantPlay ? 'w' : '');
+    } catch (x) {}
+    DBG.q.push(e);
+    if (DBG.q.length > 300) DBG.q.shift();
+    clearTimeout(DBG.timer);
+    DBG.timer = setTimeout(dbgFlush, level === 'E' ? 150 : 1500);
+  } catch (x2) {}
+}
+function dbgFlush(beacon) {
+  if (!DBG.q.length) return;
+  var body = JSON.stringify({ sid: DBG.sid, items: DBG.q.splice(0, DBG.q.length) });
+  try {
+    if (beacon === true && navigator.sendBeacon) {
+      navigator.sendBeacon('/api/debug', new Blob([body], { type: 'application/json' }));
+      return;
+    }
+    fetch('/api/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+  } catch (e) {}
+}
+function dbgBind(a, name) {
+  ['playing', 'pause', 'ended', 'waiting', 'stalled', 'loadedmetadata'].forEach(function (n) {
+    a.addEventListener(n, function () {
+      dbg(n === 'stalled' ? 'W' : 'I', 'el-' + n, { el: name, src: String(a.currentSrc).slice(0, 5), dur: isFinite(a.duration) ? Math.round(a.duration) : String(a.duration) });
+    });
+  });
+  a.addEventListener('error', function () {
+    dbg('E', 'el-error', { el: name, code: a.error ? a.error.code : 0, msg: a.error && a.error.message ? String(a.error.message).slice(0, 120) : '', src: String(a.currentSrc).slice(0, 60) });
+  });
+}
+window.addEventListener('error', function (e) {
+  /* 'Script error.' with no place is the browser hiding an error from outside this page (an extension, the share sheet). */
+  dbg(e.filename ? 'E' : 'W', 'js-error', { m: String(e.message || '').slice(0, 200), at: String(e.filename || '').slice(-30) + ':' + (e.lineno || 0) });
+});
+window.addEventListener('unhandledrejection', function (e) {
+  dbg('E', 'promise', { m: String((e.reason && (e.reason.message || e.reason)) || '').slice(0, 200) });
+});
+document.addEventListener('visibilitychange', function () {
+  dbg('I', document.hidden ? 'page-hidden' : 'page-shown');
+  if (document.hidden) dbgFlush(true);
+});
+['pagehide', 'pageshow', 'freeze', 'resume', 'online', 'offline'].forEach(function (n) {
+  var target = (n === 'freeze' || n === 'resume') ? document : window;
+  target.addEventListener(n, function () { dbg(n === 'offline' ? 'W' : 'I', n); if (n === 'pagehide' || n === 'freeze') dbgFlush(true); });
+});
+
+/* ---------- load report: how hard the page is working ---------- */
+var PERF = { tick: 0, late: 0, maxLate: 0, fxMs: 0, fxCalls: 0, since: 0 };
+/* A timer that should fire every 200 ms: when the page is busy, it fires late. */
+setInterval(function () {
+  var now = performance.now();
+  if (PERF.tick && !document.hidden) {
+    var late = now - PERF.tick - 200;
+    if (late > 100) PERF.late++;
+    if (late > PERF.maxLate) PERF.maxLate = late;
+  }
+  PERF.tick = now;
+}, 200);
+function perfReport() {
+  var span = (performance.now() - PERF.since) / 1000;
+  PERF.since = performance.now();
+  var base = {
+    lateTimers: PERF.late, worstLateMs: Math.round(PERF.maxLate),
+    backdropPerSec: span > 0 ? Math.round(PERF.fxCalls / span * 10) / 10 : 0,
+    backdropMsEach: PERF.fxCalls ? Math.round(PERF.fxMs / PERF.fxCalls * 100) / 100 : 0
+  };
+  PERF.late = 0; PERF.maxLate = 0; PERF.fxMs = 0; PERF.fxCalls = 0;
+  try {
+    base.player = $('full').classList.contains('open') ? 1 : 0;
+    base.backdrop = lsGet('ytm_fx') === '0' ? 'off' : (FX.on ? 'running' : 'idle');
+    base.motion = document.body.classList.contains('calm') ? 'off' : 'on';
+    base.lyrics = lyrOn() ? 1 : 0;
+    base.surround = S.surround ? 1 : 0;
+    base.nowBars = document.querySelectorAll('.now .thumb').length;
+    try { base.memMB = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1; } catch (e7) {}
+  } catch (e) {}
+  if (document.hidden) {
+    dbg('I', 'perf', base);
+    return;
+  }
+  /* One second of counting screen refreshes: fewer than the screen can show means the phone is
+     struggling to draw; long gaps are the visible stutters. */
+  var frames = 0, slow = 0, last = 0, start = performance.now();
+  var count = function (t) {
+    if (last && t - last > 50) slow++;
+    last = t;
+    frames++;
+    if (t - start < 1000) requestAnimationFrame(count);
+    else {
+      base.fps = Math.round(frames * 1000 / (t - start));
+      base.slowFrames = slow;
+      dbg(base.fps < 40 || slow > 3 || base.lateTimers > 5 ? 'W' : 'I', 'perf', base);
+    }
+  };
+  requestAnimationFrame(count);
+}
+setInterval(function () { try { if (S.wantPlay || !document.hidden) perfReport(); } catch (e) {} }, 15000);
+
+/* ---------- the iPhone app ----------
+   This page only ever runs inside the app: the app plays the sound, applies surround, EQ and
+   loudness, and stores downloaded songs. Commands go out through nativePost(); the app answers
+   through window.__ytmNativeEvent(). */
+/* Inside the app the native side owns the lock screen / CarPlay Now Playing and the remote
+   commands, so the page leaves navigator.mediaSession alone there. */
+function inApp() {
+  try { return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.ytm); } catch (e) { return false; }
+}
+function nativePost(m) {
+  try { if (window.__ytmGlue && window.__ytmGlue.post(m)) return; } catch (e) {}
+  try { window.webkit.messageHandlers.ytm.postMessage(m); } catch (e) {}
+}
+/* Stands in for the <audio> element: same properties and events, but the app does the playing. */
+function NativeAudio() {
+  this.L = {};
+  this.paused = true;
+  this.ended = false;
+  this.T = 0;
+  this.U = "";
+  this.currentSrc = "";
+  this.duration = NaN;
+  this.seekHold = 0;
+}
+NativeAudio.prototype.addEventListener = function (n, f) { (this.L[n] = this.L[n] || []).push(f); };
+NativeAudio.prototype.removeEventListener = function (n, f) {
+  var a = this.L[n] || [], i = a.indexOf(f);
+  if (i >= 0) a.splice(i, 1);
+};
+NativeAudio.prototype.emit = function (n) {
+  (this.L[n] || []).slice().forEach(function (f) { try { f({ type: n }); } catch (e) {} });
+};
+NativeAudio.prototype.play = function () {
+  this.ended = false;
+  nativePost({ cmd: 'play' });
+  if (this.paused) { this.paused = false; this.emit('play'); }
+  return Promise.resolve();
+};
+NativeAudio.prototype.pause = function () {
+  nativePost({ cmd: 'pause' });
+  if (!this.paused) { this.paused = true; this.emit('pause'); }
+};
+NativeAudio.prototype.load = function () {};
+NativeAudio.prototype.setAttribute = function () {};
+NativeAudio.prototype.removeAttribute = function () {};
+NativeAudio.prototype.getAttribute = function () { return null; };
+Object.defineProperty(NativeAudio.prototype, 'src', {
+  get: function () { return this.U; },
+  set: function (v) {
+    v = String(v);
+    var m = /#t=(\d+)/.exec(v);
+    this.U = v;
+    this.currentSrc = v;
+    this.T = m ? +m[1] : 0;
+    this.duration = NaN;
+    this.ended = false;
+    this.paused = true;
+    this.seekHold = 0;
+    nativePost({ cmd: 'load', url: v.split('#')[0], startAt: this.T });
+  }
+});
+Object.defineProperty(NativeAudio.prototype, 'currentTime', {
+  get: function () { return this.T; },
+  set: function (v) {
+    this.T = +v || 0;
+    /* Ignore the positions reported until the jump has happened. */
+    this.seekHold = Date.now() + 1500;
+    nativePost({ cmd: 'seek', t: this.T });
+  }
+});
+var audioA = new NativeAudio();
+var audio = audioA;
+
+var S = {
+  queue: [], index: -1, cur: null, vid: null, token: 0,
+  ready: false, loading: false, err: '',
+  dragging: false, artFor: null, lastPos: -1,
+  shuffle: lsGet('ytm_shuffle') === '1',
+  repeat: (lsGet('ytm_repeat') === 'all' || lsGet('ytm_repeat') === 'one') ? lsGet('ytm_repeat') : 'off',
+  surround: lsGet('ytm_surround') !== '0'
+};
+
+/* The level of the plain path (surround off). The app is told it together with the surround
+   setting, so that surround on and off are equally loud. */
+var HEADROOM = 0.708;
+/* ---------- loudness balancing ---------- */
+/* Songs are brought to this level. Most modern releases are louder, so they are turned down;
+   quiet ones are turned up, by no more than 6 dB so the limiter is not pushed hard. */
+var NORM_TARGET_DEFAULT = -9;
+function normTarget() {
+  var v = parseFloat(lsGet('ytm_norm_target'));
+  return isFinite(v) ? Math.max(-16, Math.min(-5, v)) : NORM_TARGET_DEFAULT;
+}
+function normOn() { return lsGet('ytm_norm') !== '0'; }
+function normDb(lufs) { return Math.max(-12, Math.min(6, normTarget() - lufs)); }
+/* The app measures each song and reports it; kept here for the display in the loudness panel. */
+function gotLufs(v) { S.lufs = v; }
+
+var EQ_BANDS = [
+  { name: '低頻', type: 'lowshelf', f: 150 },
+  { name: '中低頻', type: 'peaking', f: 400, q: 1 },
+  { name: '中頻', type: 'peaking', f: 1500, q: 1 },
+  { name: '中高頻', type: 'peaking', f: 5000, q: 1 },
+  { name: '高頻', type: 'highshelf', f: 10000 }
+];
+function eqGains() {
+  var g = null;
+  try { g = JSON.parse(lsGet('ytm_eq' + psuf()) || 'null'); } catch (e) { g = null; }
+  return EQ_BANDS.map(function (b, i) {
+    var v = g && isFinite(+g[i]) ? +g[i] : (isCar() ? (CAR_EQ[i] || 0) : 0);
+    return Math.max(-12, Math.min(12, v));
+  });
+}
+function setEqGains(g) {
+  lsSet('ytm_eq' + psuf(), JSON.stringify(g));
+  fxApply();
+  renderEqChip();
+}
+function renderEqChip() {
+  var on = eqGains().some(function (v) { return v !== 0; });
+  $('fEqTxt').textContent = on ? 'EQ 已調整' : 'EQ';
+}
+function openEq() {
+  openPanel('等化器與響度', function (body) {
+    var nb = el('button', 'plrow');
+    nb.type = 'button';
+    var drawNorm = function () {
+      nb.textContent = '';
+      nb.appendChild(el('span', null, '響度平衡（每首歌調到相近音量）'));
+      var info = normOn() ? '開' : '關';
+      if (normOn() && typeof S.lufs === 'number') info = '開 · 這首 ' + (normDb(S.lufs) > 0 ? '+' : '') + normDb(S.lufs).toFixed(1) + ' dB';
+      nb.appendChild(el('span', null, info));
+    };
+    nb.addEventListener('click', function () {
+      lsSet('ytm_norm', normOn() ? '0' : '1');
+      if (window.__ytmGlue && window.__ytmGlue.sound) window.__ytmGlue.sound();
+      drawNorm();
+    });
+    drawNorm();
+    body.appendChild(nb);
+    var trow = el('div', 'eqrow');
+    var tlab = el('div', 'eql');
+    tlab.appendChild(el('span', null, '整體音量（響度平衡的目標）'));
+    var tval = el('span', null, '');
+    tlab.appendChild(tval);
+    trow.appendChild(tlab);
+    var tin = document.createElement('input');
+    tin.type = 'range';
+    tin.min = '-16';
+    tin.max = '-5';
+    tin.step = '0.5';
+    tin.value = normTarget();
+    tin.setAttribute('aria-label', '整體音量');
+    var drawT = function () { tval.textContent = normTarget().toFixed(1) + ' LUFS'; };
+    tin.addEventListener('input', function () {
+      lsSet('ytm_norm_target', tin.value);
+      if (window.__ytmGlue && window.__ytmGlue.sound) window.__ytmGlue.sound();
+      drawT();
+      drawNorm();
+    });
+    trow.appendChild(tin);
+    body.appendChild(trow);
+    drawT();
+    body.appendChild(el('p', null, '環繞開或關都會套用。往右是增強、往左是減弱，單位是分貝。'));
+    var g = eqGains();
+    var sliders = [];
+    var draw = function (i) {
+      sliders[i].val.textContent = (g[i] > 0 ? '+' : '') + g[i].toFixed(1) + ' dB';
+      sliders[i].input.value = g[i];
+    };
+    EQ_BANDS.forEach(function (b, i) {
+      var row = el('div', 'eqrow');
+      var lab = el('div', 'eql');
+      lab.appendChild(el('span', null, b.name + '（' + (b.f >= 1000 ? (b.f / 1000) + ' kHz' : b.f + ' Hz') + '）'));
+      var val = el('span', null, '');
+      lab.appendChild(val);
+      row.appendChild(lab);
+      var input = document.createElement('input');
+      input.type = 'range';
+      input.min = '-12';
+      input.max = '12';
+      input.step = '0.5';
+      input.setAttribute('aria-label', b.name);
+      input.addEventListener('input', function () {
+        g[i] = +input.value;
+        setEqGains(g);
+        draw(i);
+      });
+      row.appendChild(input);
+      body.appendChild(row);
+      sliders.push({ input: input, val: val });
+      draw(i);
+    });
+    var btns = el('div', 'sheetbtns');
+    var less = el('button', 'btn ghost', '低頻 −3 dB');
+    less.type = 'button';
+    less.addEventListener('click', function () { g[0] = -3; setEqGains(g); draw(0); });
+    btns.appendChild(less);
+    var reset = el('button', 'btn ghost', '全部歸零');
+    reset.type = 'button';
+    reset.addEventListener('click', function () {
+      g = g.map(function () { return 0; });
+      setEqGains(g);
+      sliders.forEach(function (x, i) { draw(i); });
+    });
+    btns.appendChild(reset);
+    body.appendChild(btns);
+  });
+}
+
+/* The surround style is a base HRIR set plus four amounts (whole percentages). */
+/* Two sets of sound settings, kept apart: one for headphones, one for the car's speakers. */
+var HEAD_STYLE = { b: 'dh', w: 0, v: 50, h: 60, t: 100, o: 0, g: 0 };
+/* Car: no height layer (it relies on headphone cues), more width and envelopment instead. */
+var CAR_STYLE = { b: 'dh', w: 40, v: 50, h: 0, t: 100, o: 30, g: 0 };
+var CAR_EQ = [-3, 0, 0, 0, 0];
+function isCar() { return lsGet('ytm_profile') === 'car'; }
+function psuf() { return isCar() ? '_car' : ''; }
+var STYLE_DEFAULT = isCar() ? CAR_STYLE : HEAD_STYLE;
+/* Automatic mixing between songs is done by the app's player. The page keeps the switch; the glue
+   tells the app, and hands it what the PC knows about each song (tempo, where it starts and ends). */
+function mixOn() { return lsGet('ytm_mix') === '1'; }
+function renderMixChip() {
+  var b = $('fMix');
+  b.classList.toggle('on', mixOn());
+  b.setAttribute('aria-pressed', mixOn() ? 'true' : 'false');
+}
+function toggleMix() {
+  lsSet('ytm_mix', mixOn() ? '0' : '1');
+  renderMixChip();
+  if (window.__ytmGlue && window.__ytmGlue.mix) window.__ytmGlue.mix();
+  dbg('I', 'setting', { mix: mixOn() ? 1 : 0 });
+  toast(mixOn() ? '自動混音已開啟' : '自動混音已關閉');
+}
+function renderProfileChip() {
+  var b = $('fProfile');
+  if (!b) return;
+  $('fProfileTxt').textContent = isCar() ? '車用' : '耳機';
+  b.classList.toggle('on', isCar());
+  b.setAttribute('aria-pressed', isCar() ? 'true' : 'false');
+}
+function toggleProfile() {
+  lsSet('ytm_profile', isCar() ? '' : 'car');
+  STYLE_DEFAULT = isCar() ? CAR_STYLE : HEAD_STYLE;
+  fxApply();
+  renderProfileChip();
+  renderPlayer();
+  renderEqChip();
+  toast(isCar() ? '已切到車用設定' : '已切到耳機設定');
+}
+function styleParams() {
+  var p = null;
+  try { p = JSON.parse(lsGet('ytm_style_params' + psuf()) || 'null'); } catch (e) { p = null; }
+  if (!p) p = isCar() ? CAR_STYLE : legacyStyle();
+  var num = function (v, max, def) { v = Math.round(+v); return isFinite(v) ? Math.max(0, Math.min(max, v)) : def; };
+  return { b: typeof p.b === 'string' && /^[\w-]{1,20}$/.test(p.b) ? p.b : STYLE_DEFAULT.b,
+    w: num(p.w, 100, STYLE_DEFAULT.w), v: num(p.v, 80, STYLE_DEFAULT.v), h: num(p.h, 150, STYLE_DEFAULT.h), t: num(p.t, 180, STYLE_DEFAULT.t), o: num(p.o, 100, STYLE_DEFAULT.o), g: isFinite(Math.round(+p.g)) ? Math.max(-60, Math.min(60, Math.round(+p.g))) : 0 };
+}
+/* Carries over a style picked from the earlier fixed list, read from its id. */
+function legacyStyle() {
+  var id = lsGet('ytm_style');
+  if (!id) return STYLE_DEFAULT;
+  if (id === 'hesuvi') return { b: 'hesuvi', w: 0, v: 0, h: 0, t: 0 };
+  var bases = ['dh-large', 'dht', 'dh', 'atmos', 'dtshx', 'gsx', 'sbx', 'waves'];
+  var b = 'dh', i;
+  for (i = 0; i < bases.length; i++) { if (id === bases[i] || id.indexOf(bases[i] + '-') === 0) { b = bases[i]; break; } }
+  var rest = '-' + id.slice(b.length) + '-';
+  return {
+    b: b,
+    w: rest.indexOf('-wide-') >= 0 ? 100 : 0,
+    v: rest.indexOf('-v12-') >= 0 ? 75 : (rest.indexOf('-v6-') >= 0 ? 50 : 0),
+    h: (rest.indexOf('-hh-') >= 0 || rest.indexOf('-kk-') >= 0) ? 100 : ((rest.indexOf('-h-') >= 0 || rest.indexOf('-k-') >= 0) ? 60 : 0),
+    t: rest.indexOf('-t5-') >= 0 ? 50 : (rest.indexOf('-t-') >= 0 ? 100 : 0)
+  };
+}
+function irUrl(ch) {
+  var p = styleParams();
+  return '/api/ir/custom/' + ch + '.wav?b=' + enc(p.b) + '&w=' + p.w + '&v=' + p.v + '&h=' + p.h + '&t=' + p.t + '&o=' + p.o + '&g=' + p.g;
+}
+function isPlaying() { return S.ready && !audio.paused; }
+function curTime() { return audio.currentTime; }
+
+/* ---------- songs kept on the phone (the app stores the files; the page keeps the list) ---------- */
+var DL = { items: {}, onChange: null, timer: null };
+function dlSaveIndex() {
+  var o = {}, id;
+  for (id in DL.items) if (DL.items[id].state === 'done') o[id] = DL.items[id];
+  lsSet('ytm_dl', JSON.stringify(o));
+}
+function dlHas(id) { return !!(DL.items[id] && DL.items[id].state === 'done'); }
+function dlChanged() {
+  renderDlChip();
+  if (DL.onChange) DL.onChange();
+}
+function dlChangedSoon() {
+  if (DL.timer) return;
+  DL.timer = setTimeout(function () { DL.timer = null; dlChanged(); }, 300);
+}
+function fmtSize(n) { return (n / 1048576).toFixed(1) + ' MB'; }
+function srcAt(a, id, at) {
+  a.src = mediaUrl(id) + (at ? '#t=' + at : '');
+}
+
+/* The song after this one: the PC is asked for two bytes of it, which makes it look the stream up
+   now rather than when the song is wanted. */
+var warmedNext = '';
+function preNext() {
+  var it = S.queue[S.index + 1];
+  if (!it || !it.videoId || dlHas(it.videoId)) return;
+  var want = mediaUrl(it.videoId);
+  if (warmedNext === want) return;
+  warmedNext = want;
+  fetch(want, { headers: { Range: 'bytes=0-1' } }).catch(function () {});
+}
+/* Where a song is fetched from: the plain file on the PC (the glue turns this into the PC's
+   address; the app's own engine does the sound). */
+function mediaUrl(id) {
+  return '/media/' + enc(id) + '.m4a?mode=phone';
+}
+/* A sound setting was changed: the glue sends it to the app's engine, which applies it to the
+   song that is playing. */
+function fxApply() {
+  if (window.__ytmGlue && window.__ytmGlue.sound) window.__ytmGlue.sound();
+}
+/* Matches what the list says with what is really stored (ids: {id: size}). */
+function dlReconcile(stored) {
+  var id, changed = false;
+  for (id in DL.items) {
+    if (DL.items[id].state === 'done' && !(id in stored)) { delete DL.items[id]; changed = true; }
+  }
+  if (changed) dlSaveIndex();
+  dlChanged();
+}
+function dlInit() {
+  try {
+    var o = JSON.parse(lsGet('ytm_dl') || '{}');
+    if (o && typeof o === 'object') DL.items = o;
+  } catch (e) {}
+  nativePost({ cmd: 'dlList' });
+}
+function dlFinish(id, size) {
+  var m = DL.items[id];
+  if (!m) return;
+  m.state = 'done';
+  m.size = size;
+  dlSaveIndex();
+  dlChanged();
+  dlDetails(id, 0);
+}
+/* The real length and the loudness, so a stored song needs nothing from the PC to play right. */
+function dlDetails(id, n) {
+  api('/api/track/' + enc(id) + '/status?mode=phone').then(function (st) {
+    var m = DL.items[id];
+    if (!m) return;
+    if (st && st.duration > 0) m.duration = st.duration;
+    if (st && typeof st.lufs === 'number') m.lufs = st.lufs;
+    dlSaveIndex();
+    if (!(m.duration > 0 && typeof m.lufs === 'number') && n < 10) setTimeout(function () { dlDetails(id, n + 1); }, 3000);
+  }).catch(function () {});
+}
+function dlFail(id) {
+  var m = DL.items[id];
+  if (!m) return;
+  m.state = 'error';
+  dlChanged();
+  toast('下載失敗：' + ((m.item && m.item.title) || ''));
+}
+function dlStart(item) {
+  if (!item || !item.videoId) return;
+  var id = item.videoId;
+  if (DL.items[id] && DL.items[id].state !== 'error') return;
+  var copy;
+  try { copy = JSON.parse(JSON.stringify(item)); } catch (e) { copy = { videoId: id, title: item.title }; }
+  DL.items[id] = { item: copy, state: 'loading', got: 0, total: 0, size: 0, at: Date.now(), duration: 0, lufs: null };
+  dlChanged();
+  nativePost({ cmd: 'dl', id: id, url: mediaUrl(id) });
+}
+function dlRemove(id) {
+  delete DL.items[id];
+  dlSaveIndex();
+  nativePost({ cmd: 'dlDelete', id: id });
+  dlChanged();
+}
+/* Reports from the iPhone app. */
+function dlNative(e) {
+  var m = DL.items[e.id];
+  if (!m) return;
+  if (e.state === 'progress') { m.got = e.got || 0; m.total = e.total > 0 ? e.total : 0; dlChangedSoon(); }
+  else if (e.state === 'done') dlFinish(e.id, e.size || 0);
+  else if (e.state === 'error') dlFail(e.id);
+}
+function dlNativeList(items) {
+  var stored = {};
+  (items || []).forEach(function (x) { stored[x.id] = x.size; });
+  dlReconcile(stored);
+}
+function dlPct(m) { return m.total > 0 ? Math.min(99, Math.floor(m.got * 100 / m.total)) + '%' : fmtSize(m.got); }
+function renderDlChip() {
+  var t = $('fDlTxt');
+  if (!t) return;
+  var m = S.vid && DL.items[S.vid];
+  t.textContent = !m ? '下載' : (m.state === 'done' ? '已下載' : (m.state === 'loading' ? '下載中 ' + dlPct(m) : '重試下載'));
+}
+function dlChipTap() {
+  if (!S.cur) return;
+  var m = DL.items[S.cur.videoId];
+  if (m && m.state === 'done') { toast('已存在手機，可到「下載」頁管理'); return; }
+  if (m && m.state === 'loading') return;
+  dlStart(S.cur);
+}
+/* HISTORY-BEGIN ---------- play history, kept on the phone only ----------
+   A song counts as played once it has been heard for 30 s, or for half of its length if that
+   comes first. Only the time actually heard counts (jumps of more than 2 s are seeking, not
+   listening), once per time the song is started - a song handed over by an automatic mix is
+   counted once, from where the app reports it. Nothing is ever sent to the YouTube account. */
+function makeHistory(store, now) {
+  var KEY = 'ytm_history', MAX = 500, NEED = 30;
+  var list = null, run = { key: '', heard: 0, last: -1, done: false };
+  var load = function () {
+    if (list) return list;
+    var v = null;
+    try { v = JSON.parse(store.get(KEY) || 'null'); } catch (e) { v = null; }
+    list = Array.isArray(v) ? v.filter(function (x) { return x && typeof x.videoId === 'string'; }) : [];
+    return list;
+  };
+  var save = function () { store.set(KEY, JSON.stringify(list)); };
+  var add = function (it, dur) {
+    load();
+    var i, count = 0;
+    for (i = 0; i < list.length; i++) {
+      if (list[i].videoId === it.videoId) { count = list[i].count || 1; list.splice(i, 1); break; }
+    }
+    list.unshift({
+      videoId: it.videoId, title: it.title || '', artist: it.subtitle || it.artist || '',
+      thumb: it.thumb || '', duration: dur > 0 ? Math.round(dur) : 0, playedAt: now(), count: count + 1
+    });
+    if (list.length > MAX) list.length = MAX;
+    save();
+  };
+  return {
+    /* run: anything that changes whenever a song is started again (the page's play token) */
+    tick: function (runId, it, t, dur) {
+      if (!it || !it.videoId || typeof t !== 'number' || !isFinite(t)) return false;
+      var key = runId + '|' + it.videoId;
+      if (key !== run.key) run = { key: key, heard: 0, last: -1, done: false };
+      if (run.done) return false;
+      var d = run.last < 0 ? 0 : t - run.last;
+      run.last = t;
+      if (d > 0 && d <= 2) run.heard += d;
+      if (run.heard >= NEED || (dur > 0 && run.heard >= dur / 2)) {
+        run.done = true;
+        add(it, dur);
+        return true;
+      }
+      return false;
+    },
+    /* songs the app counted by itself (oldest first); one that is already here is skipped */
+    addNative: function (items) {
+      load();
+      var n = 0;
+      (items || []).forEach(function (it) {
+        if (!it || typeof it.videoId !== 'string') return;
+        var pa = Math.round(+it.playedAt || now()), i, count = 0;
+        for (i = 0; i < list.length; i++) if (list[i].pa === pa) return;
+        for (i = 0; i < list.length; i++) {
+          if (list[i].videoId === it.videoId) { count = list[i].count || 1; list.splice(i, 1); break; }
+        }
+        list.unshift({
+          videoId: it.videoId, title: it.title || '', artist: it.artist || '', thumb: it.thumb || '',
+          duration: +it.duration > 0 ? Math.round(+it.duration) : 0, playedAt: pa, pa: pa, count: count + 1
+        });
+        n++;
+      });
+      if (list.length > MAX) list.length = MAX;
+      if (n) save();
+      return n;
+    },
+    list: function () { return load().slice(); },
+    clear: function () { list = []; save(); },
+    /* 今天 / 昨天 / 本週 (the 5 days before those) / 更早, by the phone's calendar days */
+    groups: function () {
+      var d = new Date(now());
+      var today = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      var day = function (ms) { var x = new Date(ms); return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); };
+      var names = ['今天', '昨天', '本週', '更早'], out = names.map(function (n) { return { title: n, items: [] }; });
+      load().forEach(function (h) {
+        var ago = Math.round((today - day(h.playedAt || 0)) / 86400000);
+        out[ago <= 0 ? 0 : ago === 1 ? 1 : ago < 7 ? 2 : 3].items.push(h);
+      });
+      return out.filter(function (g) { return g.items.length; });
+    }
+  };
+}
+var HIST = makeHistory({ get: lsGet, set: lsSet }, Date.now);
+/* HISTORY-END */
+function histItem(h) {
+  var s = Math.max(0, h.duration || 0);
+  return {
+    kind: 'song', videoId: h.videoId, title: h.title, thumb: h.thumb, playlistId: '', browseId: '',
+    subtitle: (h.artist || '') + ((h.count || 1) > 1 ? (h.artist ? ' · ' : '') + '播放 ' + h.count + ' 次' : ''),
+    duration: s ? fmt(s) : ''
+  };
+}
+var histTab = 'local';
+function renderHistory(vt, page) {
+  var tb = el('div', 'topbar');
+  tb.appendChild(el('h1', null, '歷史紀錄'));
+  page.appendChild(tb);
+  var seg = el('div', 'hchips');
+  var host = el('div');
+  var tabs = [['local', '這支手機'], ['account', 'YouTube Music 紀錄']];
+  tabs.forEach(function (t) {
+    var b = el('button', 'hchip' + (histTab === t[0] ? ' on' : ''), t[1]);
+    b.type = 'button';
+    b.setAttribute('data-hist', t[0]);
+    b.setAttribute('aria-pressed', histTab === t[0] ? 'true' : 'false');
+    b.addEventListener('click', function () { if (histTab !== t[0]) { histTab = t[0]; route(true); } });
+    seg.appendChild(b);
+  });
+  page.appendChild(seg);
+  page.appendChild(host);
+  if (histTab === 'account') {
+    /* Read only: the account's own history page, through the PC's signed-in tab. */
+    var sk = skeleton(false);
+    host.appendChild(sk);
+    api('/api/browse?id=FEmusic_history').then(function (d) {
+      if (vt !== viewToken) return;
+      sk.remove();
+      if (!d.sections || !d.sections.length) { host.appendChild(el('div', 'hint', '目前拿不到帳號的播放紀錄（電腦上登入 YouTube Music 的分頁需要開著）。')); return; }
+      renderSections(host, d.sections, 'list');
+    }).catch(function (e) {
+      if (vt !== viewToken) return;
+      sk.remove();
+      host.appendChild(errorBox(e.message, function () { route(true); }));
+    });
+    return;
+  }
+  var all = HIST.list().map(histItem);
+  var bar = el('div', 'dlbar');
+  bar.appendChild(el('div', 'hint', all.length ? all.length + ' 首' : ''));
+  if (all.length) {
+    var clr = el('button', 'btn', '清除紀錄');
+    clr.type = 'button';
+    clr.setAttribute('data-hist', 'clear');
+    /* Two taps: the first only asks, so a slip of the finger clears nothing. */
+    clr.addEventListener('click', function () {
+      if (clr.classList.contains('arm')) { HIST.clear(); route(true); return; }
+      clr.classList.add('arm');
+      clr.textContent = '確定清除全部紀錄？';
+      setTimeout(function () { if (clr.isConnected) { clr.classList.remove('arm'); clr.textContent = '清除紀錄'; } }, 3000);
+    });
+    bar.appendChild(clr);
+  }
+  host.appendChild(bar);
+  if (!all.length) {
+    host.appendChild(el('div', 'hint', '還沒有播放紀錄。一首歌聽了 30 秒（或短歌聽了一半）就會記在這裡，只存在這支手機。'));
+    return;
+  }
+  HIST.groups().forEach(function (g) {
+    var wrap = el('section', 'sec');
+    wrap.appendChild(secHeadEl(g.title, null));
+    var l = el('div', 'songlist');
+    g.items.forEach(function (h) {
+      var it = histItem(h);
+      /* tapping plays from here, the older entries following as the queue */
+      var k = 0;
+      while (k < all.length && all[k].videoId !== it.videoId) k++;
+      l.appendChild(rowEl(it, function () { openItem(all[k] || it, all); }));
+    });
+    wrap.appendChild(l);
+    host.appendChild(wrap);
+  });
+}
+
+function renderDownloads(vt, page) {
+  var tb = el('div', 'topbar');
+  tb.appendChild(el('h1', null, '下載'));
+  page.appendChild(tb);
+  var host = el('div');
+  page.appendChild(host);
+  var draw = function () {
+    if (vt !== viewToken) { if (DL.onChange === draw) DL.onChange = null; return; }
+    var keep = view.scrollTop;
+    host.textContent = '';
+    var list = Object.keys(DL.items).map(function (id) { return DL.items[id]; });
+    list.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    var done = list.filter(function (m) { return m.state === 'done'; });
+    var bytes = done.reduce(function (n, m) { return n + (m.size || 0); }, 0);
+    var bar = el('div', 'dlbar');
+    bar.appendChild(el('div', 'hint', done.length + ' 首，共 ' + fmtSize(bytes)));
+    if (done.length) {
+      var all = el('button', 'btn', '全部播放');
+      all.type = 'button';
+      all.addEventListener('click', function () { playFromList(done.map(function (m) { return m.item; }), done[0].item); });
+      bar.appendChild(all);
+    }
+    host.appendChild(bar);
+    if (!list.length) host.appendChild(el('div', 'hint', '還沒有下載的歌。播放時按播放頁的「下載」，歌就會存到手機。'));
+    list.forEach(function (m) {
+      var id = m.item.videoId;
+      var row = rowEl(m.item, function () {
+        if (m.state === 'done') playFromList(done.map(function (x) { return x.item; }), m.item);
+        else if (m.state === 'error') dlStart(m.item);
+      });
+      var side = el('div', 'dlside');
+      side.appendChild(el('span', null, m.state === 'done' ? fmtSize(m.size || 0) : (m.state === 'loading' ? dlPct(m) : '失敗，點一下重試')));
+      var del = el('button', 'dldel');
+      del.type = 'button';
+      del.setAttribute('aria-label', '刪除 ' + (m.item.title || ''));
+      del.appendChild(icon('trashIcon'));
+      /* Two taps: the first only arms the button, so a slip of the finger deletes nothing. */
+      del.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (del.classList.contains('arm')) { dlRemove(id); return; }
+        del.classList.add('arm');
+        del.textContent = '確定刪除';
+        setTimeout(function () { if (del.isConnected) { del.classList.remove('arm'); del.textContent = ''; del.appendChild(icon('trashIcon')); } }, 3000);
+      });
+      side.appendChild(del);
+      row.appendChild(side);
+      host.appendChild(row);
+    });
+    view.scrollTop = keep;
+  };
+  DL.onChange = draw;
+  draw();
+}
+if (lsGet('ytm_calm') === '1') document.body.classList.add('calm');
+dlInit();
+dbg('I', 'boot', { ua: navigator.userAgent.slice(0, 140), w: window.innerWidth, h: window.innerHeight, sh: screen.height, app: 1 });
+
+/* ---------- songs on screen get their stream looked up ahead of the tap ---------- */
+var warmSeen = {};
+var warmTimer = null;
+/* Looks at where the song rows are, rather than using IntersectionObserver, which stays silent
+   while the page is not being drawn. */
+function warmFlush() {
+  warmTimer = null;
+  var now = Date.now(), ids = [], nodes = document.querySelectorAll('[data-vid]'), i, id, r;
+  var w = window.innerWidth, h = window.innerHeight;
+  for (i = 0; i < nodes.length && ids.length < 12; i++) {
+    id = nodes[i].getAttribute('data-vid');
+    if (!id || dlHas(id) || now - (warmSeen[id] || 0) < 4 * 3600 * 1000) continue;
+    r = nodes[i].getBoundingClientRect();
+    if (r.width === 0 || r.bottom <= 0 || r.top >= h || r.right <= 0 || r.left >= w) continue;
+    ids.push(id);
+    warmSeen[id] = now;
+  }
+  if (ids.length) api('/api/warm', 'POST', { ids: ids }).catch(function () { ids.forEach(function (x) { delete warmSeen[x]; }); });
+}
+/* Wait until scrolling has paused, so songs that only fly past are not looked up. */
+function warmSoon() {
+  clearTimeout(warmTimer);
+  warmTimer = setTimeout(warmFlush, 450);
+}
+document.addEventListener('scroll', warmSoon, true);
+if ('MutationObserver' in window) new MutationObserver(warmSoon).observe(document.body, { childList: true, subtree: true });
+
+/* Tells the app which songs follow, so it can carry on by itself with the screen locked. */
+function nativeQueue() {
+  var items = [], i, it;
+  if (S.repeat !== 'one') {
+    for (i = S.index + 1; i < S.queue.length && items.length < 5; i++) {
+      it = S.queue[i];
+      if (!it || !it.videoId) continue;
+      items.push({ id: it.videoId, url: mediaUrl(it.videoId), title: it.title || '',
+        artist: it.subtitle || '', artwork: hdUrl(it) || thumbUrl(it) || '', duration: parseDur(it.duration) || 0 });
+    }
+  }
+  nativePost({ cmd: 'queue', items: items });
+}
+/* The app started the next song on its own: bring the page in line without touching playback.
+   startPos: where that song has got to. After a mix the song is already some seconds in when
+   the app says it has taken over. */
+function nativeAdvanced(id, startPos) {
+  var i, at = -1;
+  /* already the current song (it was picked while the app was mixing into it) */
+  if (id === S.vid && S.ready) return;
+  for (i = S.index + 1; i < S.queue.length; i++) {
+    if (S.queue[i] && S.queue[i].videoId === id) { at = i; break; }
+  }
+  if (at < 0) {
+    /* Not among the songs that follow: the app and the page disagree about the queue. What is
+       playing decides. The song is looked for anywhere in the queue; if it is not there at all it
+       is put in after the current one, with what was told to the app about it. Either way the
+       queue is sent again below, so that both agree on what follows. */
+    for (i = 0; i < S.queue.length; i++) {
+      if (S.queue[i] && S.queue[i].videoId === id) { at = i; break; }
+    }
+    dbg('W', 'advanced-unknown', { id: id, found: at >= 0 ? 'earlier' : 'not-in-queue', index: S.index, at: at });
+    if (at < 0) {
+      var known = (window.__ytmGlue && window.__ytmGlue.sentMeta && window.__ytmGlue.sentMeta(id)) || {};
+      at = Math.min(S.queue.length, S.index + 1);
+      S.queue.splice(at, 0, { kind: 'song', videoId: id, title: known.title || '', subtitle: known.artist || '', thumb: known.artwork || '', playlistId: '', browseId: '', duration: '', seconds: known.duration || 0 });
+    }
+  }
+  var item = S.queue[at];
+  S.index = at;
+  S.token++;
+  S.cur = item;
+  S.vid = id;
+  S.loading = false;
+  S.ready = true;
+  S.err = '';
+  S.lastPos = -1;
+  S.wantPlay = true;
+  S.trueDur = parseDur(item.duration) || item.seconds || 0;
+  S.trueDurExact = false;
+  S.lufs = null;
+  audioA.U = audioA.currentSrc = mediaUrl(id);
+  audioA.T = startPos > 0 ? startPos : 0;
+  audioA.paused = false;
+  audioA.ended = false;
+  audioA.duration = NaN;
+  document.title = item.title || 'YT Music 遠端播放';
+  updateProgress(audioA.T, S.trueDur || 0);
+  renderPlayer();
+  renderQueue();
+  extendQueue();
+  prefetch();
+  fetchTrueDur(S.token, id, 0);
+}
+if (window.__ytmGlue && window.__ytmGlue.page) window.__ytmGlue.page({
+  irUrl: irUrl, eqGains: eqGains, normOn: normOn, normTarget: normTarget, gotLufs: gotLufs, dbg: dbg,
+  headroom: function () { return HEADROOM; },
+  surround: function () { return !!S.surround; },
+  vid: function () { return S.vid || ''; },
+  addHistory: function (items) {
+    var n = HIST.addNative(items);
+    /* the history list on screen shows the new songs at once */
+    if (n && histTab === 'local' && /^#\/history/.test(location.hash || '')) route(true);
+    return n;
+  },
+  render: function () { renderPlayer(); },
+  exactDur: function (id, d) { if (S.vid === id && d > 0) { S.trueDur = d; S.trueDurExact = true; updateProgress(audioA.currentTime, d); } },
+  dlForget: function (id) { if (DL.items[id]) { delete DL.items[id]; dlSaveIndex(); dlChanged(); } },
+  /* The same refresh as pulling the home feed down, without the spinner or the jump to the top.
+     When home is not on screen, the next time it is drawn it asks for the fresh feed instead. */
+  homeQuiet: function () {
+    if (homeRefresh && homeRefresh.vt === viewToken) { homeRefresh(null, true); return 'now'; }
+    homeWantFresh = true;
+    return 'later';
+  },
+  thumbOf: function (id) {
+    var i, it = S.cur && S.cur.videoId === id ? S.cur : null;
+    for (i = 0; !it && i < S.queue.length; i++) if (S.queue[i] && S.queue[i].videoId === id) it = S.queue[i];
+    return it ? thumbUrl(it) : '';
+  },
+  toast: toast,
+  mixOn: mixOn,
+  titleOf: function (id) {
+    var i;
+    for (i = 0; i < S.queue.length; i++) if (S.queue[i] && S.queue[i].videoId === id) return S.queue[i].title || '';
+    return '';
+  },
+  fail: function (msg) { S.loading = false; S.wantPlay = false; S.err = msg; renderPlayer(); toast(msg); }
+});
+window.__ytmNativeEvent = function (e) {
+  var a = audioA;
+  if (!e) return;
+  if (e.type === 'time') {
+    if (a.seekHold && Date.now() < a.seekHold) return;
+    a.T = e.t;
+    if (e.dur > 0) a.duration = e.dur;
+    a.emit('timeupdate');
+  } else if (e.type === 'state') {
+    var was = a.paused;
+    a.paused = !e.playing;
+    if (was && e.playing) { a.emit('play'); a.emit('playing'); }
+    else if (!was && !e.playing) a.emit('pause');
+    else if (e.playing) a.emit('playing');
+  } else if (e.type === 'ready') {
+    if (e.dur > 0) a.duration = e.dur;
+    a.emit('loadedmetadata');
+    a.emit('durationchange');
+  } else if (e.type === 'seeked') {
+    a.seekHold = 0;
+    a.emit('seeked');
+  } else if (e.type === 'ended') {
+    a.paused = true;
+    a.ended = true;
+    a.emit('ended');
+  } else if (e.type === 'error') {
+    a.emit('error');
+  } else if (e.type === 'remote') {
+    if (e.action === 'next') next(true);
+    else if (e.action === 'prev') prev(true);
+  } else if (e.type === 'dl') {
+    dlNative(e);
+  } else if (e.type === 'dlList') {
+    dlNativeList(e.items);
+  } else if (e.type === 'advanced') {
+    nativeAdvanced(e.id, +e.t || 0);
+  }
+};
+
+function prefetch() {
+  nativeQueue();
+  var ids = [], i;
+  for (i = S.index + 1; i < S.queue.length && ids.length < 2; i++) {
+    if (S.queue[i] && S.queue[i].videoId) ids.push(S.queue[i].videoId);
+  }
+  if (ids.length) api('/api/prefetch', 'POST', { ids: ids, mode: 'phone' }).catch(function () {});
+}
+
+/* songChange: inside the app the native player takes the next song over by itself, so no pause
+   is sent in between (that pause made CarPlay leave its Now Playing screen). */
+function haltAudio(songChange) {
+  S.ready = false;
+  if (songChange && inApp()) return;
+  try { audioA.pause(); } catch (e) {}
+}
+
+function playTrack(item, gesture) {
+  var token = ++S.token;
+  /* The song the app is mixing into right now was picked (next was pressed, or it was tapped):
+     the app keeps it playing, so nothing is stopped and the position shown is left alone until
+     the app reports where that song is. */
+  var mixing = !!(window.__ytmGlue && window.__ytmGlue.mixingInto && window.__ytmGlue.mixingInto(item.videoId));
+  if (mixing) {
+    S.ready = false;
+    posHold = true;
+    setTimeout(function () { if (token === S.token) posHold = false; }, 1500);
+  } else {
+    posHold = false;
+    haltAudio(true);
+  }
+  dbg('I', 'pick', { id: item.videoId, title: String(item.title || '').slice(0, 40), tap: gesture ? 1 : 0 });
+  S.wantPlay = true;
+  S.cur = item;
+  S.vid = item.videoId;
+  S.loading = true;
+  S.err = '';
+  S.lastPos = -1;
+  S.trueDur = parseDur(item.duration);
+  if (!mixing) updateProgress(0, 0);
+  setMeta(item);
+  renderPlayer();
+  renderQueue();
+
+  var id = item.videoId;
+  extendQueue();
+  /* No waiting: the source is set and play is pressed in this same call; the app fetches the
+     song from the PC (or takes its stored file) and starts it. */
+  var startAt = (S.resumeVid === id && S.resumeAt > 2) ? Math.floor(S.resumeAt) : 0;
+  S.resumeAt = 0;
+  S.resumeVid = '';
+  srcAt(audio, id, startAt);
+  S.loading = false;
+  S.ready = true;
+  renderPlayer();
+  var pp = audio.play();
+  if (pp && pp.catch) pp.catch(function (err) { dbg(err && err.name === 'AbortError' ? 'W' : 'E', 'play-rejected', { n: err && err.name, m: err && String(err.message || '').slice(0, 100) }); renderPlayState(); });
+  prefetch();
+  S.lufs = null;
+  S.trueDurExact = false;
+  var kept = DL.items[id];
+  if (kept && kept.state === 'done' && kept.duration > 0) {
+    S.trueDur = kept.duration;
+    S.trueDurExact = true;
+    if (typeof kept.lufs === 'number') gotLufs(kept.lufs);
+    updateProgress(startAt, S.trueDur);
+  }
+  fetchTrueDur(token, id, 0);
+}
+
+/* The phone can report a song as longer than it is. The real length comes from the song list
+   ("3:13") and, more exactly, from the server once it has looked the stream up. */
+function parseDur(t) {
+  var m = /^(?:(\d+):)?(\d{1,2}):(\d{2})$/.exec(String(t || '').trim());
+  if (!m) return 0;
+  return (+(m[1] || 0)) * 3600 + (+m[2]) * 60 + (+m[3]) + 0.9;
+}
+function fetchTrueDur(token, id, n) {
+  api('/api/track/' + enc(id) + '/status?mode=phone').then(function (st) {
+    if (token !== S.token) return;
+    var haveDur = st && st.duration > 0;
+    var haveLufs = st && typeof st.lufs === 'number';
+    if (haveDur && !(S.trueDurExact)) {
+      S.trueDur = st.duration;
+      S.trueDurExact = true;
+      updateProgress(audio.currentTime, realDur(audio));
+      updatePosState();
+    }
+    if (haveLufs) gotLufs(st.lufs);
+    if ((!haveDur || !haveLufs) && n < 16) {
+      setTimeout(function () { fetchTrueDur(token, id, n + 1); }, 800);
+    }
+  }).catch(function () {});
+}
+function realDur(a) {
+  if (S.trueDur > 0) return S.trueDur;
+  return a.duration;
+}
+
+/* When only a couple of songs are left, append related ones, like autoplay in YT Music. */
+var extending = false;
+function extendQueue() {
+  /* With "repeat all" the queue loops instead of growing. */
+  if (S.repeat === 'all') return;
+  if (extending || !S.queue.length || S.queue.length - S.index > 3) return;
+  var last = S.queue[S.queue.length - 1];
+  if (!last || !last.videoId) return;
+  var q = S.queue;
+  extending = true;
+  api('/api/queue?videoId=' + enc(last.videoId)).then(function (d) {
+    if (S.queue !== q) return;
+    var have = {};
+    q.forEach(function (x) { have[x.videoId] = 1; });
+    ((d && d.items) || []).forEach(function (x) {
+      if (isSong(x) && !have[x.videoId]) { have[x.videoId] = 1; q.push(x); }
+    });
+    if (S.shuffle) shuffleUpcoming();
+    renderQueue();
+    prefetch();
+  }).catch(function () {}).then(function () { extending = false; });
+}
+
+function next(gesture) {
+  /* gesture is false when a song ended by itself; only then does "repeat one" replay it. */
+  if (!gesture && S.repeat === 'one' && S.queue[S.index]) {
+    playTrack(S.queue[S.index], false);
+    return;
+  }
+  if (S.index + 1 >= S.queue.length && S.repeat === 'all' && S.queue.length) {
+    S.index = 0;
+    playTrack(S.queue[0], !!gesture);
+    return;
+  }
+  if (S.index + 1 < S.queue.length) {
+    S.index++;
+    playTrack(S.queue[S.index], !!gesture);
+  } else {
+    stopPlayback();
+  }
+}
+
+function prev(gesture) {
+  if (S.ready && curTime() > 3) {
+    seekTo(0);
+    return;
+  }
+  if (S.index > 0) {
+    S.index--;
+    playTrack(S.queue[S.index], !!gesture);
+  } else if (S.cur) {
+    if (S.ready) seekTo(0);
+    else playTrack(S.cur, !!gesture);
+  }
+}
+
+function stopPlayback() {
+  S.wantPlay = false;
+  S.token++;
+  S.loading = false;
+  haltAudio();
+  renderPlayer();
+}
+
+function togglePlay() {
+  if (!S.cur || S.loading) return;
+  if (!S.ready) {
+    playTrack(S.cur, true);
+    return;
+  }
+  if (audio.paused) {
+    S.wantPlay = true;
+    var p = audio.play();
+    if (p && p.catch) p.catch(function () {});
+  } else {
+    S.wantPlay = false;
+    audio.pause();
+  }
+  renderPlayState();
+}
+
+function setPlaying(want) {
+  if (!S.cur) return;
+  if (!S.ready) {
+    if (want && !S.loading) playTrack(S.cur, true);
+    return;
+  }
+  if (isPlaying() !== want) togglePlay();
+}
+
+function seekTo(t) {
+  if (!S.ready) return;
+  try { audio.currentTime = t; } catch (e) {}
+}
+
+var failStreak = 0;
+function bindAudio(a) {
+  var mine = function () { return a === audio && S.ready; };
+  a.addEventListener('playing', function () { if (mine()) { failStreak = 0; renderPlayState(); } });
+  a.addEventListener('play', function () { if (mine()) renderPlayState(); });
+  a.addEventListener('pause', function () { if (mine()) renderPlayState(); });
+  a.addEventListener('loadedmetadata', function () {
+    if (mine()) updateProgress(a.currentTime, realDur(a));
+  });
+  a.addEventListener('durationchange', function () {
+    if (mine()) updateProgress(a.currentTime, realDur(a));
+  });
+  a.addEventListener('timeupdate', function () {
+    if (!mine()) return;
+    posHold = false;
+    updateProgress(a.currentTime, realDur(a));
+    if (a.currentTime > 15) preNext();
+    var pos = Math.floor(a.currentTime);
+    if (pos !== S.lastPos) {
+      S.lastPos = pos;
+      updatePosState();
+    }
+  });
+  a.addEventListener('ended', function () {
+    if (mine()) next(false);
+  });
+  a.addEventListener('error', function () {
+    if (mine()) {
+      S.err = (window.__ytmGlue && window.__ytmGlue.errorText && window.__ytmGlue.errorText()) || '音檔載入失敗';
+      renderPlayer();
+      /* Skip to the next song once; a second failure in a row stays where it is, so that the
+         reason can be read. */
+      failStreak++;
+      if (failStreak <= 1 && S.index + 1 < S.queue.length) {
+        toast(S.err + '，已跳到下一首');
+        next(false);
+      }
+    }
+  });
+}
+bindAudio(audioA);
+wireEl(audioA);
+/* A song that was asked for but never got going (the page was left while it was loading) is
+   started when the page is shown again. Limited to songs still at their very start, so music
+   that was paused from outside - a call, earphones taken out - does not restart by itself. */
+function resumeIfNeverStarted() {
+  if (document.hidden || !S.wantPlay || !S.ready || !audio.paused) return;
+  if (audio.currentTime > 1) return;
+  var p = audio.play();
+  if (p && p.catch) p.catch(function () {});
+}
+/* What the player needs besides bindAudio. */
+function wireEl(a) {
+  dbgBind(a, 'main');
+  a.addEventListener('playing', function () {
+    if (a !== audio || !S.ready) return;
+    remoteControls();
+    if (S.cur) setMeta(S.cur);
+    updatePosState();
+  });
+  a.addEventListener('timeupdate', function () {
+    if (a === audio && S.ready) saveState(false);
+    /* the play history: what has been heard of the song now playing */
+    /* inside the app the app counts it (this page stops running when the screen is off) */
+    if (!window.__ytmNative && a === audio && S.ready && S.cur) HIST.tick(S.token, S.cur, a.currentTime, S.trueDur || realDur(a));
+  });
+  a.addEventListener('pause', function () {
+    if (a !== audio) return;
+    if (S.ready) saveState(true);
+  });
+}
+/* The buttons on the lock screen and in the Dynamic Island. The phone only offers the ones it has
+   been given a handler for, and it can lose track of them when the source of the sound changes,
+   so they are handed over again every time a song starts playing. */
+function remoteControls() {
+  try {
+    if (inApp() || !('mediaSession' in navigator)) return;
+    var ms = navigator.mediaSession;
+    var set = function (name, fn) { try { ms.setActionHandler(name, fn); } catch (e) {} };
+    set('play', function () { dbg('I', 'remote', { a: 'play' }); setPlaying(true); });
+    set('pause', function () { dbg('I', 'remote', { a: 'pause' }); setPlaying(false); });
+    set('previoustrack', function () { dbg('I', 'remote', { a: 'prev' }); prev(true); });
+    set('nexttrack', function () { dbg('I', 'remote', { a: 'next' }); next(true); });
+    set('seekto', function (d) {
+      dbg('I', 'remote', { a: 'seek', to: d && d.seekTime });
+      if (d && isFinite(d.seekTime)) seekTo(d.seekTime);
+    });
+    /* With these two set, the phone shows 10-second skips in place of previous and next. */
+    set('seekbackward', null);
+    set('seekforward', null);
+  } catch (e2) {}
+}
+document.addEventListener('visibilitychange', resumeIfNeverStarted);
+window.addEventListener('pageshow', resumeIfNeverStarted);
+window.addEventListener('focus', resumeIfNeverStarted);
+
+/* ---------- queue sources ---------- */
+function playFromList(list, item) {
+  var songs = list.filter(isSong);
+  var i = -1, k;
+  for (k = 0; k < songs.length; k++) {
+    if (songs[k].videoId === item.videoId) { i = k; break; }
+  }
+  if (i < 0) i = 0;
+  if (!songs.length) return;
+  S.queue = songs.slice(i);
+  S.index = 0;
+  playTrack(S.queue[0], true);
+}
+
+function playAll(songs) {
+  if (!songs.length) return;
+  S.queue = songs.slice();
+  S.index = 0;
+  playTrack(S.queue[0], true);
+}
+
+function playSingle(item) {
+  S.queue = [item];
+  S.index = 0;
+  playTrack(item, true);
+  var q = '/api/queue?videoId=' + enc(item.videoId);
+  if (item.playlistId) q += '&playlistId=' + enc(item.playlistId);
+  api(q).then(function (d) {
+    if (S.queue.length !== 1 || S.queue[0] !== item) return;
+    var rest = ((d && d.items) || []).filter(function (x) {
+      return isSong(x) && x.videoId !== item.videoId;
+    });
+    rest.forEach(function (x) { S.queue.push(x); });
+    if (S.shuffle) shuffleUpcoming();
+    renderQueue();
+    prefetch();
+  }).catch(function () {});
+}
+
+function openItem(item, list) {
+  if (isSong(item)) {
+    if (list) playFromList(list, item);
+    else playSingle(item);
+    if (list && S.shuffle) shuffleUpcoming();
+    openFull();
+  } else if (item.browseId) {
+    location.hash = '#/browse/' + enc(item.browseId);
+  } else if (item.playlistId) {
+    location.hash = '#/browse/' + enc('VL' + item.playlistId);
+  } else if (item.videoId) {
+    playSingle(item);
+  }
+}
+
+/* ---------- player UI ---------- */
+function statusText() {
+  if (S.err) return S.err;
+  if (S.loading) return '載入中…';
+  if (!S.ready) return '';
+  return window.__ytmGlue && window.__ytmGlue.status ? window.__ytmGlue.status(S.surround) : (S.surround ? 'App：手機處理環繞' : 'App：環繞關閉');
+}
+
+function setMeta(item) {
+  try {
+    if (!inApp() && 'mediaSession' in navigator && typeof MediaMetadata !== 'undefined') {
+      var u = hdUrl(item) || thumbUrl(item);
+      var art = u ? [{ src: u, sizes: '320x180' }] : [];
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: item.title || '', artist: item.subtitle || '', album: 'YT Music', artwork: art
+      });
+    }
+  } catch (e) {}
+  nativePost({ cmd: 'meta', title: item.title || '', artist: item.subtitle || '', artwork: hdUrl(item) || thumbUrl(item) || '', duration: parseDur(item.duration) || 0, id: item.videoId || '' });
+  document.title = item.title || 'YT Music 遠端播放';
+}
+
+function updatePosState() {
+  if (S.ready && S.trueDur > 0) nativePost({ cmd: 'dur', d: S.trueDur, id: (S.cur && S.cur.videoId) || '' });
+  try {
+    if (!inApp() && 'mediaSession' in navigator && navigator.mediaSession.setPositionState && S.ready &&
+        isFinite(realDur(audio)) && realDur(audio) > 0) {
+      navigator.mediaSession.setPositionState({
+        duration: realDur(audio),
+        playbackRate: 1,
+        position: Math.min(curTime(), realDur(audio))
+      });
+    }
+  } catch (e) {}
+}
+
+/* Set while the position is not known: the song the app was mixing into has just been picked, and
+   where it has got to is what the app reports next. Until then the display is left as it is. */
+var posHold = false;
+function updateProgress(cur, dur) {
+  if (posHold) return;
+  lyrTick(isFinite(cur) ? cur : 0, isFinite(dur) ? dur : 0);
+  cur = isFinite(cur) ? Math.max(0, cur) : 0;
+  dur = isFinite(dur) && dur > 0 ? dur : 0;
+  var pct = dur ? Math.min(100, cur / dur * 100) : 0;
+  var seek = $('seek');
+  if (!S.dragging) {
+    seek.max = dur || 1;
+    seek.value = cur;
+    seek.style.setProperty('--p', pct + '%');
+    $('tCur').textContent = fmt(cur);
+  }
+  seek.disabled = !dur;
+  $('tDur').textContent = fmt(dur);
+  $('mbarFill').style.width = pct + '%';
+}
+
+function renderPlayState() {
+  document.body.classList.toggle('playing', isPlaying());
+  setTimeout(fxKick, 0);
+  var name = isPlaying() ? 'pause' : 'play';
+  setIcon($('miniPlay'), name);
+  setIcon($('fPlay'), name);
+  try {
+    if (!inApp() && 'mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = !S.ready ? 'none' : (isPlaying() ? 'playing' : 'paused');
+    }
+  } catch (e) {}
+}
+
+
+/* ---------- title line: scrolling title, links to artist and album, lyrics ---------- */
+var TL = { key: "", info: {}, album: "" };
+function goBrowse(id) {
+  closeFull();
+  location.hash = '#/browse/' + enc(id);
+}
+/* Lets the title travel left and back when it is wider than its line. */
+function titleFit() {
+  var box = $('fullTitle');
+  var span = box.firstChild;
+  if (!span || !span.offsetWidth) return;
+  var over = span.offsetWidth - box.clientWidth;
+  box.classList.toggle('long', over > 4);
+  if (over > 4) {
+    box.style.setProperty('--mq', (-over - 8) + 'px');
+    box.style.setProperty('--mqs', Math.max(7, Math.round(over / 22) + 6) + 's');
+  }
+}
+function renderByline(it, info) {
+  var sub = $('fullSub');
+  sub.textContent = '';
+  TL.album = '';
+  if (!info || !info.runs || !info.runs.length) { sub.textContent = it.subtitle || ''; return; }
+  info.runs.forEach(function (r) {
+    if (r.kind === 'album' && r.browseId && !TL.album) TL.album = r.browseId;
+    if (!r.browseId) { sub.appendChild(document.createTextNode(r.text)); return; }
+    var a = el('a', 'lk', r.text);
+    a.href = '#/browse/' + enc(r.browseId);
+    a.addEventListener('click', function (e) { e.preventDefault(); goBrowse(r.browseId); });
+    sub.appendChild(a);
+  });
+  var t = $('fullTitle');
+  t.classList.toggle('tap', !!TL.album);
+  if (TL.album) { t.setAttribute('role', 'link'); t.tabIndex = 0; } else { t.removeAttribute('role'); t.removeAttribute('tabindex'); }
+}
+function renderTitle(it) {
+  var key = (it.videoId || '') + '|' + (it.title || '') + '|' + (it.subtitle || '');
+  if (key === TL.key) return;
+  TL.key = key;
+  var box = $('fullTitle');
+  box.textContent = '';
+  box.classList.remove('long');
+  box.appendChild(el('span', 'mqt', it.title || ''));
+  setTimeout(titleFit, 60);
+  var id = it.videoId;
+  renderByline(it, TL.info[id]);
+  if (!id || TL.info[id]) return;
+  api('/api/song/' + enc(id) + '/info').then(function (d) {
+    TL.info[id] = d || {};
+    if (S.vid === id && S.cur) renderByline(S.cur, TL.info[id]);
+  }).catch(function () {});
+}
+var LY = { id: "", lines: [], els: [], synced: false, cur: -1, userAt: 0, target: -1, raf: 0 };
+function lyrOn() { return $('full').classList.contains('lyr'); }
+function toggleLyrics() {
+  var on = !lyrOn();
+  $('full').classList.toggle('lyr', on);
+  $('fLyrics').classList.toggle('on', on);
+  $('fLyrics').setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (on) { LY.userAt = 0; lyrLoad(S.vid); lyrTick(curTime(), realDur(audio)); }
+  setTimeout(titleFit, 60);
+}
+function lyrLoad(id) {
+  if (!id || LY.id === id) return;
+  LY.id = id;
+  LY.lines = [];
+  LY.els = [];
+  LY.cur = -1;
+  LY.target = -1;
+  var body = $('lyrBody');
+  body.className = '';
+  body.textContent = '';
+  body.appendChild(el('div', 'lyl cur', '載入歌詞中…'));
+  $('lyrView').scrollTop = 0;
+  api('/api/song/' + enc(id) + '/lyrics').then(function (d) {
+    if (LY.id !== id) return;
+    body.textContent = '';
+    var synced = d && d.synced && d.synced.length ? d.synced : null;
+    var rows = synced ? synced.map(function (x) { return { t: x.t, text: x.l }; })
+      : (d && d.text ? d.text.split('\n').map(function (x) { return { t: -1, text: x.trim() }; }) : []);
+    if (!rows.length) { body.appendChild(el('div', 'lyl cur', '這首歌沒有歌詞')); return; }
+    LY.synced = !!synced;
+    body.className = synced ? 'sync' : 'flat';
+    if (!synced) body.appendChild(el('div', 'lyhint', '這首歌的歌詞沒有逐句時間，會跟著播放進度捲動'));
+    rows.forEach(function (r, i) {
+      var d2 = el('div', 'lyl' + (r.text ? '' : ' gap'), r.text || (synced ? '♪' : ''));
+      if (synced) d2.addEventListener('click', function () { LY.userAt = 0; seekTo(r.t); });
+      body.appendChild(d2);
+      LY.els.push(d2);
+    });
+    LY.lines = rows;
+    if (d.source) body.appendChild(el('div', 'lyhint', d.source));
+    lyrTick(curTime(), realDur(audio));
+  }).catch(function () {
+    if (LY.id !== id) return;
+    body.textContent = '';
+    body.appendChild(el('div', 'lyl cur', '歌詞載入失敗'));
+    LY.id = '';
+  });
+}
+/* How far the sound reaching the ears is behind what the player reports, in seconds: the
+   listener's own setting for the current profile (wireless headphones, car). The picture is held
+   back by this much. */
+function avLagUser() { return Math.max(0, Math.min(800, Number(lsGet('ytm_avlag' + psuf())) || 0)) / 1000; }
+function avLag() { return avLagUser(); }
+/* Called as the song moves on: picks the line and where the text should be. */
+function lyrTick(cur, dur) {
+  if (!lyrOn()) return;
+  if (S.vid && LY.id !== S.vid) { lyrLoad(S.vid); return; }
+  if (!LY.els.length) return;
+  var view = $('lyrView');
+  cur = Math.max(0, cur - avLag());
+  if (LY.synced) {
+    var i, at = -1;
+    for (i = 0; i < LY.lines.length; i++) { if (LY.lines[i].t <= cur + 0.2) at = i; else break; }
+    if (at !== LY.cur) {
+      LY.cur = at;
+      for (i = 0; i < LY.els.length; i++) {
+        LY.els[i].classList.toggle('cur', i === at);
+        LY.els[i].classList.toggle('past', i < at);
+      }
+    }
+    var line = LY.els[Math.max(0, at)];
+    LY.target = line.offsetTop - view.clientHeight * 0.34;
+  } else {
+    var first = LY.els[0], last = LY.els[LY.els.length - 1];
+    /* Most songs open and close without singing: hold the text still for those parts. */
+    var f = dur > 0 ? Math.max(0, Math.min(1, (cur / dur - 0.06) / 0.86)) : 0;
+    LY.target = first.offsetTop + f * (last.offsetTop - first.offsetTop) - view.clientHeight * 0.34;
+  }
+  if (!LY.raf) LY.raf = requestAnimationFrame(lyrFrame);
+}
+function lyrFrame() {
+  LY.raf = 0;
+  if (!lyrOn() || document.hidden || LY.target < -1e6) return;
+  var view = $('lyrView');
+  /* Leave the text alone for a few seconds after the reader has moved it. */
+  if (Date.now() - LY.userAt < 3500) { LY.raf = requestAnimationFrame(lyrFrame); return; }
+  var max = view.scrollHeight - view.clientHeight;
+  var want = Math.max(0, Math.min(max, LY.target));
+  var diff = want - view.scrollTop;
+  if (Math.abs(diff) < 0.6) return;
+  view.scrollTop += diff * 0.09 + (diff > 0 ? 0.5 : -0.5);
+  LY.raf = requestAnimationFrame(lyrFrame);
+}
+function renderPlayer() {
+  renderDlChip();
+  var it = S.cur;
+  $('mini').hidden = !it;
+  if (!it) return;
+  $('miniTitle').textContent = it.title || '';
+  var st = statusText();
+  $('miniSub').textContent = (it.subtitle || '') + (st ? ' · ' + st : '');
+  renderTitle(it);
+  $('fullStat').textContent = st;
+  $('fRetry').hidden = !S.err;
+  if (S.artFor !== it) {
+    S.artFor = it;
+    setThumb($('miniArt'), thumbUrl(it));
+    setArt(it);
+  }
+  if (!S.ready) updateProgress(0, 0);
+  renderPlayState();
+  highlight();
+  syncActions();
+  renderNext();
+}
+
+function highlight() {
+  var nodes = document.querySelectorAll('[data-vid]');
+  for (var i = 0; i < nodes.length; i++) {
+    var on = !!S.vid && nodes[i].getAttribute('data-vid') === S.vid;
+    nodes[i].classList.toggle('now', on);
+  }
+}
+
+function renderQueue() {
+  nativeQueue();
+  renderNext();
+  var box = $('qlist');
+  box.textContent = '';
+  if (!S.queue.length) {
+    box.appendChild(el('div', 'hint', '佇列是空的'));
+    return;
+  }
+  S.queue.forEach(function (it, i) {
+    var r = rowEl(it, function () {
+      /* A swipe or drag that just ended must not also count as a tap. */
+      if (Date.now() < queueTapBlockUntil) return;
+      S.index = i;
+      playTrack(S.queue[i], true);
+    });
+    queueGestures(r, i);
+    box.appendChild(r);
+  });
+  highlight();
+}
+
+function openFull() {
+  var f = $('full');
+  f.scrollTop = 0;
+  f.classList.add('open');
+  setThemeColor(BAR.tint || '#030303');
+  setTimeout(titleFit, 320);
+  f.setAttribute('aria-hidden', 'false');
+  setTimeout(fxKick, 0);
+}
+function closeFull() {
+  var f = $('full');
+  f.classList.remove('open');
+  setThemeColor('#030303');
+  f.style.transform = '';
+  closeQueue();
+  f.setAttribute('aria-hidden', 'true');
+}
+
+/* ---------- song actions: like, comments, save, share, AirPlay ---------- */
+var A = { vid: '', like: '' };
+var toastTimer = null;
+function toast(msg) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+}
+function setThemeColor(c) {
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', c);
+}
+function openPanel(title, fill) {
+  var sh = $('sheet');
+  sh.textContent = '';
+  var panel = el('div', 'panel');
+  panel.appendChild(el('h3', null, title));
+  var body = el('div');
+  panel.appendChild(body);
+  var row = el('div', 'sheetbtns');
+  var cl = el('button', 'btn', '關閉');
+  cl.type = 'button';
+  cl.addEventListener('click', closeSheet);
+  row.appendChild(cl);
+  panel.appendChild(row);
+  sh.appendChild(panel);
+  sh.hidden = false;
+  fill(body);
+}
+function renderActions() {
+  var up = $('fLike'), down = $('fDislike');
+  up.classList.toggle('on', A.like === 'LIKE');
+  down.classList.toggle('on', A.like === 'DISLIKE');
+  up.setAttribute('aria-pressed', A.like === 'LIKE' ? 'true' : 'false');
+  down.setAttribute('aria-pressed', A.like === 'DISLIKE' ? 'true' : 'false');
+}
+/* Called whenever the player is drawn; asks for the like state once per song. */
+function syncActions() {
+  if (!S.vid || A.vid === S.vid) return;
+  var id = S.vid;
+  A.vid = id;
+  A.like = '';
+  A.touched = false;
+  renderActions();
+  api('/api/song/' + enc(id) + '/like').then(function (d) {
+    if (S.vid !== id || A.touched) return;
+    A.like = (d && d.status) || 'INDIFFERENT';
+    renderActions();
+  }).catch(function () {});
+}
+function setLike(want) {
+  if (!S.vid) return;
+  var id = S.vid;
+  var before = A.like;
+  A.touched = true;
+  A.like = (A.like === want) ? 'INDIFFERENT' : want;
+  renderActions();
+  api('/api/song/' + enc(id) + '/like', 'POST', { status: A.like }).then(function () {
+    if (S.vid === id) toast(A.like === 'LIKE' ? '已加入喜歡的音樂' : (A.like === 'DISLIKE' ? '已標記不喜歡' : '已取消'));
+  }).catch(function (e) {
+    if (S.vid === id) {
+      A.like = before;
+      renderActions();
+      /* The PC may still have applied it; ask for the real state instead of trusting the guess. */
+      A.vid = '';
+      syncActions();
+    }
+    toast('無法更新：' + e.message);
+  });
+}
+function openSave() {
+  if (!S.vid) return;
+  var id = S.vid;
+  openPanel('儲存到播放清單', function (body) {
+    body.appendChild(el('div', 'hint', '載入你的播放清單…'));
+    api('/api/song/' + enc(id) + '/playlists').then(function (d) {
+      body.textContent = '';
+      var items = (d && d.items) || [];
+      if (!items.length) { body.appendChild(el('div', 'hint', '沒有可用的播放清單')); return; }
+      items.forEach(function (p) {
+        var b = el('button', 'plrow');
+        b.type = 'button';
+        b.appendChild(el('span', null, p.title || p.playlistId));
+        b.appendChild(el('span', null, p.contains ? '已在清單中' : ''));
+        b.addEventListener('click', function () {
+          b.disabled = true;
+          api('/api/song/' + enc(id) + '/save', 'POST', { playlistId: p.playlistId }).then(function () {
+            toast('已儲存到「' + (p.title || '') + '」');
+            closeSheet();
+          }).catch(function (e) {
+            b.disabled = false;
+            toast('儲存失敗：' + e.message);
+          });
+        });
+        body.appendChild(b);
+      });
+    }).catch(function (e) {
+      body.textContent = '';
+      body.appendChild(el('div', 'hint', '無法載入：' + e.message));
+    });
+  });
+}
+function openComments() {
+  if (!S.vid) return;
+  var id = S.vid;
+  openPanel('留言', function (body) {
+    body.appendChild(el('div', 'hint', '載入留言…'));
+    api('/api/song/' + enc(id) + '/comments').then(function (d) {
+      body.textContent = '';
+      var items = (d && d.items) || [];
+      if (!items.length) { body.appendChild(el('div', 'hint', '沒有留言，或這首歌已關閉留言')); return; }
+      items.forEach(function (c) {
+        var box = el('div', 'cmt');
+        var meta = [c.author, c.time, c.likes ? '讚 ' + c.likes : ''].filter(function (x) { return !!x; }).join(' · ');
+        box.appendChild(el('div', 'ca', meta));
+        box.appendChild(el('div', 'cx', c.text));
+        body.appendChild(box);
+      });
+    }).catch(function (e) {
+      body.textContent = '';
+      body.appendChild(el('div', 'hint', '無法載入：' + e.message));
+    });
+  });
+}
+function shareSong() {
+  if (!S.vid || !S.cur) return;
+  var url = 'https://music.youtube.com/watch?v=' + S.vid;
+  if (navigator.share) {
+    navigator.share({ title: S.cur.title || '', url: url }).catch(function () {});
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function () { toast('已複製連結'); }, function () { toast(url); });
+  } else {
+    toast(url);
+  }
+}
+
+/* ---------- artwork, backdrop, up-next bar, surround style ---------- */
+/* Thumbnails in the lists are small. For the player, ask the image host for a large version. */
+function hdUrl(it) {
+  var u = thumbUrl(it);
+  if (!u) return '';
+  if (/googleusercontent\.com|ggpht\.com/.test(u)) {
+    if (/=[whs]\d+[^\/]*$/.test(u)) return u.replace(/=[whs]\d+[^\/]*$/, '=w1000-h1000-l90-rj');
+    return u;
+  }
+  var m = /i\.ytimg\.com\/vi(?:_webp)?\/([\w-]{11})\//.exec(u);
+  if (m) return 'https://i.ytimg.com/vi/' + m[1] + '/maxresdefault.jpg';
+  return u;
+}
+/* ---------- small motion helpers ---------- */
+document.addEventListener('load', function (e) {
+  var t = e.target;
+  if (t && t.tagName === 'IMG') t.classList.add('in');
+}, true);
+(function () {
+  var sh = $('sheet');
+  if (!sh || !('MutationObserver' in window)) return;
+  var was = sh.hidden;
+  new MutationObserver(function () {
+    if (was && !sh.hidden) {
+      sh.classList.add('enter');
+      setTimeout(function () { sh.classList.remove('enter'); }, 450);
+    }
+    was = sh.hidden;
+  }).observe(sh, { attributes: true, attributeFilter: ['hidden'] });
+})();
+
+/* ---------- backdrop that moves with the music ---------- */
+var FX = { on: false, raf: 0, skip: false, env: 0, peak: 0.25, avg: 0, hit: 0, phase: 0, last: 0 };
+function fxWanted() {
+  if (document.hidden || !$('full').classList.contains('open') || !isPlaying()) return false;
+  if (lsGet('ytm_fx') === '0') return false;
+  if (!$('fullBg').classList.contains('on')) return false;
+  try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false; } catch (e) {}
+  return true;
+}
+function fxRest() {
+  FX.on = false;
+  FX.env = 0;
+  FX.hit = 0;
+  var a = $('fullBg'), b = $('fullBg2'), c = $('fullPulse');
+  a.style.transition = b.style.transition = c.style.transition = 'transform .8s ease, opacity .8s ease';
+  a.style.transform = '';
+  b.style.opacity = '0';
+  c.style.opacity = '0';
+}
+function fxKick() {
+  if (FX.on || !fxWanted()) return;
+  FX.on = true;
+  FX.last = 0;
+  var a = $('fullBg'), b = $('fullBg2'), c = $('fullPulse');
+  a.style.transition = 'opacity .7s';
+  b.style.transition = c.style.transition = 'none';
+  FX.raf = requestAnimationFrame(fxFrame);
+}
+/* Counts how often the backdrop is redrawn and how long each redraw takes (for the load report). */
+/* The page cannot hear the music (the app plays it). The app supplies how strong the bass and the
+   middle are at each moment of the song, and the light follows the playing position. */
+var ENV = { id: '', data: null, busy: '' };
+function envLoad(id) {
+  if (ENV.busy === id || ENV.id === id) return;
+  ENV.busy = id;
+  fetch('/api/env/' + enc(id)).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); }).then(function (ab) {
+    if (ENV.busy !== id) return;
+    ENV.id = id; ENV.data = new Uint8Array(ab); ENV.busy = '';
+  }).catch(function () { if (ENV.busy === id) { ENV.id = id; ENV.data = null; ENV.busy = ''; } });
+}
+function fxFrame(now) {
+  var t0 = performance.now();
+  fxFrameBody(now);
+  PERF.fxMs += performance.now() - t0;
+  PERF.fxCalls++;
+}
+function fxFrameBody(now) {
+  if (!fxWanted()) { fxRest(); return; }
+  FX.raf = requestAnimationFrame(fxFrame);
+  /* Half the screen refresh rate is plenty for soft light, and halves the work. */
+  FX.skip = !FX.skip;
+  if (FX.skip) return;
+  var dt = FX.last ? Math.min(0.1, (now - FX.last) / 1000) : 0.033;
+  FX.last = now;
+  var bass = 0, mid = 0;
+  /* How strong the bass and the middle are right now comes from the app, which works it out
+     for each song (thirty steps a second, two bytes each). */
+  if (S.vid) {
+    if (ENV.id !== S.vid) envLoad(S.vid);
+    else if (ENV.data) {
+      var ek = Math.floor(Math.max(0, audio.currentTime) * 30) * 2;
+      if (ek + 1 < ENV.data.length) {
+        var e1 = ENV.data[ek] / 255, e2 = ENV.data[ek + 1] / 255;
+        bass = e1 * e1 * e1 * e1;
+        mid = Math.min(1, e2 * e2 * 3);
+      }
+    }
+  }
+  /* Shown when the sound is actually heard, not when it left the phone. */
+  var lagMs = avLag() * 1000;
+  if (!FX.q) FX.q = [];
+  FX.q.push([now, bass, mid]);
+  while (FX.q.length > 1 && FX.q[1][0] <= now - lagMs) FX.q.shift();
+  if (FX.q.length > 120) FX.q.splice(0, FX.q.length - 120);
+  if (lagMs > 0 && FX.q[0][0] > now - lagMs) { bass = 0; mid = 0; } else { bass = FX.q[0][1]; mid = FX.q[0][2]; }
+  /* Follow how loud this song is, so quiet and loud songs both move the picture. */
+  FX.peak = Math.max(FX.peak * (1 - 0.15 * dt), bass, 0.002);
+  var b = bass / FX.peak;
+  FX.raw = bass;
+  FX.avg += (b - FX.avg) * Math.min(1, dt * 2.5);
+  /* A beat is the bass jumping above its recent average. */
+  var jump = Math.max(0, b - FX.avg - 0.05) * 3.2;
+  FX.hit = Math.max(jump, FX.hit * Math.pow(0.02, dt));
+  FX.env += (FX.avg - FX.env) * Math.min(1, dt * 3);
+  FX.phase += dt * (0.18 + mid * 1.4);
+  var hit = Math.min(1, FX.hit), env = Math.min(1, FX.env), ph = FX.phase;
+  var a = $('fullBg'), b2 = $('fullBg2'), c = $('fullPulse');
+  a.style.transform = 'scale(' + (1.04 + env * 0.05 + hit * 0.07).toFixed(4) + ') rotate(' + (Math.sin(ph * 0.6) * 5).toFixed(2) + 'deg)';
+  b2.style.transform = 'translate(' + (Math.sin(ph) * 9).toFixed(2) + '%,' + (Math.cos(ph * 0.8) * 7).toFixed(2) + '%) scale(' + (1.25 + hit * 0.12).toFixed(4) + ') rotate(' + (-ph * 12 % 360).toFixed(2) + 'deg)';
+  b2.style.opacity = (0.28 + env * 0.3 + hit * 0.25).toFixed(3);
+  c.style.transform = 'translateY(' + (Math.sin(ph * 0.5) * 6).toFixed(2) + '%) scale(' + (0.9 + hit * 0.35).toFixed(4) + ')';
+  c.style.opacity = Math.min(0.42, hit * 0.4 + env * 0.06).toFixed(3);
+}
+document.addEventListener('visibilitychange', function () { if (!document.hidden) fxKick(); });
+window.__ytmFx = { frame: fxFrame, state: FX };
+function setArt(it) {
+  var box = $('fullArt');
+  var bg = $('fullBg');
+  var low = thumbUrl(it);
+  var hi = hdUrl(it);
+  box.textContent = '';
+  if (!low && !hi) {
+    bg.classList.remove('on');
+    return;
+  }
+  var img = document.createElement('img');
+  img.alt = '';
+  var triedLow = false;
+  var fallBack = function () {
+    if (triedLow || !low || low === img.src) { return false; }
+    triedLow = true;
+    img.src = low;
+    return true;
+  };
+  /* A missing large image comes back as a tiny grey placeholder rather than an error. */
+  img.addEventListener('load', function () { if (!triedLow && hi && img.naturalWidth <= 200) fallBack(); });
+  img.addEventListener('error', function () { if (!fallBack()) img.style.display = 'none'; });
+  img.src = hi || low;
+  box.appendChild(img);
+  /* The backdrop is heavily blurred, so the small image is enough and loads at once. */
+  var safe = String(low || hi).replace(/["\\\n\r()]/g, '');
+  bg.style.backgroundImage = 'url("' + safe + '")';
+  $('fullBg2').style.backgroundImage = 'url("' + safe + '")';
+  fxKick();
+  bg.classList.add('on');
+  tintFromArt(String(low || hi));
+}
+/* The player's own background takes the artwork's average colour (darkened), so that any part
+   the blurred layers do not reach - the strip behind the status bar - is coloured, not black. */
+var BAR = { tint: "" };
+function tintFromArt(address) {
+  var full = $('full');
+  var im = new Image();
+  im.crossOrigin = 'anonymous';
+  im.onload = function () {
+    try {
+      var c = document.createElement('canvas');
+      c.width = 8;
+      c.height = 8;
+      var x = c.getContext('2d');
+      x.drawImage(im, 0, 0, 8, 8);
+      var d = x.getImageData(0, 0, 8, 8).data, r = 0, g = 0, b = 0, i;
+      for (i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+      var n = d.length / 4, k = 0.42;
+      full.style.backgroundColor = 'rgb(' + Math.round(r / n * k) + ',' + Math.round(g / n * k) + ',' + Math.round(b / n * k) + ')';
+      /* The status bar is a solid strip in this app mode: give it the colour the top of the player has
+         (the tint seen through the dark veil that lies over it). */
+      var mix = function (v) { return Math.round(v / n * k * 0.62 + 3 * 0.38); };
+      BAR.tint = 'rgb(' + mix(r) + ',' + mix(g) + ',' + mix(b) + ')';
+      full.style.setProperty('--bar', BAR.tint);
+      if ($('full').classList.contains('open')) setThemeColor(BAR.tint);
+    } catch (e) {}
+  };
+  im.src = address;
+}
+function renderNext() {
+  var bar = $('nextBar');
+  if (!bar) return;
+  var it = S.queue[S.index + 1];
+  $('nextTitle').textContent = it ? (it.title || '') + (it.subtitle ? ' · ' + it.subtitle.split(' • ')[0] : '') : '沒有下一首';
+  if (bar.nextFor !== (it ? it.videoId : '')) {
+    bar.nextFor = it ? it.videoId : '';
+    setThumb($('nextArt'), it ? thumbUrl(it) : '');
+  }
+}
+function openQueue() {
+  var q = $('qpanel');
+  q.classList.add('open');
+  q.setAttribute('aria-hidden', 'false');
+  /* Scroll only the list itself; scrollIntoView would also drag the player screen behind it. */
+  var now = q.querySelector('.now');
+  q.scrollTop = now ? Math.max(0, now.offsetTop - 70) : 0;
+}
+function closeQueue() {
+  var q = $('qpanel');
+  q.classList.remove('open');
+  q.setAttribute('aria-hidden', 'true');
+}
+function renderStyleChip() {
+  $('fStyleTxt').textContent = '風格';
+}
+/* p: the values being edited; rows: the sliders (kept in step); save: stores and applies. */
+function styleScene(p, rows, save) {
+  var cv = document.createElement('canvas');
+  cv.className = 'scene';
+  cv.setAttribute('role', 'img');
+  cv.setAttribute('aria-label', '環繞音場示意，可拖曳調整；下方滑桿可做相同調整');
+  var hs = [];
+  var drag = null;
+  var G = { cx: 0, cy: 0, S: 1, w: 0, h: 0 };
+  var ZS = 0.55, YS = 0.8;
+  var rad = function (d) { return d * Math.PI / 180; };
+  var pt = function (x, y, z) { return [G.cx + x * G.S, G.cy - z * G.S * ZS - y * G.S * YS]; };
+  var off = function () { return p.b === 'hesuvi'; };
+  var setVal = function (k, v, max) {
+    v = Math.max(0, Math.min(max, Math.round(v / 5) * 5));
+    if (p[k] === v) return;
+    p[k] = v;
+    rows.forEach(function (r) {
+      if (r.def.k === k) { r.input.value = v; r.val.textContent = r.def.show(v); }
+    });
+    save();
+  };
+  var draw = function () {
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    var c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    G.w = w; G.h = h; G.cx = w / 2; G.cy = h * 0.66; G.S = Math.min(w * 0.34, h * 0.42);
+    var dim = off() ? 0.35 : 1;
+    c.globalAlpha = dim;
+    c.lineCap = 'round';
+    /* floor */
+    c.strokeStyle = 'rgba(255,255,255,.14)';
+    c.lineWidth = 1;
+    c.beginPath(); c.ellipse(G.cx, G.cy, G.S, G.S * ZS, 0, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.ellipse(G.cx, G.cy, G.S * 0.5, G.S * ZS * 0.5, 0, 0, Math.PI * 2); c.stroke();
+    /* how far the sound wraps round the listener */
+    var A = 60 + p.w * 1.2, a = 30 + p.o * 0.3, i, q;
+    c.strokeStyle = 'rgba(120,170,255,' + (0.25 + p.w / 100 * 0.6) + ')';
+    c.lineWidth = 5;
+    [-1, 1].forEach(function (sg) {
+      c.beginPath();
+      for (i = 0; i <= 24; i++) {
+        var t = rad(a + (A - a) * i / 24);
+        q = pt(sg * Math.sin(t), 0, Math.cos(t));
+        if (i) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]);
+      }
+      c.stroke();
+    });
+    hs = [];
+    /* height layer */
+    var hy = p.h / 150 * 0.95;
+    var hc = pt(0, hy, 0);
+    c.strokeStyle = 'rgba(190,150,255,' + (0.2 + Math.min(1, p.h / 100) * 0.7) + ')';
+    c.lineWidth = 2 + p.h / 60;
+    c.beginPath(); c.ellipse(hc[0], hc[1], G.S * 0.5, G.S * 0.5 * ZS, 0, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = 'rgba(190,150,255,.3)';
+    c.lineWidth = 1;
+    c.setLineDash([3, 4]);
+    c.beginPath(); c.moveTo(G.cx, G.cy); c.lineTo(hc[0], hc[1]); c.stroke();
+    c.setLineDash([]);
+    hs.push({ k: 'h', x: hc[0] - G.S * 0.5, y: hc[1], col: '#be96ff', label: '高度 ' + p.h + '%', side: -1, dy: -16 });
+    /* listener, seen from behind: the front is towards the top */
+    c.fillStyle = '#e8e8e8';
+    c.beginPath(); c.arc(G.cx, G.cy, 13, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.moveTo(G.cx - 5, G.cy - 11); c.lineTo(G.cx, G.cy - 20); c.lineTo(G.cx + 5, G.cy - 11); c.fill();
+    c.fillStyle = '#9a9a9a';
+    c.fillRect(G.cx - 17, G.cy - 5, 4, 10);
+    c.fillRect(G.cx + 13, G.cy - 5, 4, 10);
+    /* the vocal: closer and with a smaller halo the more of its reverb is taken away */
+    var vd = 1 - p.v / 80 * 0.6;
+    var vp = pt(0, 0, vd);
+    c.fillStyle = 'rgba(255,190,90,.16)';
+    c.beginPath(); c.arc(vp[0], vp[1], 8 + (1 - p.v / 80) * 26, 0, Math.PI * 2); c.fill();
+    hs.push({ k: 'v', x: vp[0], y: vp[1], col: '#ffbe5a', label: '人聲殘響 −' + p.v + '%', side: 1, dy: -16, r: 7 + Math.max(-3, Math.min(5, p.g / 12)) });
+    /* front speakers and the ends of the wrap */
+    [-1, 1].forEach(function (sg) {
+      q = pt(sg * Math.sin(rad(a)), 0, Math.cos(rad(a)));
+      hs.push({ k: 'o', x: q[0], y: q[1], col: '#ffffff', label: sg > 0 ? '開闊度 ' + p.o + '%' : '', side: sg, sq: true });
+      q = pt(sg * Math.sin(rad(A)), 0, Math.cos(rad(A)));
+      hs.push({ k: 'w', x: q[0], y: q[1], col: '#78aaff', label: sg > 0 ? '包圍感 ' + p.w + '%' : '', side: sg });
+    });
+    c.font = '12px system-ui, -apple-system, sans-serif';
+    c.textBaseline = 'middle';
+    hs.forEach(function (hd) {
+      var r = hd.r || 8;
+      c.fillStyle = hd.col;
+      c.beginPath();
+      if (hd.sq) c.rect(hd.x - 8, hd.y - 8, 16, 16); else c.arc(hd.x, hd.y, r, 0, Math.PI * 2);
+      c.fill();
+      if (drag === hd.k) { c.strokeStyle = hd.col; c.lineWidth = 2; c.beginPath(); c.arc(hd.x, hd.y, 16, 0, Math.PI * 2); c.stroke(); }
+      if (hd.label) {
+        c.fillStyle = 'rgba(255,255,255,.85)';
+        c.textAlign = hd.side < 0 ? 'right' : 'left';
+        var lx = hd.x + hd.side * 14;
+        if (hd.side > 0) lx = Math.min(lx, w - c.measureText(hd.label).width - 4);
+        else lx = Math.max(lx, c.measureText(hd.label).width + 4);
+        c.fillText(hd.label, lx, hd.y + (hd.dy || 0));
+      }
+    });
+    c.globalAlpha = 1;
+  };
+  var where = function (e) {
+    var b = cv.getBoundingClientRect();
+    return [e.clientX - b.left, e.clientY - b.top];
+  };
+  var apply = function (m) {
+    var x = (m[0] - G.cx) / G.S, z = (G.cy - m[1]) / (G.S * ZS);
+    if (drag === 'o') setVal('o', (Math.asin(Math.max(0, Math.min(1, Math.abs(x)))) * 180 / Math.PI - 30) / 0.3, 100);
+    else if (drag === 'w') setVal('w', (Math.atan2(Math.abs(x), z) * 180 / Math.PI - 60) / 1.2, 100);
+    else if (drag === 'h') setVal('h', (G.cy - m[1]) / (G.S * YS) / 0.95 * 150, 150);
+    else if (drag === 'v') setVal('v', (1 - z) / 0.6 * 80, 80);
+    draw();
+  };
+  cv.addEventListener('pointerdown', function (e) {
+    if (off()) return;
+    var m = where(e), best = null, bd = 30 * 30;
+    hs.forEach(function (hd) {
+      var d = (hd.x - m[0]) * (hd.x - m[0]) + (hd.y - m[1]) * (hd.y - m[1]);
+      if (d < bd) { bd = d; best = hd; }
+    });
+    if (!best) return;
+    drag = best.k;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+    draw();
+  });
+  cv.addEventListener('pointermove', function (e) { if (drag) { e.preventDefault(); apply(where(e)); } });
+  var end = function () { if (drag) { drag = null; draw(); } };
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
+  return { el: cv, draw: draw };
+}
+function openStyles() {
+  openPanel('環繞風格', function (body) {
+    var p = styleParams();
+    var rows = [];
+    var save = function () {
+      lsSet('ytm_style_params' + psuf(), JSON.stringify(p));
+      fxApply();
+    };
+    var sel = document.createElement('select');
+    sel.className = 'stylesel';
+    sel.setAttribute('aria-label', '基底');
+    var lab = el('div', 'eql');
+    lab.appendChild(el('span', null, '基底'));
+    var srow = el('div', 'eqrow');
+    srow.appendChild(lab);
+    srow.appendChild(sel);
+    body.appendChild(srow);
+    var enable = function () {
+      var off = p.b === 'hesuvi';
+      rows.forEach(function (r) { r.input.disabled = off; });
+    };
+    api('/api/ir/bases').then(function (d) {
+      ((d && d.items) || []).forEach(function (b) {
+        var o = document.createElement('option');
+        o.value = b.id;
+        o.textContent = b.name;
+        sel.appendChild(o);
+      });
+      sel.value = p.b;
+    }).catch(function () {});
+    sel.addEventListener('change', function () {
+      p.b = sel.value;
+      enable();
+      save();
+    });
+    var defs = [
+      { k: 'o', name: '開闊度（把音場往左右推開）', max: 100 },
+      { k: 'w', name: '包圍感（環境聲送往兩側與後方）', max: 100 },
+      { k: 'g', name: '人聲音量', min: -60, max: 60, db: true },
+      { k: 'v', name: '人聲殘響減少', max: 80 },
+      { k: 'h', name: '高度', max: 150 },
+      { k: 't', name: '音色校正（讓人聲不悶）', max: 180 }
+    ];
+    defs.forEach(function (d) {
+      var row = el('div', 'eqrow');
+      var l = el('div', 'eql');
+      l.appendChild(el('span', null, d.name));
+      var show = function (x) { return d.db ? ((x > 0 ? '+' : '') + (x / 10).toFixed(1) + ' dB') : (x + '%'); };
+      d.show = show;
+      var val = el('span', null, show(p[d.k]));
+      l.appendChild(val);
+      row.appendChild(l);
+      var input = document.createElement('input');
+      input.type = 'range';
+      input.min = String(d.min || 0);
+      input.max = String(d.max);
+      input.step = '5';
+      input.value = p[d.k];
+      input.setAttribute('aria-label', d.name);
+      input.addEventListener('input', function () {
+        p[d.k] = +input.value;
+        val.textContent = show(p[d.k]);
+        save();
+      });
+      row.appendChild(input);
+      body.appendChild(row);
+      rows.push({ input: input, val: val, def: d });
+    });
+    enable();
+    var scene = styleScene(p, rows, save);
+    body.insertBefore(scene.el, body.children[1] || null);
+    body.insertBefore(el('div', 'scenetip', '拖曳圖上的點來調整：白色方塊是前方喇叭，藍點是包圍範圍，紫點是高度，橘點是人聲。'), scene.el.nextSibling);
+    rows.forEach(function (r) { r.input.addEventListener('input', function () { scene.draw(); }); });
+    sel.addEventListener('change', function () { setTimeout(scene.draw, 0); });
+    setTimeout(scene.draw, 0);
+    setTimeout(scene.draw, 350);
+    var btns = el('div', 'sheetbtns');
+    var reset = el('button', 'btn ghost', '回到建議值');
+    reset.type = 'button';
+    reset.addEventListener('click', function () {
+      ['b', 'w', 'v', 'h', 't', 'o', 'g'].forEach(function (k) { p[k] = STYLE_DEFAULT[k]; });
+      sel.value = p.b;
+      rows.forEach(function (r) { r.input.value = p[r.def.k]; r.val.textContent = r.def.show(p[r.def.k]); });
+      enable();
+      save();
+      scene.draw();
+    });
+    btns.appendChild(reset);
+    body.appendChild(btns);
+  });
+}
+/* ---------- queue: remove by swiping sideways, reorder by long-press and drag ---------- */
+var queueTapBlockUntil = 0;
+var queueDragging = false;
+function queueRemove(i) {
+  if (i === S.index) {
+    toast('正在播放的歌不能移除');
+    return false;
+  }
+  S.queue.splice(i, 1);
+  if (i < S.index) S.index--;
+  return true;
+}
+function queueMove(from, to) {
+  if (from === to) return;
+  var it = S.queue.splice(from, 1)[0];
+  S.queue.splice(to, 0, it);
+  if (S.index === from) S.index = to;
+  else if (from < S.index && to >= S.index) S.index--;
+  else if (from > S.index && to <= S.index) S.index++;
+}
+function queueChanged() {
+  var q = $('qpanel');
+  var top = q.scrollTop;
+  renderQueue();
+  q.scrollTop = top;
+  prefetch();
+  saveState(true);
+}
+function queueGestures(row, index) {
+  var x0 = 0, y0 = 0, mode = '', timer = null, pos = index, rowH = 0, base = 0;
+  var panel = $('qpanel');
+  var clear = function () { if (timer) { clearTimeout(timer); timer = null; } };
+  row.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) return;
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+    mode = '';
+    pos = index;
+    clear();
+    timer = setTimeout(function () {
+      timer = null;
+      if (mode !== '') return;
+      mode = 'drag';
+      queueDragging = true;
+      rowH = row.getBoundingClientRect().height;
+      base = y0;
+      row.classList.add('lifted');
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) {}
+    }, 420);
+  }, { passive: true });
+  row.addEventListener('touchmove', function (e) {
+    var t = e.touches[0];
+    var dx = t.clientX - x0, dy = t.clientY - y0;
+    if (mode === '') {
+      if (Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        mode = 'swipe';
+        clear();
+        row.classList.add('swiping');
+      } else if (Math.abs(dy) > 10) {
+        /* The finger is scrolling the list: neither a swipe nor a long press. */
+        mode = 'scroll';
+        clear();
+      }
+    }
+    if (mode === 'swipe') {
+      if (e.cancelable) e.preventDefault();
+      row.style.transform = 'translateX(' + dx + 'px)';
+      row.style.opacity = String(Math.max(0.25, 1 - Math.abs(dx) / 260));
+    } else if (mode === 'drag') {
+      if (e.cancelable) e.preventDefault();
+      /* Step the row past its neighbours as the finger crosses them. */
+      var off = t.clientY - base;
+      while (off > rowH * 0.6 && row.nextElementSibling) {
+        row.parentNode.insertBefore(row.nextElementSibling, row);
+        base += rowH;
+        off -= rowH;
+        pos++;
+      }
+      while (off < -rowH * 0.6 && row.previousElementSibling) {
+        row.parentNode.insertBefore(row, row.previousElementSibling);
+        base -= rowH;
+        off += rowH;
+        pos--;
+      }
+      row.style.transform = 'translateY(' + off + 'px)';
+      /* Near the top or bottom of the list, scroll it so the row can go further. */
+      var pr = panel.getBoundingClientRect();
+      if (t.clientY > pr.bottom - 70) { panel.scrollTop += 10; base -= 10; }
+      else if (t.clientY < pr.top + 110) { var before = panel.scrollTop; panel.scrollTop -= 10; base += before - panel.scrollTop; }
+    }
+  }, { passive: false });
+  var end = function (e) {
+    clear();
+    var m = mode;
+    mode = '';
+    if (m === 'swipe') {
+      queueTapBlockUntil = Date.now() + 400;
+      var t = e.changedTouches && e.changedTouches[0];
+      var dx = t ? t.clientX - x0 : 0;
+      row.classList.remove('swiping');
+      if (e.type === 'touchend' && Math.abs(dx) > 90 && queueRemove(index)) {
+        queueChanged();
+      } else {
+        row.style.transform = '';
+        row.style.opacity = '';
+      }
+    } else if (m === 'drag') {
+      queueTapBlockUntil = Date.now() + 400;
+      queueDragging = false;
+      row.classList.remove('lifted');
+      row.style.transform = '';
+      queueMove(index, pos);
+      queueChanged();
+    }
+  };
+  row.addEventListener('touchend', end);
+  row.addEventListener('touchcancel', end);
+  row.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+}
+/* Pulling the queue down from its top closes it and shows the player again. */
+function initQueueSwipeClose() {
+  var q = $('qpanel');
+  var y0 = -1, x0 = 0, dy = 0, on = false;
+  q.addEventListener('touchstart', function (e) {
+    y0 = (q.scrollTop <= 0 && e.touches.length === 1) ? e.touches[0].clientY : -1;
+    x0 = e.touches[0].clientX;
+    dy = 0;
+    on = false;
+  }, { passive: true });
+  q.addEventListener('touchmove', function (e) {
+    if (y0 < 0 || queueDragging) return;
+    dy = e.touches[0].clientY - y0;
+    var dx = Math.abs(e.touches[0].clientX - x0);
+    if (!on) {
+      if (dy > 14 && dy > dx * 1.5 && q.scrollTop <= 0) on = true;
+      else if (dy < -8 || dx > 20) { y0 = -1; return; }
+      else return;
+    }
+    q.style.transition = 'none';
+    q.style.transform = 'translateY(' + Math.max(0, dy) + 'px)';
+  }, { passive: true });
+  var end = function () {
+    var close = on && dy > 100 && !queueDragging;
+    y0 = -1;
+    on = false;
+    q.style.transition = '';
+    q.style.transform = '';
+    if (close) closeQueue();
+  };
+  q.addEventListener('touchend', end);
+  q.addEventListener('touchcancel', end);
+}
+
+/* ---------- swipe the player down to go back ---------- */
+function initSwipeClose() {
+  var f = $('full');
+  var startY = -1, startX = 0, dy = 0, active = false;
+  f.addEventListener('touchstart', function (e) {
+    var t = e.target;
+    var blocked = t && t.closest && (t.closest('.seekrow') || t.closest('.fchips') || t.closest('#qpanel'));
+    startY = (!blocked && f.scrollTop <= 0 && e.touches.length === 1) ? e.touches[0].clientY : -1;
+    startX = e.touches[0].clientX;
+    dy = 0;
+    active = false;
+  }, { passive: true });
+  f.addEventListener('touchmove', function (e) {
+    if (startY < 0) return;
+    dy = e.touches[0].clientY - startY;
+    var dx = Math.abs(e.touches[0].clientX - startX);
+    if (!active) {
+      if (dy > 14 && dy > dx * 1.5 && f.scrollTop <= 0) active = true;
+      else if (dy < -8 || dx > 20) { startY = -1; return; }
+      else return;
+    }
+    f.classList.add('dragging');
+    f.style.transform = 'translateY(' + Math.max(0, dy) + 'px)';
+  }, { passive: true });
+  var end = function () {
+    if (startY < 0 && !active) return;
+    var close = active && dy > 110;
+    startY = -1;
+    active = false;
+    f.classList.remove('dragging');
+    f.style.transform = '';
+    if (close) closeFull();
+  };
+  f.addEventListener('touchend', end);
+  f.addEventListener('touchcancel', end);
+}
+
+/* ---------- pull down to refresh the home feed ---------- */
+var homeRefresh = null, homeWantFresh = false;
+function initPull() {
+  var startY = -1, dist = 0, busy = false;
+  var box = $('ptr'), txt = $('ptrTxt');
+  var atHome = function () {
+    var h = location.hash || '#/home';
+    return h === '#/home' || h === '#/' || h === '#';
+  };
+  view.addEventListener('touchstart', function (e) {
+    startY = (!busy && homeRefresh && atHome() && view.scrollTop <= 0 && e.touches.length === 1) ? e.touches[0].clientY : -1;
+    dist = 0;
+  }, { passive: true });
+  view.addEventListener('touchmove', function (e) {
+    if (startY < 0) return;
+    dist = e.touches[0].clientY - startY;
+    if (dist > 12 && view.scrollTop <= 0) {
+      txt.textContent = dist > 90 ? '放開以更新' : '下拉以更新';
+      box.classList.add('show');
+    } else {
+      box.classList.remove('show');
+    }
+  }, { passive: true });
+  var end = function () {
+    if (startY < 0) return;
+    var go = dist > 90 && view.scrollTop <= 0;
+    startY = -1;
+    if (!go || !homeRefresh) { box.classList.remove('show'); return; }
+    busy = true;
+    txt.textContent = '更新中…';
+    box.classList.add('show');
+    homeRefresh(function () {
+      busy = false;
+      box.classList.remove('show');
+    });
+  };
+  view.addEventListener('touchend', end);
+  view.addEventListener('touchcancel', end);
+}
+
+/* ---------- shuffle / repeat / surround switches ---------- */
+function shuffleUpcoming() {
+  var i, j, t;
+  for (i = S.queue.length - 1; i > S.index + 1; i--) {
+    j = S.index + 1 + Math.floor(Math.random() * (i - S.index));
+    t = S.queue[i];
+    S.queue[i] = S.queue[j];
+    S.queue[j] = t;
+  }
+  renderQueue();
+  prefetch();
+}
+function renderToggles() {
+  nativeQueue();
+  var sh = $('fShuffle'), rp = $('fRepeat'), su = $('fSurround');
+  sh.classList.toggle('on', S.shuffle);
+  sh.setAttribute('aria-pressed', S.shuffle ? 'true' : 'false');
+  rp.classList.toggle('on', S.repeat !== 'off');
+  setIcon(rp, S.repeat === 'one' ? 'repeatOne' : 'repeat');
+  rp.setAttribute('aria-label', S.repeat === 'one' ? '重複播放：單曲' : (S.repeat === 'all' ? '重複播放：全部' : '重複播放：關閉'));
+  su.classList.toggle('off', !S.surround);
+  su.setAttribute('aria-pressed', S.surround ? 'true' : 'false');
+  $('fSurroundTxt').textContent = S.surround ? '環繞 開' : '環繞 關';
+}
+
+function openSheet() {
+  var sh = $('sheet');
+  sh.hidden = false;
+  buildSheet();
+}
+function closeSheet() {
+  $('sheet').hidden = true;
+}
+function buildSheet() {
+  var sh = $('sheet');
+  sh.textContent = '';
+  var panel = el('div', 'panel');
+  panel.appendChild(el('h3', null, '耗電相關'));
+  var seg2 = el('div', 'seg');
+  var fxOff = lsGet('ytm_fx') === '0', calm = lsGet('ytm_calm') === '1';
+  var b1 = el('button', fxOff ? '' : 'on', '背景光效：' + (fxOff ? '關' : '開'));
+  b1.type = 'button';
+  b1.addEventListener('click', function () { lsSet('ytm_fx', fxOff ? '1' : '0'); if (!fxOff) fxRest(); else fxKick(); dbg('I', 'setting', { backdrop: fxOff ? 'on' : 'off' }); buildSheet(); });
+  var b2 = el('button', calm ? '' : 'on', '介面動畫：' + (calm ? '關' : '開'));
+  b2.type = 'button';
+  b2.addEventListener('click', function () { lsSet('ytm_calm', calm ? '0' : '1'); document.body.classList.toggle('calm', !calm); dbg('I', 'setting', { motion: calm ? 'on' : 'off' }); buildSheet(); });
+  seg2.appendChild(b1);
+  seg2.appendChild(b2);
+  panel.appendChild(seg2);
+  panel.appendChild(el('p', null, '手機發燙時可以逐一關掉試試，找出是哪一項造成的。'));
+  panel.appendChild(el('h3', null, '畫面與聲音對齊（' + (isCar() ? '車用' : '耳機') + '）'));
+  var lagNow = Math.round(avLagUser() * 1000);
+  var lagLabel = el('p', null, '');
+  var lagText = function (v) { lagLabel.textContent = '畫面延後 ' + v + ' 毫秒'; };
+  lagText(lagNow);
+  var lagIn = document.createElement('input');
+  lagIn.type = 'range'; lagIn.min = '0'; lagIn.max = '600'; lagIn.step = '10'; lagIn.value = String(lagNow);
+  lagIn.setAttribute('aria-label', '畫面延後');
+  lagIn.style.width = '100%';
+  lagIn.addEventListener('input', function () { lsSet('ytm_avlag' + psuf(), lagIn.value); lagText(Number(lagIn.value)); });
+  lagIn.addEventListener('change', function () { dbg('I', 'setting', { pictureLagMs: Number(lagIn.value), profile: isCar() ? 'car' : 'head' }); });
+  panel.appendChild(lagIn);
+  panel.appendChild(lagLabel);
+  panel.appendChild(el('p', null, '藍牙耳機或車機的聲音會比畫面晚。開著歌詞模式播一首有逐句歌詞的歌，往右拉到歌詞和光效跟聲音對上為止。耳機和車用各記一組。'));
+  var row = el('div', 'sheetbtns');
+  var cl = el('button', 'btn', '關閉');
+  cl.type = 'button';
+  cl.addEventListener('click', closeSheet);
+  row.appendChild(cl);
+  panel.appendChild(row);
+  if (window.__ytmGlue && window.__ytmGlue.diag) window.__ytmGlue.diag(panel);
+  sh.appendChild(panel);
+}
+
+/* ---------- list builders ---------- */
+function rowEl(it, onClick) {
+  var r = el('div', 'row' + (it.kind === 'artist' ? ' round' : ''));
+  r.setAttribute('role', 'button');
+  r.tabIndex = 0;
+  if (isSong(it)) r.setAttribute('data-vid', it.videoId);
+  r.appendChild(makeThumb(it));
+  var txt = el('div', 'txt');
+  txt.appendChild(el('div', 'rt qt', it.title || ''));
+  if (it.subtitle) txt.appendChild(el('div', 'rs', it.subtitle));
+  r.appendChild(txt);
+  if (it.duration) r.appendChild(el('div', 'rd', it.duration));
+  r.addEventListener('click', onClick);
+  r.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') onClick();
+  });
+  return r;
+}
+
+function cardEl(it, onClick) {
+  var c = el('div', 'card' + (it.kind === 'artist' ? ' round' : ''));
+  c.setAttribute('role', 'button');
+  c.tabIndex = 0;
+  if (isSong(it)) c.setAttribute('data-vid', it.videoId);
+  c.appendChild(makeThumb(it));
+  c.appendChild(el('div', 'ct', it.title || ''));
+  if (it.subtitle) c.appendChild(el('div', 'cs', it.subtitle));
+  c.addEventListener('click', onClick);
+  return c;
+}
+
+function tileEl(it, onClick) {
+  var t = el('div', 'qtile');
+  t.setAttribute('role', 'button');
+  t.tabIndex = 0;
+  t.setAttribute('aria-label', it.title || '');
+  if (isSong(it)) t.setAttribute('data-vid', it.videoId);
+  t.appendChild(makeThumb(it));
+  t.appendChild(el('div', 'qtt', it.title || ''));
+  t.addEventListener('click', onClick);
+  t.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') onClick();
+  });
+  return t;
+}
+
+/* Quick-pick grid: pages of 3x3 square tiles, swiped sideways, with page dots. */
+function quickGridEl(items) {
+  var box = el('div');
+  var pager = el('div', 'qp');
+  var per = 9, pages = [], i;
+  for (i = 0; i < items.length; i += per) {
+    var pg = el('div', 'qpage');
+    items.slice(i, i + per).forEach(function (it) {
+      pg.appendChild(tileEl(it, function () { openItem(it, null); }));
+    });
+    pages.push(pg);
+    pager.appendChild(pg);
+  }
+  box.appendChild(pager);
+  if (pages.length > 1) {
+    var dots = el('div', 'qdots');
+    dots.setAttribute('aria-hidden', 'true');
+    var marks = pages.map(function (p, k) {
+      var d = el('i', k === 0 ? 'on' : '');
+      dots.appendChild(d);
+      return d;
+    });
+    box.appendChild(dots);
+    var cur = 0;
+    pager.addEventListener('scroll', function () {
+      var step = pages[0].offsetWidth + 16;
+      var n = step > 0 ? Math.round(pager.scrollLeft / step) : 0;
+      n = Math.max(0, Math.min(pages.length - 1, n));
+      if (n === cur) return;
+      marks[cur].classList.remove('on');
+      marks[n].classList.add('on');
+      cur = n;
+    }, { passive: true });
+  }
+  return box;
+}
+
+function secHeadEl(title, songs) {
+  var h = el('div', 'sec-h');
+  h.appendChild(el('h2', 'sec-t', title || ''));
+  if (songs && songs.length) {
+    var b = el('button', 'pillbtn');
+    b.type = 'button';
+    b.appendChild(el('span', null, '全部播放'));
+    b.addEventListener('click', function () { playAll(songs); openFull(); });
+    h.appendChild(b);
+  }
+  return h;
+}
+
+function renderSections(host, sections, mode) {
+  /* Only the first all-song section of the whole home feed is drawn as the grid;
+     sections appended later see the grid already in the host and stay lists. */
+  var hasGrid = mode !== 'home' || !!host.querySelector('.qp');
+  (sections || []).forEach(function (sec) {
+    if (!sec || !sec.items || !sec.items.length) return;
+    var items = sec.items;
+    var wrap = el('section', 'sec');
+    var allSongs = items.every(isSong);
+    var asGrid = allSongs && !hasGrid;
+    var withPlayAll = allSongs && mode === 'home' && !asGrid;
+    if (sec.title || withPlayAll) wrap.appendChild(secHeadEl(sec.title, withPlayAll ? items : null));
+    var ctx = mode === 'home' ? null : items;
+    if (asGrid) {
+      hasGrid = true;
+      wrap.appendChild(quickGridEl(items));
+    } else if (allSongs && mode === 'home') {
+      var g = el('div', 'qgrid');
+      items.forEach(function (it) {
+        g.appendChild(rowEl(it, function () { openItem(it, null); }));
+      });
+      wrap.appendChild(g);
+    } else if (allSongs) {
+      var l = el('div', 'songlist');
+      items.forEach(function (it) {
+        l.appendChild(rowEl(it, function () { openItem(it, ctx); }));
+      });
+      wrap.appendChild(l);
+    } else {
+      var hs = el('div', 'hscroll');
+      items.forEach(function (it) {
+        hs.appendChild(cardEl(it, function () { openItem(it, ctx); }));
+      });
+      wrap.appendChild(hs);
+    }
+    host.appendChild(wrap);
+  });
+  highlight();
+}
+
+function skeleton(big) {
+  var s = el('div', 'skel');
+  var n = big ? 3 : 8, i;
+  if (big) s.appendChild(el('i', 'big'));
+  for (i = 0; i < n; i++) s.appendChild(el('i'));
+  return s;
+}
+
+function errorBox(msg, retry) {
+  var b = el('div', 'errbox');
+  b.appendChild(el('p', null, '載入失敗：' + msg));
+  var btn = el('button', 'btn', '重試');
+  btn.type = 'button';
+  btn.addEventListener('click', retry);
+  b.appendChild(btn);
+  return b;
+}
+
+/* ---------- router ---------- */
+var view = $('view');
+var cache = {};
+var scrollPos = {};
+var viewToken = 0;
+var lastHash = '';
+var TTL = 5 * 60 * 1000;
+var curTab = 'home';
+
+function cacheGet(key) {
+  var c = cache[key];
+  if (c && Date.now() - c.t < TTL) return c.d;
+  return null;
+}
+
+function loadInto(vt, host, key, url, render, big) {
+  var d = cacheGet(key);
+  if (d) {
+    render(d);
+    restoreScroll();
+    return;
+  }
+  var sk = skeleton(big);
+  host.appendChild(sk);
+  api(url).then(function (data) {
+    if (vt !== viewToken) return;
+    cache[key] = { t: Date.now(), d: data };
+    sk.remove();
+    render(data);
+    restoreScroll();
+  }).catch(function (e) {
+    if (vt !== viewToken) return;
+    sk.remove();
+    host.appendChild(errorBox(e.message, function () { delete cache[key]; route(true); }));
+  });
+}
+
+function restoreScroll() {
+  var y = scrollPos[location.hash || '#/home'];
+  view.scrollTop = y || 0;
+}
+
+function setTab(t) {
+  var as = document.querySelectorAll('#nav a');
+  for (var i = 0; i < as.length; i++) {
+    as[i].classList.toggle('on', as[i].getAttribute('data-tab') === t);
+  }
+}
+
+function route(force) {
+  var h = location.hash || '#/home';
+  if (!force && lastHash) scrollPos[lastHash] = view.scrollTop;
+  if (force && lastHash === h) scrollPos[h] = view.scrollTop;
+  lastHash = h;
+  var vt = ++viewToken;
+  view.textContent = '';
+  var page = el('div', 'page enter');
+  view.appendChild(page);
+  /* Only what is there when the page arrives is animated in; later redraws are not. */
+  setTimeout(function () { page.classList.remove('enter'); }, 900);
+  var m;
+  if ((m = /^#\/browse\/(.+)$/.exec(h))) {
+    var id = decodeURIComponent(m[1]);
+    setTab(curTab);
+    renderBrowse(vt, page, id);
+  } else if (/^#\/history/.test(h)) {
+    curTab = 'history';
+    setTab('history');
+    renderHistory(vt, page);
+  } else if (/^#\/downloads/.test(h)) {
+    curTab = 'downloads';
+    setTab('downloads');
+    renderDownloads(vt, page);
+  } else if (/^#\/search/.test(h)) {
+    curTab = 'search';
+    setTab('search');
+    var qm = /[?&]q=([^&]*)/.exec(h);
+    var q = qm ? decodeURIComponent(qm[1].replace(/\+/g, ' ')) : '';
+    renderSearch(vt, page, q);
+  } else {
+    curTab = 'home';
+    setTab('home');
+    renderHome(vt, page);
+  }
+}
+
+/* ---------- home filters ---------- */
+var homeFilter = '';
+var homeChips = [];
+function homeUrl(extra) {
+  var parts = [];
+  if (homeFilter) parts.push('p=' + enc(homeFilter));
+  if (extra) parts.push(extra);
+  return '/api/home' + (parts.length ? '?' + parts.join('&') : '');
+}
+function chipRow() {
+  var row = el('div', 'hchips');
+  homeChips.forEach(function (c) {
+    var b = el('button', 'hchip' + (homeFilter === c.params ? ' on' : ''), c.title);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', homeFilter === c.params ? 'true' : 'false');
+    b.addEventListener('click', function () {
+      /* Tapping the chosen filter again goes back to the normal home feed. */
+      homeFilter = (homeFilter === c.params) ? '' : c.params;
+      delete cache.home;
+      view.scrollTop = 0;
+      scrollPos['#/home'] = 0;
+      route(true);
+    });
+    row.appendChild(b);
+  });
+  return row;
+}
+
+function renderHome(vt, page) {
+  page.classList.add('home');
+  var tb = el('div', 'topbar');
+  tb.appendChild(el('h1', null, '首頁'));
+  var gear = el('button', 'iconbtn');
+  gear.type = 'button';
+  gear.setAttribute('aria-label', '設定');
+  gear.appendChild(icon('gear'));
+  gear.addEventListener('click', openSheet);
+  tb.appendChild(gear);
+  page.appendChild(tb);
+  var host = el('div');
+  page.appendChild(host);
+  var nextToken = '';
+  var loadingMore = false;
+  var draw = function (d) {
+    host.textContent = '';
+    if (d.chips && d.chips.length) homeChips = d.chips;
+    if (homeChips.length) host.appendChild(chipRow());
+    /* Shown while the PC cannot be reached; the glue shows and hides it as that changes. */
+    var away = el('div', 'notice', '離線模式：連不到電腦');
+    away.id = 'pcNotice';
+    away.style.display = window.__ytmGlue && window.__ytmGlue.offline && window.__ytmGlue.offline() ? '' : 'none';
+    host.appendChild(away);
+    if (!d.sections || !d.sections.length) {
+      host.appendChild(el('div', 'hint', '目前沒有內容'));
+    } else {
+      renderSections(host, d.sections, 'home');
+    }
+    nextToken = d.next || '';
+  };
+  var onScroll = function () {
+    if (vt !== viewToken) { view.removeEventListener('scroll', onScroll); return; }
+    if (!nextToken || loadingMore) return;
+    if (view.scrollTop + view.clientHeight < view.scrollHeight - 700) return;
+    loadingMore = true;
+    api(homeUrl('c=' + enc(nextToken))).then(function (d) {
+      if (vt !== viewToken) return;
+      renderSections(host, d.sections, 'home');
+      nextToken = d.next || '';
+    }).catch(function () { nextToken = ''; }).then(function () {
+      loadingMore = false;
+      onScroll();
+    });
+  };
+  view.addEventListener('scroll', onScroll);
+  var cached = cache.home ? cache.home.d : null;
+  var sk = null;
+  if (cached) {
+    draw(cached);
+    restoreScroll();
+  } else {
+    sk = skeleton(false);
+    host.appendChild(sk);
+  }
+  /* Always ask for a fresh feed; what was shown before is only a placeholder. */
+  var tries = 0;
+  /* Bumped by every fresh feed that lands, so a slower plain answer cannot replace it. */
+  var freshGen = 0, freshBusy = false;
+  var wantFresh = homeWantFresh;
+  homeWantFresh = false;
+  var refresh = function () {
+    var gen = freshGen;
+    api(homeUrl(wantFresh ? 'fresh=1' : '')).then(function (d) {
+      if (vt !== viewToken || gen !== freshGen) return;
+      tries++;
+      /* The signed-in feed can take a while to arrive from the PC; check back a few times. */
+      /* (Not inside the app: nothing is being fetched by a PC there, so asking again changes
+         nothing and only redraws the list every few seconds.) */
+      if (d.personalized === false && tries < 5 && !window.__ytmStandalone) setTimeout(refresh, 6000);
+      if (d.personalized === false && cache.home && cache.home.d.personalized) return;
+      cache.home = { t: Date.now(), d: d };
+      if (cached && view.scrollTop > 200) return;
+      cached = d;
+      draw(d);
+      onScroll();
+    }).catch(function (e) {
+      if (vt !== viewToken || cached) return;
+      if (sk) sk.remove();
+      host.appendChild(errorBox(e.message, function () { route(true); }));
+    });
+  };
+  /* quiet: started by the app itself (launch, back after a long while) - no messages, and the
+     list stays where the user is looking. */
+  homeRefresh = function (done, quiet) {
+    if (quiet && freshBusy) { if (done) done(); return; }
+    freshBusy = true;
+    api(homeUrl('fresh=1')).then(function (d) {
+      if (vt !== viewToken) return;
+      /* Right after the PC server starts it may only have the general feed; keep what is shown. */
+      if (d.personalized === false && cached && cached.personalized) { if (!quiet) toast('電腦端還在取得最新內容，請稍後再拉一次'); return; }
+      freshGen++;
+      cache.home = { t: Date.now(), d: d };
+      cached = d;
+      var top = view.scrollTop;
+      if (sk) { sk.remove(); sk = null; }
+      draw(d);
+      view.scrollTop = quiet ? top : 0;
+      onScroll();
+    }).catch(function (e) { if (!quiet) toast('更新失敗：' + e.message); }).then(function () {
+      freshBusy = false;
+      if (done) done();
+    });
+  };
+  homeRefresh.vt = vt;
+  refresh();
+}
+
+function renderSearch(vt, page, q) {
+  var tb = el('div', 'topbar');
+  tb.appendChild(el('h1', null, '搜尋'));
+  page.appendChild(tb);
+  var form = el('form', 'sform');
+  var input = document.createElement('input');
+  input.type = 'search';
+  input.placeholder = '搜尋歌曲、專輯、歌手';
+  input.setAttribute('enterkeyhint', 'search');
+  input.setAttribute('autocomplete', 'off');
+  input.setAttribute('autocapitalize', 'off');
+  input.value = q;
+  form.appendChild(input);
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var v = input.value.trim();
+    if (!v) return;
+    lsSet('ytm_lastq', v);
+    input.blur();
+    var nh = '#/search?q=' + enc(v);
+    if (location.hash === nh) {
+      delete cache['q:' + v];
+      route(true);
+    } else {
+      location.hash = nh;
+    }
+  });
+  page.appendChild(form);
+  var host = el('div');
+  page.appendChild(host);
+  if (!q) {
+    var last = lsGet('ytm_lastq');
+    host.appendChild(el('div', 'hint', '輸入關鍵字開始搜尋'));
+    if (last) {
+      var b = el('button', 'btn ghost', '上次搜尋：' + last);
+      b.type = 'button';
+      b.addEventListener('click', function () { location.hash = '#/search?q=' + enc(last); });
+      var w = el('div', 'hint');
+      w.appendChild(b);
+      host.appendChild(w);
+    }
+    return;
+  }
+  loadInto(vt, host, 'q:' + q, '/api/search?q=' + enc(q), function (d) {
+    if (!d.sections || !d.sections.some(function (s) { return s && s.items && s.items.length; })) {
+      host.appendChild(el('div', 'hint', '找不到結果'));
+      return;
+    }
+    renderSections(host, d.sections, 'list');
+  });
+}
+
+function renderBrowse(vt, page, id) {
+  var tb = el('div', 'topbar');
+  var back = el('button', 'iconbtn');
+  back.type = 'button';
+  back.setAttribute('aria-label', '返回');
+  back.appendChild(icon('back'));
+  back.addEventListener('click', function () {
+    if (history.length > 1) history.back();
+    else location.hash = '#/home';
+  });
+  tb.appendChild(back);
+  page.appendChild(tb);
+  var host = el('div');
+  page.appendChild(host);
+  loadInto(vt, host, 'b:' + id, '/api/browse?id=' + enc(id), function (d) {
+    var head = el('div', 'bhead');
+    head.appendChild(makeThumb({ thumb: d.thumb, kind: 'other' }));
+    head.appendChild(el('h2', null, d.title || ''));
+    if (d.subtitle) head.appendChild(el('p', null, d.subtitle));
+    var songs = [];
+    var seen = {};
+    (d.sections || []).forEach(function (s) {
+      ((s && s.items) || []).forEach(function (it) {
+        if (isSong(it) && !seen[it.videoId]) {
+          seen[it.videoId] = 1;
+          songs.push(it);
+        }
+      });
+    });
+    var pb = el('button', 'btn', '全部播放');
+    pb.type = 'button';
+    pb.disabled = !songs.length;
+    pb.addEventListener('click', function () { playAll(songs); openFull(); });
+    head.appendChild(pb);
+    host.appendChild(head);
+    renderSections(host, d.sections, 'list');
+  }, true);
+}
+
+/* ---------- wiring ---------- */
+function bindUI() {
+  initIcons();
+  $('miniOpen').addEventListener('click', openFull);
+  $('fullClose').addEventListener('click', closeFull);
+  $('fullGear').addEventListener('click', openSheet);
+  $('miniPlay').addEventListener('click', function () { togglePlay(); });
+  $('fPlay').addEventListener('click', function () { togglePlay(); });
+  $('miniNext').addEventListener('click', function () { next(true); });
+  $('fNext').addEventListener('click', function () { next(true); });
+  $('fPrev').addEventListener('click', function () { prev(true); });
+  $('nextBar').addEventListener('click', openQueue);
+  $('qClose').addEventListener('click', closeQueue);
+  $('fStyle').addEventListener('click', openStyles);
+  $('fProfile').addEventListener('click', toggleProfile);
+  $('fMix').addEventListener('click', toggleMix);
+  renderMixChip();
+  renderProfileChip();
+  $('fEq').addEventListener('click', openEq);
+  renderEqChip();
+  renderStyleChip();
+  $('fLike').addEventListener('click', function () { setLike('LIKE'); });
+  $('fDislike').addEventListener('click', function () { setLike('DISLIKE'); });
+  $('fComments').addEventListener('click', openComments);
+  $('fLyrics').addEventListener('click', toggleLyrics);
+  /* The two group buttons each open one extra row; only one is open at a time. */
+  var groups = [['fGrpSound', 'rowSound'], ['fGrpMore', 'rowMore']];
+  groups.forEach(function (g) {
+    $(g[0]).addEventListener('click', function () {
+      var open = $(g[1]).hidden;
+      groups.forEach(function (x) {
+        $(x[1]).hidden = !(open && x === g);
+        $(x[0]).setAttribute('aria-expanded', open && x === g ? 'true' : 'false');
+      });
+      setTimeout(titleFit, 60);
+    });
+  });
+  ['touchstart', 'wheel'].forEach(function (n) {
+    $('lyrView').addEventListener(n, function () { LY.userAt = Date.now(); }, { passive: true });
+  });
+  $('fullTitle').addEventListener('click', function () { if (TL.album) goBrowse(TL.album); });
+  window.addEventListener('resize', titleFit);
+  $('fSave').addEventListener('click', openSave);
+  $('fShare').addEventListener('click', shareSong);
+  $('fDl').addEventListener('click', dlChipTap);
+  initPull();
+  initSwipeClose();
+  initQueueSwipeClose();
+  $('fShuffle').addEventListener('click', function () {
+    S.shuffle = !S.shuffle;
+    lsSet('ytm_shuffle', S.shuffle ? '1' : '0');
+    if (S.shuffle) shuffleUpcoming();
+    renderToggles();
+  });
+  $('fRepeat').addEventListener('click', function () {
+    S.repeat = S.repeat === 'off' ? 'all' : (S.repeat === 'all' ? 'one' : 'off');
+    lsSet('ytm_repeat', S.repeat);
+    renderToggles();
+    extendQueue();
+  });
+  $('fSurround').addEventListener('click', function () {
+    S.surround = !S.surround;
+    lsSet('ytm_surround', S.surround ? '1' : '0');
+    fxApply();
+    renderToggles();
+    renderPlayer();
+  });
+  renderToggles();
+  $('fRetry').addEventListener('click', function () {
+    if (S.cur) playTrack(S.cur, true);
+  });
+  $('sheet').addEventListener('click', function (e) {
+    if (e.target === $('sheet')) closeSheet();
+  });
+
+  var seek = $('seek');
+  seek.addEventListener('input', function () {
+    S.dragging = true;
+    var max = +seek.max || 1;
+    seek.style.setProperty('--p', (+seek.value / max * 100) + '%');
+    $('tCur').textContent = fmt(+seek.value);
+  });
+  seek.addEventListener('change', function () {
+    S.dragging = false;
+    seekTo(+seek.value);
+  });
+  var endDrag = function () {
+    setTimeout(function () { S.dragging = false; }, 300);
+  };
+  seek.addEventListener('pointerup', endDrag);
+  seek.addEventListener('touchend', endDrag);
+
+  window.addEventListener('hashchange', function () { route(false); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeSheet(); closeFull(); }
+  });
+
+  remoteControls();
+  dbg('I', 'remote-ready');
+}
+
+/* ---------- remember what was playing ---------- */
+var lastSave = 0;
+function saveState(force) {
+  if (!S.cur) return;
+  var now = Date.now();
+  if (!force && now - lastSave < 4000) return;
+  lastSave = now;
+  var from = Math.max(0, S.index - 5);
+  var pos = S.ready ? curTime() : (S.resumeAt || 0);
+  lsSet('ytm_state', JSON.stringify({ at: now, index: S.index - from, queue: S.queue.slice(from, from + 60), t: pos }));
+}
+function restoreState() {
+  var d = null;
+  try { d = JSON.parse(lsGet('ytm_state') || 'null'); } catch (e) { d = null; }
+  if (!d || !d.queue || !d.queue.length || Date.now() - d.at > 24 * 3600 * 1000) return;
+  var q = d.queue.filter(isSong);
+  var i = Math.min(Math.max(0, d.index | 0), q.length - 1);
+  if (q.length !== d.queue.length || i < 0) return;
+  S.queue = q;
+  S.index = i;
+  S.cur = q[i];
+  S.vid = q[i].videoId;
+  S.resumeAt = +d.t || 0;
+  S.resumeVid = q[i].videoId;
+  S.trueDur = parseDur(q[i].duration);
+  renderPlayer();
+  if (S.trueDur > 0) updateProgress(S.resumeAt, S.trueDur);
+}
+window.addEventListener('pagehide', function () { saveState(true); });
+document.addEventListener('visibilitychange', function () { if (document.hidden) saveState(true); });
+
+bindUI();
+restoreState();
+renderQueue();
+route(true);
+})();
+</script>
+</body>
+</html>

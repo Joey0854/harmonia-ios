@@ -1,0 +1,16 @@
+build/
+*.xcodeproj
+Payload/
+*.ipa
+App/Info.plist
+.DS_Store
+_out/
+.build/
+.swiftpm/
+Package.resolved
+# Made by tools/build-python.py; too big to keep in git.
+PythonRuntime/
+vendor/
+__pycache__/
+*.pyc
+*.bak-*
