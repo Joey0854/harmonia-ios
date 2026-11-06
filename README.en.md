@@ -119,7 +119,7 @@ Four tabs at the bottom: **Home** (首頁), **Search** (搜尋), **Downloads** (
 
 ### Sound
 
-In the player: **Surround** on/off and style, a **5-band equaliser** (150 / 400 / 1500 / 5000 / 10000 Hz) with loudness balancing, and **automatic mixing** between songs. The app finds each song's main part and ending from its loudness and lets the next song come in as the ending fades (no beat matching). The next song must be downloaded first, so very short songs are not mixed. **Picture and sound alignment** (Settings): if the backdrop light or the lyrics are behind the sound, drag left (earlier); if ahead, drag right (later); headphones and car are remembered separately.
+In the player: **Surround** on/off and style, a **5-band equaliser** (150 / 400 / 1500 / 5000 / 10000 Hz) with loudness balancing, and **automatic mixing** between songs. The analysis runs entirely on the phone (the same method the PC used): it finds each song's tempo, beat positions, main part and ending, mixes beat on beat when the tempos agree, and otherwise lets the next song come in as the ending fades. The next song must be downloaded first, so very short songs are not mixed. **Picture and sound alignment** (Settings): if the backdrop light or the lyrics are behind the sound, drag left (earlier); if ahead, drag right (later); headphones and car are remembered separately.
 
 ### Downloads
 
