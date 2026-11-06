@@ -222,6 +222,7 @@ final class Account {
                 return
             }
             guard http.statusCode == 200 else {
+                self.noteSession(loggedIn: nil, status: http.statusCode)
                 DispatchQueue.main.async { completion(.failure("HTTP \(http.statusCode)")) }
                 return
             }
@@ -230,8 +231,46 @@ final class Account {
                 DispatchQueue.main.async { completion(.failure("not JSON")) }
                 return
             }
+            self.noteSession(loggedIn: Account.loggedInFlag(object), status: nil)
             DispatchQueue.main.async { completion(.success(object)) }
         }.resume()
+    }
+
+    // MARK: - is the sign-in still good?
+
+    /// Called on the main queue, at most once in ten minutes, when YouTube says the stored
+    /// sign-in no longer counts (the answers say "not logged in", or HTTP 401).
+    var onExpired: (() -> Void)?
+    private var expiredAt = Date.distantPast
+
+    private func noteSession(loggedIn flag: String?, status: Int?) {
+        guard isLoggedIn, flag == "0" || status == 401 else { return }
+        DispatchQueue.main.async {
+            guard Date().timeIntervalSince(self.expiredAt) > 600 else { return }
+            self.expiredAt = Date()
+            Diag.shared.log("account: the sign-in is no longer accepted", error: true)
+            self.onExpired?()
+        }
+    }
+
+    /// One small request just to learn whether the sign-in still works (at start).
+    func verifySession() {
+        guard isLoggedIn else { return }
+        call("browse", ["browseId": "FEmusic_home"]) { _ in }
+    }
+
+    /// YouTube's answers carry "logged_in": "1" or "0" among their tracking parameters.
+    private static func loggedInFlag(_ json: [String: Any]) -> String? {
+        var flag: String?
+        walk(json, depth: 0) { node in
+            if flag != nil { return true }
+            if (node["key"] as? String) == "logged_in", let value = node["value"] as? String {
+                flag = value
+                return true
+            }
+            return false
+        }
+        return flag
     }
 
     /// What the watch page says about the song's like state.

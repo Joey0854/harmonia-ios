@@ -101,7 +101,7 @@ Tap **Download** (下載) in the player to keep a song on the phone; manage them
 
 ### Signing in (optional)
 
-Settings > **YouTube Music account** > Sign in. Then the home feed is your own, the heart in the player shows and changes your like, songs can be added to playlists, and songs you heard for 30 seconds (half of a short one) are also written to your YouTube Music history (it may take a few minutes to show). You type your Google credentials only on Google's own page.
+Settings > **YouTube Music account** > Sign in. When nobody is signed in, or the sign-in has expired, the app shows a sign-in prompt (you can choose Later; for "not signed in" also Do not remind me). Then the home feed is your own, the heart in the player shows and changes your like, songs can be added to playlists, and songs you heard for 30 seconds (half of a short one) are also written to your YouTube Music history (it may take a few minutes to show). You type your Google credentials only on Google's own page.
 
 ### Play history
 
@@ -109,7 +109,7 @@ Settings > **YouTube Music account** > Sign in. Then the home feed is your own, 
 
 ### Ambient light (optional)
 
-Settings > **Ambient light** (氛圍燈). Needs a compatible car controller (Bluetooth LE); Bluetooth permission is asked only when you switch it on.
+Settings > **Ambient light** (氛圍燈; folded by default, tap to open). Needs a compatible car controller (Bluetooth LE); Bluetooth permission is asked only when you switch it on.
 
 ### Diagnostics
 

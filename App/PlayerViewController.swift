@@ -176,6 +176,10 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
         view.addGestureRecognizer(tap)
 
         player.onEvent = { [weak self] event in self?.send(event) }
+        /* The stored sign-in stopped working: the page asks the user to sign in again. Checked
+           once a few seconds after start, and whenever an account request notices it. */
+        Account.shared.onExpired = { [weak self] in self?.send(["type": "accountExpired"]) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { Account.shared.verifySession() }
         /* A song counts as played: kept for the page (it may not be running), and sent to the
            signed-in account's history. */
         player.onListened = { [weak self] id, title, artist, artwork, duration in

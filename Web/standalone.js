@@ -159,6 +159,58 @@
      stamped with the account (the app does that), and the account-only actions (like,
      playlists) are answered by the app instead of the PC. */
   function accountOn() { return !!(window.__ytmAccount); }
+
+  /* The sign-in page: shown when nobody is signed in, or when the stored sign-in stopped working. */
+  var promptEl = null;
+  function closePrompt() {
+    try { if (promptEl && promptEl.parentNode) promptEl.parentNode.removeChild(promptEl); } catch (e) {}
+    promptEl = null;
+  }
+  function loginPrompt(reason) {
+    if (promptEl || !hasAppHandler()) return;
+    var skip = false;
+    try { skip = localStorage.getItem('ytm_login_skip') === '1'; } catch (e) { skip = false; }
+    if (reason === 'none' && skip) return;
+    var wrap = document.createElement('div');
+    wrap.setAttribute('role', 'dialog');
+    wrap.setAttribute('aria-modal', 'true');
+    wrap.setAttribute('style', 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.72)');
+    var card = document.createElement('div');
+    card.setAttribute('style', 'width:100%;max-width:380px;background:#1c1c1c;color:#fff;border-radius:18px;padding:22px 20px;box-shadow:0 10px 40px rgba(0,0,0,.6)');
+    var h = document.createElement('h2');
+    h.textContent = reason === 'expired' ? '登入已失效' : '登入 YouTube Music';
+    h.setAttribute('style', 'margin:0 0 10px;font-size:20px');
+    var p = document.createElement('p');
+    p.textContent = reason === 'expired'
+      ? '你的 YouTube Music 登入已經失效，請重新登入。不登入也能繼續聽歌，但看不到個人推薦，喜歡的歌曲和播放紀錄也不會同步。'
+      : '登入後可以看到自己的推薦內容，並同步喜歡的歌曲、播放清單和播放紀錄。不登入也能聽歌。';
+    p.setAttribute('style', 'margin:0 0 18px;line-height:1.5;opacity:.85');
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.textContent = '登入';
+    go.setAttribute('style', 'display:block;width:100%;margin:0 0 10px;padding:13px;border-radius:12px;border:0;background:#fff;color:#000;font:inherit;font-weight:600');
+    go.addEventListener('click', function () { closePrompt(); raw({ cmd: 'login' }); });
+    var later = document.createElement('button');
+    later.type = 'button';
+    later.textContent = '稍後';
+    later.setAttribute('style', 'display:block;width:100%;margin:0 0 6px;' + BTN);
+    later.addEventListener('click', closePrompt);
+    card.appendChild(h);
+    card.appendChild(p);
+    card.appendChild(go);
+    card.appendChild(later);
+    if (reason === 'none') {
+      var never = document.createElement('button');
+      never.type = 'button';
+      never.textContent = '不再提醒';
+      never.setAttribute('style', 'display:block;width:100%;margin:0;padding:9px;border:0;background:transparent;color:inherit;opacity:.6;font:inherit');
+      never.addEventListener('click', function () { try { localStorage.setItem('ytm_login_skip', '1'); } catch (e) {} closePrompt(); });
+      card.appendChild(never);
+    }
+    wrap.appendChild(card);
+    (document.body || document.documentElement).appendChild(wrap);
+    promptEl = wrap;
+  }
   function accountCall(what, id, u) {
     var h = null;
     try { h = window.webkit.messageHandlers.ytmAccount; } catch (e) { h = null; }
@@ -572,6 +624,7 @@
   function onAppEvent(e) {
     if (!e || typeof e.type !== 'string') return toPage(e);
     if (e.type === 'history') { historyPull(); return; }
+    if (e.type === 'accountExpired') { plog('W', 'account-expired', {}); loginPrompt('expired'); return; }
     if (e.type === 'diag') { diagApp = String(e.text || ''); diagShow(); return; }
     if (e.type === 'light') {
       lightState = { state: String(e.state || 'off'), name: e.name == null ? null : String(e.name), detail: e.detail == null ? null : String(e.detail) };
@@ -817,10 +870,15 @@
       var hasApp = false;
       try { hasApp = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.ytm); } catch (e0) { hasApp = false; }
       if (hasApp) {
-        var lh = document.createElement('h3');
-        lh.textContent = '氛圍燈';
-        panel.appendChild(lh);
-        lightControls(panel);
+        /* folded away until opened: most people never use it */
+        var det = document.createElement('details');
+        det.setAttribute('style', 'margin:10px 0');
+        var sum = document.createElement('summary');
+        sum.textContent = '氛圍燈';
+        sum.setAttribute('style', 'font-size:18px;font-weight:600;cursor:pointer;padding:6px 0');
+        det.appendChild(sum);
+        lightControls(det);
+        panel.appendChild(det);
       }
 
       var ah = document.createElement('h3');
@@ -1102,6 +1160,7 @@
      so it comes back personal (or anonymous again). */
   window.__ytmAccountChanged = function (on) {
     plog('I', 'account', { on: !!on });
+    if (on) closePrompt();
     try { if (P && P.homeQuiet) P.homeQuiet(); } catch (e) {}
   };
 
@@ -1133,6 +1192,8 @@
     page: function (p) {
       P = p;
       historyPull();
+      /* not signed in: offered once, a moment after the page is up */
+      setTimeout(function () { if (!accountOn()) loginPrompt('none'); }, 2500);
       homeAuto('page');
       raw({ cmd: 'config', pc: B.pcBase() });
       /* the light settings, so that the app knows them from the start */

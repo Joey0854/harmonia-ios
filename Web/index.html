@@ -2921,19 +2921,6 @@ function buildSheet() {
   var sh = $('sheet');
   sh.textContent = '';
   var panel = el('div', 'panel');
-  panel.appendChild(el('h3', null, '耗電相關'));
-  var seg2 = el('div', 'seg');
-  var fxOff = lsGet('ytm_fx') === '0', calm = lsGet('ytm_calm') === '1';
-  var b1 = el('button', fxOff ? '' : 'on', '背景光效：' + (fxOff ? '關' : '開'));
-  b1.type = 'button';
-  b1.addEventListener('click', function () { lsSet('ytm_fx', fxOff ? '1' : '0'); if (!fxOff) fxRest(); else fxKick(); dbg('I', 'setting', { backdrop: fxOff ? 'on' : 'off' }); buildSheet(); });
-  var b2 = el('button', calm ? '' : 'on', '介面動畫：' + (calm ? '關' : '開'));
-  b2.type = 'button';
-  b2.addEventListener('click', function () { lsSet('ytm_calm', calm ? '0' : '1'); document.body.classList.toggle('calm', !calm); dbg('I', 'setting', { motion: calm ? 'on' : 'off' }); buildSheet(); });
-  seg2.appendChild(b1);
-  seg2.appendChild(b2);
-  panel.appendChild(seg2);
-  panel.appendChild(el('p', null, '手機發燙時可以逐一關掉試試，找出是哪一項造成的。'));
   panel.appendChild(el('h3', null, '畫面與聲音對齊（' + (isCar() ? '車用' : '耳機') + '）'));
   var lagNow = Math.round(avLagUser() * 1000);
   var lagLabel = el('p', null, '');
@@ -2948,13 +2935,14 @@ function buildSheet() {
   panel.appendChild(lagIn);
   panel.appendChild(lagLabel);
   panel.appendChild(el('p', null, '藍牙耳機或車機的聲音會比畫面晚。開著歌詞模式播一首有逐句歌詞的歌，往右拉到歌詞和光效跟聲音對上為止。耳機和車用各記一組。'));
+  /* the app's own items (ambient light, account, diagnostics) go here; the close button is last */
+  if (window.__ytmGlue && window.__ytmGlue.diag) window.__ytmGlue.diag(panel);
   var row = el('div', 'sheetbtns');
   var cl = el('button', 'btn', '關閉');
   cl.type = 'button';
   cl.addEventListener('click', closeSheet);
   row.appendChild(cl);
   panel.appendChild(row);
-  if (window.__ytmGlue && window.__ytmGlue.diag) window.__ytmGlue.diag(panel);
   sh.appendChild(panel);
 }
 
