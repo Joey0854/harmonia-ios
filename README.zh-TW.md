@@ -1,4 +1,4 @@
-# HeSuVi Music
+# Harmonia
 
 [English](README.md)
 

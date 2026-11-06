@@ -1,4 +1,4 @@
-# HeSuVi Music
+# Harmonia
 
 [繁體中文](README.zh-TW.md)
 

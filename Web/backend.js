@@ -4915,7 +4915,7 @@ function makeIcon(size) {
 
 const ICONS = { 180: makeIcon(180), 512: makeIcon(512) };
 const MANIFEST = JSON.stringify({
-  id: '/hesuvi-music', name: 'HeSuVi Music', short_name: 'HeSuVi', start_url: '/', scope: '/',
+  id: '/harmonia', name: 'Harmonia', short_name: 'Harmonia', start_url: '/', scope: '/',
   display: 'standalone', background_color: '#030303', theme_color: '#030303',
   icons: [{ src: '/icon-180.png', sizes: '180x180', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }],
 });

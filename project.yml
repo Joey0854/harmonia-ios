@@ -27,7 +27,7 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: HeSuVi Music
+        CFBundleDisplayName: Harmonia
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "40"
         UILaunchScreen: {}
