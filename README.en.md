@@ -7,6 +7,8 @@ screen off, and shows up on the lock screen and CarPlay's Now Playing.
 
 > **Platforms:** iPhone (iOS 16 or later) only. **There is no Android version (no APK).** See
 > [Android](#android).
+>
+> **Read the [important notes](#️-important-notes) first: turn off the car's original surround sound.**
 
 ## Features
 
@@ -17,6 +19,30 @@ screen off, and shows up on the lock screen and CarPlay's Now Playing.
 - Automatic mixing between songs.
 - Download songs to the phone; play history on the phone, and when you are signed in, plays are also sent to your YouTube Music history.
 - Optional: drives a car ambient-light controller over Bluetooth LE from the music (needs a compatible controller).
+
+## ⚠️ Important notes
+
+> [!IMPORTANT]
+> **Turn off the car's original surround sound first.**
+> Harmonia makes its own surround (headphone impulse responses) and equaliser. If the car stereo (or the headphones, or the phone) also has surround, sound field, 3D, Live, Dolby or spatial audio switched on, the sound is processed twice and can turn dull, smeared, hollow or distorted.
+>
+> - **Car stereo:** switch off the factory surround / sound field / virtual stage, and set its equaliser to flat (Off).
+> - **Headphones and phone:** switch off the headphones' own enhancement and the phone's Spatial Audio.
+> - Turn the volume down before you start, then raise it slowly.
+> - The app's own **Surround** and **Equaliser & loudness** are yours to adjust; to listen without surround, switch **Surround** off in the player.
+
+> [!WARNING]
+> **Expires after 7 days.** An app sideloaded with a free Apple ID stops opening after 7 days and must be installed again (a paid developer account lasts a year).
+
+> [!WARNING]
+> **Terms of service and stability.** The app reads audio from YouTube with yt-dlp. That may be against YouTube's Terms of Service, and playback can stop working for a while when YouTube changes. Personal use only, at your own risk.
+
+> [!NOTE]
+> - **iPhone only.** There is no Android version (no APK).
+> - **Sign in only on Google's own page.** Never type your account or password anywhere else.
+> - **The ambient light is optional.** It only fits compatible car Bluetooth LE controllers; use it at your own risk, and ignore it if you do not need it.
+> - **Check a log before you post it.** It lists the song ids and titles you played.
+> - **The first song after each start** needs a few seconds to be looked up. That is normal.
 
 ## Install on iPhone
 

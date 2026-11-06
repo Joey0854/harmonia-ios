@@ -2575,6 +2575,10 @@ function styleScene(p, rows, save) {
 }
 function openStyles() {
   openPanel('環繞風格', function (body) {
+    /* the car's own surround must be off, or the sound is processed twice */
+    var warn = el('p', null, '注意：請先關閉車機、耳機或手機自己的環繞／音場／空間音訊，否則聲音會被處理兩次，容易變悶或破音。');
+    warn.setAttribute('style', 'margin:0 0 12px;padding:10px 12px;border-radius:10px;background:rgba(255,190,60,.14);border:1px solid rgba(255,190,60,.45)');
+    body.appendChild(warn);
     var p = styleParams();
     var rows = [];
     var save = function () {
