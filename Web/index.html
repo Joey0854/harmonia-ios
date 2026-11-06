@@ -1108,6 +1108,14 @@ function makeHistory(store, now) {
       return n;
     },
     list: function () { return load().slice(); },
+    /* one song out of the list */
+    remove: function (videoId) {
+      load();
+      var n = list.length;
+      list = list.filter(function (x) { return x.videoId !== videoId; });
+      if (list.length !== n) save();
+      return n - list.length;
+    },
     clear: function () { list = []; save(); },
     /* 今天 / 昨天 / 本週 (the 5 days before those) / 更早, by the phone's calendar days */
     groups: function () {
@@ -1197,7 +1205,19 @@ function renderHistory(vt, page) {
       /* tapping plays from here, the older entries following as the queue */
       var k = 0;
       while (k < all.length && all[k].videoId !== it.videoId) k++;
-      l.appendChild(rowEl(it, function () { openItem(all[k] || it, all); }));
+      var hrow = rowEl(it, function () { openItem(all[k] || it, all); });
+      var hdel = el('button', 'hdel', '✕');
+      hdel.type = 'button';
+      hdel.setAttribute('aria-label', '刪除這筆紀錄');
+      hdel.setAttribute('data-hist', 'del');
+      hdel.setAttribute('style', 'flex:none;margin-left:6px;padding:10px 12px;border:0;background:transparent;color:inherit;opacity:.55;font-size:16px;line-height:1');
+      hdel.addEventListener('click', function (e) {
+        e.stopPropagation();
+        HIST.remove(it.videoId);
+        route(true);
+      });
+      hrow.appendChild(hdel);
+      l.appendChild(hrow);
     });
     wrap.appendChild(l);
     host.appendChild(wrap);
@@ -3181,6 +3201,18 @@ function route(force) {
 /* ---------- home filters ---------- */
 var homeFilter = '';
 var homeChips = [];
+/* The ids of the songs, albums and playlists in a home feed. */
+function feedIds(d) {
+  var set = {}, n = 0;
+  (function walk(x) {
+    if (Array.isArray(x)) { x.forEach(walk); return; }
+    if (!x || typeof x !== 'object') return;
+    var k = x.videoId || x.browseId || x.playlistId;
+    if (typeof k === 'string' && k && !set[k]) { set[k] = 1; n++; }
+    Object.keys(x).forEach(function (key) { walk(x[key]); });
+  })(d && d.sections);
+  return { set: set, n: n };
+}
 function homeUrl(extra) {
   var parts = [];
   if (homeFilter) parts.push('p=' + enc(homeFilter));
@@ -3298,6 +3330,9 @@ function renderHome(vt, page) {
       /* Right after the PC server starts it may only have the general feed; keep what is shown. */
       if (d.personalized === false && cached && cached.personalized) { if (!quiet) toast('電腦端還在取得最新內容，請稍後再拉一次'); return; }
       freshGen++;
+      /* what is new compared with what was on screen, to tell the user and the log */
+      var was = cached ? feedIds(cached) : null, now = feedIds(d), added = 0;
+      Object.keys(now.set).forEach(function (k) { if (!was || !was.set[k]) added++; });
       cache.home = { t: Date.now(), d: d };
       cached = d;
       var top = view.scrollTop;
@@ -3305,6 +3340,8 @@ function renderHome(vt, page) {
       draw(d);
       view.scrollTop = quiet ? top : 0;
       onScroll();
+      dbg('I', 'home-refresh', { items: now.n, added: added, personal: d.personalized === false ? 0 : 1, quiet: quiet ? 1 : 0 });
+      if (!quiet) toast(added ? '已更新（' + added + ' 項新內容）' : '已更新，內容和剛才相同');
     }).catch(function (e) { if (!quiet) toast('更新失敗：' + e.message); }).then(function () {
       freshBusy = false;
       if (done) done();

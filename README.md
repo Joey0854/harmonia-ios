@@ -1,89 +1,140 @@
 # Harmonia
 
-[繁體中文](README.zh-TW.md)
+[English](README.en.md)
 
-An iPhone music player for YouTube Music. It plays by itself (no PC needed), keeps playing with the
-screen off, and shows up on the lock screen and CarPlay's Now Playing.
+給 iPhone 用的 YouTube Music 播放器。不需要電腦就能自己播放，螢幕關閉也會持續播放，
+並顯示在鎖定畫面與 CarPlay 的「正在播放」。
 
-> **Platforms:** iPhone (iOS 16 or later) only. **There is no Android version (no APK).** See
-> [Android](#android).
+> **支援平台：** 只有 iPhone（iOS 16 以上）。**沒有 Android 版（沒有 APK）**，詳見 [Android](#android)。
 
-## Features
+## 功能
 
-- Browse and search YouTube Music; sign in (optional) for your own home feed, likes and playlists.
-- Plays by itself: [yt-dlp](https://github.com/yt-dlp/yt-dlp) runs inside the app.
-- Background playback, lock screen, Control Centre and CarPlay Now Playing.
-- Surround effect (headphone impulse responses), 5-band equaliser, loudness balancing.
-- Automatic mixing between songs.
-- Download songs to the phone; play history on the phone, and when you are signed in, plays are also sent to your YouTube Music history.
-- Optional: drives a car ambient-light controller over Bluetooth LE from the music (needs a compatible controller).
+- 瀏覽、搜尋 YouTube Music；可選擇登入，取得自己的首頁、喜歡的歌曲與播放清單。
+- 自己播放：App 內建 [yt-dlp](https://github.com/yt-dlp/yt-dlp)。
+- 背景播放、鎖定畫面、控制中心、CarPlay「正在播放」。
+- 環繞音效（耳機脈衝響應）、5 段等化器、音量平衡。
+- 歌曲之間自動混音。
+- 下載歌曲到手機；手機上的播放歷史；登入後播放紀錄也會送到 YouTube Music 的歷史。
+- 選用：用藍牙 LE 讓車上的氛圍燈跟著音樂變化（需要相容的控制器）。
 
-## Install on iPhone
+## 在 iPhone 上安裝
 
-The app is **not** on the App Store. You install the `.ipa` from the [Releases](../../releases)
-page with a sideloading tool, using your own Apple ID.
+App **不在 App Store**。請到 [Releases](../../releases) 下載 `.ipa`，用側載工具和你自己的 Apple ID 安裝。
 
-**You need:** an iPhone on iOS 16 or later, a USB cable, a Windows PC or a Mac, and an Apple ID.
-A free Apple ID works, but the app then **expires after 7 days** and must be installed again
-(a paid developer account lasts a year).
+**需要：** iOS 16 以上的 iPhone、USB 線、一台 Windows 電腦或 Mac、一個 Apple ID。
+免費 Apple ID 可以用，但 App **7 天後會過期**，要重新安裝（付費開發者帳號則為一年）。
 
-### Option A - Sideloadly (Windows or macOS)
+### 方法 A：Sideloadly（Windows 或 macOS）
 
-1. Install **iTunes** and **iCloud for Windows** from Apple's website (the Microsoft Store versions do
-   not work with Sideloadly). On a Mac nothing extra is needed.
-2. Install [Sideloadly](https://sideloadly.io/).
-3. Download `YTMRemote.ipa` from the latest [release](../../releases/latest).
-4. Connect the iPhone with the cable and tap **Trust** on the phone.
-5. On the iPhone turn on **Developer Mode**: Settings > Privacy & Security > Developer Mode
-   (the phone restarts). If you do not see it yet, do step 6 first and come back.
-6. Open Sideloadly, drag the `.ipa` into it, choose your iPhone, type your Apple ID, press **Start** and
-   enter your password when it asks. Type your credentials only into Sideloadly's own window.
-7. On the iPhone: Settings > General > **VPN & Device Management** > your Apple ID > **Trust**.
-8. Open the app.
+1. 到 Apple 官網安裝 **iTunes** 和 **iCloud for Windows**（Microsoft Store 版本不能搭配 Sideloadly）。
+   Mac 不需要額外安裝。
+2. 安裝 [Sideloadly](https://sideloadly.io/)。
+3. 從最新的 [Release](../../releases/latest) 下載 `YTMRemote.ipa`。
+4. 用線連接 iPhone，在手機上按「信任」。
+5. 在 iPhone 開啟**開發者模式**：設定 > 隱私權與安全性 > 開發者模式（手機會重新啟動）。
+   如果還看不到這個選項，先做第 6 步再回來。
+6. 開啟 Sideloadly，把 `.ipa` 拖進去，選擇你的 iPhone，輸入 Apple ID，按 **Start**，
+   需要時輸入密碼。帳號與密碼只輸入在 Sideloadly 自己的視窗。
+7. 在 iPhone：設定 > 一般 > **VPN 與裝置管理** > 你的 Apple ID > **信任**。
+8. 開啟 App。
 
-### Option B - AltStore (Windows or macOS)
+### 方法 B：AltStore（Windows 或 macOS）
 
-1. Install [AltServer](https://altstore.io/) on the computer and use it to install **AltStore** on the
-   iPhone (follow AltStore's own guide).
-2. Send `YTMRemote.ipa` to the iPhone (AirDrop, Files, or download it in Safari).
-3. In AltStore open **My Apps**, tap **+** and pick the `.ipa`.
-4. Do steps 5 and 7 from Option A (Developer Mode, Trust).
-5. AltStore refreshes the app in the background while AltServer is running on your computer.
+1. 在電腦安裝 [AltServer](https://altstore.io/)，並用它把 **AltStore** 裝到 iPhone（照 AltStore 官方說明）。
+2. 把 `YTMRemote.ipa` 傳到 iPhone（AirDrop、檔案 App，或用 Safari 下載）。
+3. 在 AltStore 開啟 **My Apps**，點 **+**，選擇 `.ipa`。
+4. 做方法 A 的第 5、7 步（開發者模式、信任）。
+5. 只要電腦上的 AltServer 開著，AltStore 會在背景自動續期。
 
-### First start
+### 第一次使用
 
-1. Pick a song from the home page. The first song after the app opens needs a few seconds to be looked up.
-2. Optional: Settings > **YouTube Music account** > Sign in, to get your own home feed, likes and playlists.
-3. Optional: allow Bluetooth only if you use the ambient light.
+1. 在首頁選一首歌。App 開啟後的第一首歌需要幾秒鐘查詢。
+2. 選用：設定 > **YouTube Music 帳號** > 登入，取得自己的首頁、喜歡的歌曲與播放清單。
+3. 選用：只有要用氛圍燈時才需要允許藍牙。
 
-### Problems
+### 常見問題
 
-| Symptom | What to do |
+| 症狀 | 處理方式 |
 | --- | --- |
-| "Untrusted developer" | Settings > General > VPN & Device Management > Trust |
-| The app closes right away, or shows no Developer Mode | Turn on Developer Mode (step 5), then restart the phone |
-| The app stopped opening after about a week | Free Apple IDs expire after 7 days: install it again |
-| Sideloadly cannot find the iPhone | Reinstall iTunes (Apple's website version), unlock the phone, tap Trust |
-| A song does not play | Wait about 10 seconds for the first lookup; update to the newest release (YouTube changes often) |
+| 「未受信任的開發者」 | 設定 > 一般 > VPN 與裝置管理 > 信任 |
+| App 一開就關閉，或找不到開發者模式 | 開啟開發者模式（第 5 步），再重新啟動手機 |
+| 約一週後打不開 | 免費 Apple ID 7 天過期，重新安裝即可 |
+| Sideloadly 找不到 iPhone | 重新安裝 Apple 官網版 iTunes、解鎖手機、按「信任」 |
+| 歌曲播不出來 | 等約 10 秒（第一次查詢）；更新到最新 Release（YouTube 常常改版） |
 
-### Sending a log when you ask for help
+### 求助時如何提供紀錄
 
-Tap the screen **three times with two fingers**: a log screen opens. **Copy** or **Share** puts it
-into a message, mail or file. Read it before you post it; it lists song ids and titles you played.
+用**兩根手指在畫面上連點三下**，會開啟紀錄畫面。按 **Copy** 或 **Share** 就能貼到訊息、
+郵件或存成檔案。貼出去之前請先看過內容，裡面有你播放過的歌曲 ID 和標題。
+
+## 使用說明
+
+### 畫面總覽
+
+底部有四個分頁：**首頁**、**搜尋**、**下載**、**紀錄**。右上角的齒輪是**設定**。
+
+| 分頁 | 做什麼 |
+| --- | --- |
+| 首頁 | YouTube Music 的推薦內容。往下拉可以更新，更新後會提示「已更新（N 項新內容）」或「內容和剛才相同」 |
+| 搜尋 | 搜尋歌曲、專輯、歌手 |
+| 下載 | 已存到手機的歌曲，離線也能播放；可以全部播放或逐首刪除 |
+| 紀錄 | 播放歷史，分成「這支手機」和「YouTube Music 紀錄」兩個頁籤 |
+
+### 播放
+
+1. 點任何一首歌就開始播放，歌曲會加入佇列，自動接著播下一首。
+2. 展開播放頁可以拖進度條、切換上一首／下一首、隨機播放、重複播放（關閉／全部／單曲）。
+3. 螢幕關閉、切到別的 App、使用鎖定畫面或 CarPlay 的「正在播放」時都會繼續播放。
+4. 每次 App 重新開啟後的第一首歌，需要幾秒鐘查詢歌曲位址。
+
+### 音效
+
+在播放頁可以調整：
+
+- **環繞**：開或關；可選風格（耳機脈衝響應），也能拖曳調整音場。
+- **等化器與響度**：5 段等化器（150 / 400 / 1500 / 5000 / 10000 Hz）和整體音量；音量平衡讓每首歌的大小接近。
+- **自動混音**：歌曲之間自動疊接，開關會用提示告訴你目前狀態。
+
+### 下載歌曲
+
+播放時按播放頁的「**下載**」，歌就會存到手機；按鈕會依狀態顯示「下載中」「已下載」或「重試下載」。到「**下載**」分頁管理。
+
+### 登入 YouTube Music（選用）
+
+設定 > **YouTube Music 帳號** > 登入。登入後：
+
+- 首頁變成你自己的推薦內容。
+- 播放頁的愛心按鈕會顯示並更新這首歌是否已喜歡，也可以把歌加入播放清單。
+- 聽滿 30 秒（短歌聽一半）的歌，會同步記到 YouTube Music 的歷史（可能有數分鐘延遲）。
+
+帳號和密碼只輸入在 Google 自己的登入頁面，本 App 不會看到。
+
+### 播放歷史
+
+- 「這支手機」只存在手機上，最多 500 首；一首歌聽滿 30 秒（短歌聽一半）才會記錄，重複播放會累計次數。
+- 每一筆右側的 **✕** 可以刪除單筆；上方的「**清除紀錄**」會刪除全部（要點兩下確認，第一下只是詢問）。
+- 「YouTube Music 紀錄」是帳號上的歷史，只能讀取，需要先登入。
+
+### 氛圍燈（選用）
+
+設定 > **氛圍燈**。需要相容的車用氛圍燈控制器（藍牙 LE）；第一次開啟時才會要求藍牙權限。可選顏色來源（依歌曲封面、緩慢變換、固定）、風格（柔和、節拍、多彩）、強度與飽和度。不用的話完全不需要理會。
+
+### 診斷與回報問題
+
+設定最下方的「**診斷**」會顯示目前狀態和最近的紀錄。要把完整紀錄傳給別人：用**兩根手指在畫面上連點三下**開啟紀錄畫面，按 **Share** 或 **Copy**。貼出去前請先看過內容。
 
 ## Android
 
-There is **no Android app and no APK**. The app uses iOS-only parts (the system audio engine,
-CarPlay, Bluetooth LE and an embedded Python runtime), so it cannot be repackaged. An Android
-version would be a separate project; contributions are welcome.
+**沒有 Android 版，也沒有 APK。** App 用到只有 iOS 才有的部分（系統音訊引擎、CarPlay、
+藍牙 LE、內嵌 Python），無法直接改打包。Android 版會是另一個獨立專案，歡迎貢獻。
 
-## Build it yourself
+## 自行編譯
 
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). CI builds an unsigned ipa on every push; pushing a
-tag such as `v1.0.0` publishes it as a release.
+見 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。每次 push 時 CI 會建出未簽名的 ipa；
+推送像 `v1.0.0` 這樣的 tag 會自動發佈成 Release。
 
-## Legal
+## 法律
 
-MIT licence, see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The app is not
-affiliated with YouTube, Google or Apple. Reading audio from YouTube may be against YouTube's Terms of
-Service; use it at your own risk and for personal use.
+MIT 授權，見 [LICENSE](LICENSE) 與 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+本 App 與 YouTube、Google、Apple 無任何關聯。從 YouTube 讀取音訊可能違反 YouTube 服務條款，
+請自行承擔風險，且僅供個人使用。
