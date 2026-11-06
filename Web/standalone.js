@@ -927,7 +927,7 @@
      them whole ({ cmd: 'light', ... }) on every change and once at start, and shows the state the
      app reports ({ type: 'light', state, name, detail }). */
   var LIGHT_KEY = 'ytm_light';
-  var LIGHT_DEFAULT = { on: false, style: 'beat', level: 1.0, floor: 0.12, hue: -1, offsetMs: 0, colourMode: 'song', saturation: 1, intensity: 1, zones: 'all' };
+  var LIGHT_DEFAULT = { on: false, style: 'beat', level: 1.0, floor: 0.12, hue: -1, offsetMs: -50, colourMode: 'song', saturation: 1, intensity: 1, zones: 'all' };
   /* where the colour comes from: the song's cover art, a slow drift, or one fixed hue */
   var LIGHT_COLOURS = [['song', '依歌曲'], ['drift', '緩慢變換'], ['fixed', '固定']];
   var LIGHT_STYLES = [['soft', '柔和'], ['beat', '節拍'], ['colour', '多彩']];

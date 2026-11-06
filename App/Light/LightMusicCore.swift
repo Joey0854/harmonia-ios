@@ -184,7 +184,7 @@ public struct LightMusicSettings: Equatable {
     /// A fixed hue in degrees, or -1 for one that turns slowly round the colour circle.
     public var hue = -1.0
     /// Moves the light later (positive) or earlier, in milliseconds, -300 ... 500.
-    public var offsetMs = 0.0
+    public var offsetMs = -50.0
     /// Where the colour comes from; nil = as `hue` says (-1 drift, otherwise fixed).
     public var colourMode: LightColourMode?
     /// The user's saturation factor, 0 ... 1, applied last in every colour mode (1 = the colour
@@ -217,7 +217,7 @@ public struct LightMusicSettings: Equatable {
         floor = min(0.5, max(0, number("floor") ?? 0.12))
         floor = min(floor, level)
         if let h = number("hue"), h >= 0 { hue = h.truncatingRemainder(dividingBy: 360) } else { hue = -1 }
-        offsetMs = min(500, max(-300, number("offsetMs") ?? 0))
+        offsetMs = min(500, max(-300, number("offsetMs") ?? -50))
         colourMode = LightColourMode(rawValue: message["colourMode"] as? String ?? "")
         saturation = min(1, max(0, number("saturation") ?? 1))
         intensity = min(1, max(0, number("intensity") ?? 1))
