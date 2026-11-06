@@ -3901,7 +3901,24 @@ async function getQueue(videoId, playlistId) {
   const { json } = await ytApi('next', body);
   const items = parseQueue(json);
   /* a playlist the user chose is played as it is; only the automatic radio is thinned out */
-  return playlistId ? items : withoutSameSong(items);
+  return { items: playlistId ? items : withoutSameSong(items), continuation: radioContinuation(json) };
+}
+/* The token with which the official player asks for the rest of the same radio. */
+function radioContinuation(json) {
+  let token = '';
+  (function walk(o) {
+    if (token || !o || typeof o !== 'object') return;
+    const c = o.nextRadioContinuationData;
+    if (c && typeof c.continuation === 'string') { token = c.continuation; return; }
+    for (const k in o) walk(o[k]);
+  })(json);
+  return token;
+}
+/* More of the radio that was started, as the official player does it, instead of starting a new
+   radio from the last song (which wanders off and meets the same songs again). */
+async function getQueueMore(token) {
+  const { json } = await ytApi('next', { continuation: token });
+  return { items: parseQueue(json), continuation: radioContinuation(json) };
 }
 
 // ---------------------------------------------------------------- audio cache
@@ -5086,7 +5103,7 @@ async function handle(req, res) {
       }
       // Radio mixes have no browse page; show their queue as a track list instead.
       if (!out.sections.length && id.startsWith('VL')) {
-        const items = await getQueue('', id.slice(2));
+        const items = (await getQueue('', id.slice(2))).items;
         if (items.length) out.sections.push({ title: '', items });
       }
       return send(res, 200, out);
@@ -5118,10 +5135,16 @@ async function handle(req, res) {
     if (GET && p === '/api/queue') {
       const videoId = url.searchParams.get('videoId') || '';
       const playlistId = url.searchParams.get('playlistId') || '';
+      /* c = the continuation of a radio that was started: the next part of it */
+      const more = url.searchParams.get('c') || '';
+      if (more) {
+        if (!/^[\w%=-]{10,4000}$/.test(more)) return send(res, 400, { error: 'bad continuation' });
+        return send(res, 200, await getQueueMore(more));
+      }
       if (videoId && !ID_RE.test(videoId)) return send(res, 400, { error: 'bad videoId' });
       if (playlistId && !/^[\w-]{2,80}$/.test(playlistId)) return send(res, 400, { error: 'bad playlistId' });
       if (!videoId && !playlistId) return send(res, 400, { error: 'videoId or playlistId required' });
-      return send(res, 200, { items: await getQueue(videoId, playlistId) });
+      return send(res, 200, await getQueue(videoId, playlistId));
     }
   } catch (e) {
     return send(res, 502, { error: String(e.message || e) });

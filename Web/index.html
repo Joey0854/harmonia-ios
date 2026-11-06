@@ -1571,8 +1571,15 @@ function extendQueue() {
   if (!last || !last.videoId) return;
   var q = S.queue;
   extending = true;
-  api('/api/queue?videoId=' + enc(last.videoId)).then(function (d) {
+  /* The radio that was started goes on where it stopped (as in the official player); only when
+     there is nothing to go on with is a new radio started from the last song. */
+  var more = (S.radioQ === q && S.radioCont) ? S.radioCont : '';
+  api(more ? '/api/queue?c=' + enc(more) : '/api/queue?videoId=' + enc(last.videoId)).then(function (d) {
     if (S.queue !== q) return;
+    if (more) {
+      S.radioCont = (d && d.continuation) || '';
+      if (!(d && d.items && d.items.length)) { S.radioCont = ''; return; }
+    }
     var have = {}, haveTitle = {};
     q.forEach(function (x) { have[x.videoId] = 1; haveTitle[songKey(x.title)] = 1; });
     ((d && d.items) || []).forEach(function (x) {
@@ -1785,6 +1792,9 @@ function playSingle(item) {
     var rest = ((d && d.items) || []).filter(function (x) {
       return isSong(x) && x.videoId !== item.videoId;
     });
+    /* where this radio goes on when the queue runs low */
+    S.radioQ = S.queue;
+    S.radioCont = (d && d.continuation) || '';
     rest.forEach(function (x) { S.queue.push(x); });
     if (S.shuffle) shuffleUpcoming();
     renderQueue();
