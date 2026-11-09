@@ -39,7 +39,8 @@ final class NativePlayer: NSObject {
     private let sound = SoundEngine()
     /// True while the current song plays through the sound engine.
     private var usingEngine = false
-    private var currentFile: URL?
+    /// Read by the student stress test (App/StudentStress.swift).
+    private(set) var currentFile: URL?
     private var currentID: String?
     private var engineTimer: Timer?
 

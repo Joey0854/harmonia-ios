@@ -55,6 +55,22 @@ jobs:
           [ "$status" = 0 ] || exit "$status"
           xcrun coremlcompiler compile "$RUNNER_TEMP/bandout/HTDemucsBody.mlpackage" BandModel/ | tee -a band.log
           du -sh "$RUNNER_TEMP/bandout/HTDemucsBody.mlpackage" BandModel/HTDemucsBody.mlmodelc | tee -a band.log
+      # The distillation student candidates (tools/student): random weights, float16, converted with the
+      # band step's venv; then where Core ML plans each op (MLComputePlan, compute units .all). A VM may
+      # have no Neural Engine: the plan's device list says so, and the app logs the phone's own plan.
+      - name: Convert the student models
+        if: always()
+        run: |
+          set -o pipefail
+          mkdir -p StudentModel
+          . "$RUNNER_TEMP/band/bin/activate"
+          python tools/student/convert_student.py "$RUNNER_TEMP/studentout" 2>&1 | grep -v -i warn | tee student.log
+          cp "$RUNNER_TEMP/studentout/student-check.json" student-check.json || true
+          for k in A B; do
+            xcrun coremlcompiler compile "$RUNNER_TEMP/studentout/Student$k.mlpackage" StudentModel/ | tee -a student.log
+          done
+          du -sh StudentModel/* | tee -a student.log
+          swift tools/student/plan.swift StudentModel/StudentA.mlmodelc StudentModel/StudentB.mlmodelc 2>&1 | tee student-plan.log
       - name: Generate project
         if: always()
         run: |
@@ -84,6 +100,9 @@ jobs:
             python.log
             band.log
             band-check.json
+            student.log
+            student-check.json
+            student-plan.log
       - uses: actions/upload-artifact@v4
         with:
           name: YTMRemote-ipa

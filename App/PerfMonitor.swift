@@ -129,7 +129,8 @@ final class PerfMonitor {
             "cacheHitSegments": cacheHits,
             "cacheMB": BandCache.shared.size() / 1_048_576,
             "backgroundSlowSegments": backgroundSlow,
-            "computeUnits": BandModel.shared.label
+            "computeUnits": BandModel.shared.label,
+            "studentStress": StudentStress.shared.summary()
         ]
     }
 

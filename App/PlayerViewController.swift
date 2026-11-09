@@ -470,6 +470,32 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
             }
         case "diag":
             send(["type": "diag", "text": Diag.shared.tail(80)])
+        case "studentTest":
+            /* the student model stress test (App/StudentStress.swift): start A / B, stop, status */
+            let action = body["action"] as? String ?? "status"
+            let update: ([String: Any]) -> Void = { [weak self] info in
+                var e = info
+                e["type"] = "studentTest"
+                DispatchQueue.main.async { self?.send(e) }
+            }
+            switch action {
+            case "start":
+                let kind = (body["kind"] as? String) == "B" ? "B" : "A"
+                Diag.shared.log("cmd studentTest start \(kind)")
+                if let problem = StudentStress.shared.start(kind: kind, file: player.currentFile, onUpdate: update) {
+                    update(["state": "refused", "error": problem])
+                } else {
+                    update(["state": "starting", "kind": kind])
+                }
+            case "stop":
+                Diag.shared.log("cmd studentTest stop")
+                StudentStress.shared.stop()
+                update(StudentStress.shared.summary())
+            default:
+                var info = StudentStress.shared.summary()
+                info["available"] = ["A": StudentModel.available("A"), "B": StudentModel.available("B")]
+                update(info)
+            }
         case "login":
             /* The Google sign-in page, in-app; its cookies are kept by Account. */
             if presentedViewController != nil { return }

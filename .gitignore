@@ -16,3 +16,5 @@ __pycache__/
 *.bak-*
 # Made by tools/band/convert.py in CI (the HTDemucs Core ML model); too big to keep in git.
 BandModel/
+# Made by tools/student/convert_student.py in CI (the student candidates, random weights).
+StudentModel/

@@ -667,6 +667,10 @@
       try { if (reportUi && reportUi.update) reportUi.update(e); } catch (x) {}
       return;
     }
+    if (e.type === 'studentTest') {
+      try { if (studentUi && studentUi.update) studentUi.update(e); } catch (x) {}
+      return;
+    }
     if (e.type === 'band') {
       bandState = { state: String(e.state || 'off'), seconds: e.seconds, realtime: e.realtime, message: e.message ? String(e.message) : '' };
       if (bandState.state === 'failed' || bandState.state === 'late') plog('W', 'band-' + bandState.state, { message: bandState.message });
@@ -1088,6 +1092,49 @@
     raw({ cmd: 'report', action: 'get' });
     raw({ cmd: 'headroom' });
   }
+  /* The student model stress test (1.3.11 pilot): the app separates the song now playing with a
+     random-weights student model for 20 minutes and logs heat every 30 s; see App/StudentStress.swift. */
+  var studentUi = null;
+  function studentControls(panel) {
+    var h = document.createElement('h3');
+    h.textContent = '學生模型壓力測試';
+    panel.appendChild(h);
+    var note = document.createElement('p');
+    note.setAttribute('style', 'margin:0 0 8px;opacity:.8;font-size:13px');
+    note.textContent = '先播一首歌，再按開始：連續分軌 20 分鐘（結果不播放），每 30 秒記錄熱狀態、耗時、記憶體、電量，結束後自動傳報告到電腦。';
+    panel.appendChild(note);
+    var row = document.createElement('div');
+    row.setAttribute('style', 'display:flex;flex-wrap:wrap;gap:8px;margin:0 0 6px');
+    var mk = function (text, fn) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('style', BTN);
+      b.textContent = text;
+      b.addEventListener('click', fn);
+      row.appendChild(b);
+    };
+    mk('開始（A：純卷積）', function () { raw({ cmd: 'studentTest', action: 'start', kind: 'A' }); });
+    mk('開始（B：含注意力）', function () { raw({ cmd: 'studentTest', action: 'start', kind: 'B' }); });
+    mk('停止', function () { raw({ cmd: 'studentTest', action: 'stop' }); });
+    panel.appendChild(row);
+    var st = document.createElement('p');
+    st.setAttribute('style', 'margin:0 0 12px;font-size:13px;white-space:pre-wrap');
+    st.textContent = '狀態：查詢中…';
+    panel.appendChild(st);
+    var NAMES = { idle: '未執行', starting: '啟動中', running: '執行中', done: '已結束', failed: '失敗', refused: '沒有開始' };
+    studentUi = {
+      update: function (e) {
+        var t = '狀態：' + (NAMES[e.state] || e.state || '?') + (e.kind ? '（' + e.kind + '）' : '');
+        if (e.error) t += '\n' + e.error;
+        if (e.state === 'running') t += '\n' + Math.round(e.elapsed / 60) + ' 分，' + e.segments + ' 段，平均 ' + Number(e.avgSeconds || 0).toFixed(2) + ' 秒／段，熱 ' + e.thermal + '（最高 ' + e.worstThermal + '），' + e.footprintMB + ' MB，電量 ' + e.battery;
+        if (e.state === 'done') t += '：' + (e.reason || '') + '\n' + e.segments + ' 段，平均 ' + e.avgSeconds + ' 秒／段（' + e.realtimeX + ' 倍即時），最高熱狀態 ' + e.worstThermal + '，電量 ' + e.batteryStart + ' → ' + e.batteryEnd;
+        if (e.plan) t += '\n' + e.plan;
+        if (e.available && !e.available.A && !e.available.B) t += '\n（這個版本沒有學生模型）';
+        st.textContent = t;
+      }
+    };
+    raw({ cmd: 'studentTest', action: 'status' });
+  }
   function sheetExtras(panel) {
     try {
       /* the ambient light (only where the app is there to talk to the controller) */
@@ -1144,6 +1191,7 @@
       panel.appendChild(b);
       panel.appendChild(box);
       if (hasApp) reportControls(panel);
+      if (hasApp) studentControls(panel);
     } catch (e) {}
   }
 

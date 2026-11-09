@@ -24,6 +24,11 @@ targets:
       - path: BandModel
         type: folder
         buildPhase: resources
+      # The distillation student candidates (StudentModel/StudentA.mlmodelc, StudentB.mlmodelc; random
+      # weights, for the stress test only), made in CI by tools/student/convert_student.py.
+      - path: StudentModel
+        type: folder
+        buildPhase: resources
     dependencies:
       # CPython for iOS. Embedded in Frameworks/, loaded by the app itself.
       - framework: vendor/Python.framework
@@ -33,8 +38,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Harmonia
-        CFBundleShortVersionString: "1.3.10"
-        CFBundleVersion: "58"
+        CFBundleShortVersionString: "1.3.11"
+        CFBundleVersion: "59"
         UILaunchScreen: {}
         UIBackgroundModes:
           - audio
