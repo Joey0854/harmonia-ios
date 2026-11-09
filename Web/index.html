@@ -361,6 +361,7 @@ body:not(.playing) #fullArt{transform:scale(.9)}
   </div>
   <div class="fchips sub" id="rowSound" hidden>
     <button class="chipbtn" id="fSurround" type="button" aria-pressed="true"><span data-icon="headset"></span><span id="fSurroundTxt">環繞 開</span></button>
+    <button class="chipbtn" id="fAB" type="button"><span id="fABTxt">比較</span></button>
     <button class="chipbtn" id="fProfile" type="button" aria-pressed="false"><span id="fProfileTxt">耳機</span></button>
     <button class="chipbtn" id="fMix" type="button" aria-pressed="false"><span>混音</span></button>
     <button class="chipbtn" id="fStyle" type="button"><span id="fStyleTxt">風格</span></button>
@@ -3092,6 +3093,32 @@ function renderToggles() {
   su.classList.toggle('off', !S.surround);
   su.setAttribute('aria-pressed', S.surround ? 'true' : 'false');
   $('fSurroundTxt').textContent = S.surround ? '環繞 開' : '環繞 關';
+  renderAbChip();
+}
+/* One button to compare by ear: original -> HRIR surround -> stage -> original ... */
+function abState() { return !S.surround ? 'off' : stageMode(); }
+var AB_NAME = { off: '原音', hrir: '耳機環繞', stage: '舞台' };
+function renderAbChip() {
+  var b = $('fAB');
+  if (!b) return;
+  $('fABTxt').textContent = '比較：' + AB_NAME[abState()];
+  b.classList.toggle('on', S.surround);
+}
+function cycleAb() {
+  var next = { off: 'hrir', hrir: 'stage', stage: 'off' }[abState()];
+  if (next === 'off') {
+    S.surround = false;
+  } else {
+    S.surround = true;
+    lsSet('ytm_surround_mode' + psuf(), next);
+  }
+  lsSet('ytm_surround', S.surround ? '1' : '0');
+  dbg('I', 'setting', { compare: next, profile: isCar() ? 'car' : 'head' });
+  renderStyleChip();
+  fxApply();
+  renderToggles();
+  renderPlayer();
+  toast('現在：' + AB_NAME[next]);
 }
 
 function openSheet() {
@@ -3682,6 +3709,7 @@ function bindUI() {
     renderToggles();
     renderPlayer();
   });
+  $('fAB').addEventListener('click', cycleAb);
   renderToggles();
   $('fRetry').addEventListener('click', function () {
     if (S.cur) playTrack(S.cur, true);
