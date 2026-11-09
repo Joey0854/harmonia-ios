@@ -27,10 +27,13 @@ public struct SurroundSettings {
     /// For `bandHead`: one pair of impulse responses (WAV, as `irLeft` / `irRight`) per
     /// part, in `Demucs.sources` order.
     public let bandIrs: [(left: Data, right: Data)]
+    /// For the band modes: the make-up gain that goes with `irLeft` / `irRight` (the user's
+    /// headphone surround, which stands in where the band is missing). Nil: none sent.
+    public let hrirMakeup: Float?
 
     public init(key: String, surround: Bool, irLeft: Data?, irRight: Data?, makeup: Float,
                 mode: SurroundMode = .hrir, stage: StageParams = .neutral,
-                bandIrs: [(left: Data, right: Data)] = []) {
+                bandIrs: [(left: Data, right: Data)] = [], hrirMakeup: Float? = nil) {
         self.key = key
         self.surround = surround
         self.irLeft = irLeft
@@ -39,6 +42,7 @@ public struct SurroundSettings {
         self.mode = mode
         self.stage = stage
         self.bandIrs = bandIrs
+        self.hrirMakeup = hrirMakeup
     }
 }
 
@@ -112,13 +116,22 @@ public final class SurroundChain {
                 let seed = song.isEmpty ? nil : BandPrefetch.shared.take(id: song, startTime: startTime, sampleRate: sampleRate)
                 /* the stand-in at the level the band's make-up gain will bring it to */
                 var dry: SurroundChain?
-                if let f = fallback, f.mode != .band, f.mode != .bandHead {
+                if let f = fallback, f.surround, f.mode != .band, f.mode != .bandHead {
+                    /* the mode chosen before */
                     let scaled = SurroundSettings(key: f.key, surround: f.surround, irLeft: f.irLeft, irRight: f.irRight,
                                                   makeup: f.makeup / max(0.01, s.makeup), mode: f.mode, stage: f.stage)
                     dry = SurroundChain(settings: scaled, sampleRate: sampleRate, blockSize: blockSize)
+                } else if let l = s.irLeft, let r = s.irRight {
+                    /* else the user's headphone surround, never the bare original */
+                    let hrir = SurroundSettings(key: "stand-in", surround: true, irLeft: l, irRight: r,
+                                                makeup: (s.hrirMakeup ?? s.makeup) / max(0.01, s.makeup), mode: .hrir)
+                    dry = SurroundChain(settings: hrir, sampleRate: sampleRate, blockSize: blockSize)
                 }
                 band = BandProcessor(output: output, network: network, sampleRate: sampleRate,
-                                     queue: SurroundChain.bandQueue, seed: seed, dry: dry, log: SurroundChain.log,
+                                     queue: SurroundChain.bandQueue, seed: seed, dry: dry,
+                                     cache: song.isEmpty ? nil : BandCache.shared, cacheID: song.isEmpty ? nil : song,
+                                     startOffset: Int((startTime * Double(Demucs.sampleRate)).rounded()),
+                                     log: SurroundChain.log,
                                      status: SurroundChain.status)
             } else {
                 band = nil

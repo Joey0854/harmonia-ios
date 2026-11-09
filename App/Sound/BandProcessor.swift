@@ -103,6 +103,33 @@ public final class BandProcessor {
        that a switch is not followed by a moment of the stand-in. */
     private var dry: SurroundChain?
     private var gateOpen = false
+    /* where this run's sample 0 lies in the song (44.1 kHz), and the cache chunk being written */
+    private let startOffset: Int
+    private var cacheWriter: BandCache.Writer?
+    private var thermalPaused = false
+    /// The phone's thermal state (0 nominal … 3 critical); serious and above pause new
+    /// separation (tests replace it).
+    public static var thermal: () -> Int = { ProcessInfo.processInfo.thermalState.rawValue }
+    private static let statsLock = NSLock()
+    private static var hits = 0
+    private static var hotNow = false
+    static func countCacheHits(_ n: Int) {
+        statsLock.lock()
+        hits += n
+        statsLock.unlock()
+    }
+    /// Segments read from the disk cache since the last call (the performance report).
+    public static func takeCacheHits() -> Int {
+        statsLock.lock()
+        defer { hits = 0; statsLock.unlock() }
+        return hits
+    }
+    /// Whether some band is held back by the heat now.
+    public static var heldByHeat: Bool {
+        statsLock.lock()
+        defer { statsLock.unlock() }
+        return hotNow
+    }
     private var retry: BandSplitter.Job?
     private var errors = 0
     /// Network failures in a row before the band gives up for the song.
@@ -135,6 +162,7 @@ public final class BandProcessor {
     /// segment and per change between band and original; `status` the same for the page.
     public init(output: Output, network: BandNetwork, sampleRate: Int, queue: DispatchQueue?,
                 mix: BandMix = .shared, seed: BandSeed? = nil, dry: SurroundChain? = nil,
+                cache: BandCache? = nil, cacheID: String? = nil, startOffset: Int = 0,
                 log: @escaping (String) -> Void = { _ in },
                 status: @escaping (BandStatus) -> Void = { _ in }) {
         self.network = network
@@ -163,7 +191,27 @@ public final class BandProcessor {
             log("band: song at \(self.sampleRate) Hz, resampled to \(Demucs.sampleRate) Hz for the model and back")
         }
         self.dry = dry
-        if let s = seed {
+        self.startOffset = startOffset
+        /* the disk cache first: parts kept from an earlier play need no network at all */
+        if let c = cache, let id = cacheID, let reader = c.reader(id), reader.covered > startOffset {
+            let k = (reader.covered - startOffset) / Demucs.stride
+            if k >= 1 {
+                let off = startOffset
+                splitter.seed(source: { reader.read(from: off + $0, count: $1) }, segments: k)
+                gateOpen = true
+                everReady = true
+                wasReady = true
+                amount = 1
+                BandProcessor.countCacheHits(k)
+                log(String(format: "band: cache hit %@: %d segments (%.1f s) from %.1f s read from disk",
+                           id, k, Double(k * Demucs.stride) / Double(Demucs.sampleRate), Double(off) / Double(Demucs.sampleRate)))
+            }
+        }
+        if let c = cache, let id = cacheID {
+            let from = c.covered(id)
+            if from >= startOffset { cacheWriter = c.writer(id, from: from) }
+        }
+        if let s = seed, !gateOpen {
             gateOpen = true
             splitter.seed(s.stems, segments: s.segments)
             /* separated already: the band from the very first sample, no fade-in */
@@ -228,7 +276,38 @@ public final class BandProcessor {
     }
 
     /// The rest (whatever `drain` left, and the tails held inside the impulse responses).
+    /* Writes newly separated sound to the disk cache, while it follows what is kept there
+       (band queue). A gap (a skipped segment, sound already handed on) ends the chunk. */
+    private func keep() {
+        guard let w = cacheWriter else { return }
+        lock.lock()
+        let final = splitter.finalUpTo
+        let from = w.start + w.frames - startOffset
+        let part = final > from && from >= 0 ? splitter.read(from: from, count: final - from) : nil
+        let done = splitter.total.map { final >= $0 } ?? false
+        lock.unlock()
+        if let p = part {
+            if p.ready.allSatisfy({ $0 }) {
+                w.append(p.stems)
+            } else {
+                w.close()
+                lock.lock()
+                cacheWriter = nil
+                lock.unlock()
+                return
+            }
+        }
+        if done {
+            w.close()
+            lock.lock()
+            cacheWriter = nil
+            lock.unlock()
+        }
+    }
+
     public func finish() -> (left: [Float], right: [Float]) {
+        keep()
+        cacheWriter?.close()
         var out = emit(upTo: received)
         fading = nil
         if !convolvers.isEmpty {
@@ -269,6 +348,23 @@ public final class BandProcessor {
     }
 
     private func take() -> BandSplitter.Job? {
+        /* too hot (serious or critical): no new separation until it is fair again; what is
+           separated or kept on disk plays, the rest is the stand-in */
+        let heat = BandProcessor.thermal()
+        let hot = thermalPaused ? heat >= 2 : heat >= 2
+        if hot != thermalPaused {
+            thermalPaused = hot
+            BandProcessor.statsLock.lock()
+            BandProcessor.hotNow = hot
+            BandProcessor.statsLock.unlock()
+            log(hot ? "band: phone hot (thermal \(heat)): no new separation; separated parts play, then the stand-in"
+                    : "band: phone cooler (thermal \(heat)): separating again")
+            lock.lock()
+            let run = lastRun
+            lock.unlock()
+            status(hot ? .paused("hot") : run)
+        }
+        if hot { return nil }
         lock.lock()
         defer { lock.unlock() }
         if failed { return nil }
@@ -310,6 +406,7 @@ public final class BandProcessor {
             lastRun = s
             let behind = late
             lock.unlock()
+            keep()
             /* while the original is playing, the page keeps saying so */
             if !behind { status(s) }
         } catch {
@@ -326,8 +423,8 @@ public final class BandProcessor {
                 retry = job
             }
             lock.unlock()
-            log("band: the network failed on segment \(job.index), try \(n) of \(BandProcessor.maxTries) (\(error)); " + (giveUp ? "playing the original for this song" : "trying again"))
-            status(.failed("\(error)"))
+            log("band: the network failed on segment \(job.index), try \(n) of \(BandProcessor.maxTries) (\(error)); " + (giveUp ? "the stand-in plays for this song" : "trying again"))
+            status(.failed((giveUp ? "paused: " : "retrying: ") + "\(error)"))
             if !giveUp { Thread.sleep(forTimeInterval: 2) }
         }
         wake.signal()

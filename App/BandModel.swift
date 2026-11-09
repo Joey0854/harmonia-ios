@@ -32,7 +32,11 @@ final class BandModel: BandNetwork {
     private var background = false
     private var released = false
     private var reloads = 0
-    private let loaded = DispatchSemaphore(value: 0)
+    /* The first load. A group, not a semaphore: waiting on it uses nothing up. (1.3.9 waited
+       on a semaphore signalled 64 times, once per segment, so after 64 segments every
+       segment, the next song's and every new mode's too, waited 10 minutes on the band queue.) */
+    private let loaded = DispatchGroup()
+    private var loadStarted = false
     /* the input arrays, made once and filled for every segment */
     private var inSpec: MLMultiArray?
     private var inWave: MLMultiArray?
@@ -77,10 +81,11 @@ final class BandModel: BandNetwork {
         }
         if start {
             /* not on the band queue: the network waits for this there */
+            loaded.enter()
             DispatchQueue.global(qos: .userInitiated).async {
                 let units = self.wantedUnits()
                 _ = try? self.ensure(units, reason: "first use")
-                for _ in 0..<64 { self.loaded.signal() }
+                self.loaded.leave()
             }
         }
         return self
@@ -106,8 +111,13 @@ final class BandModel: BandNetwork {
         if had { Diag.shared.log("band: memory warning, model let go; it is loaded again for the next segment", error: true) }
     }
 
+    private var override: MLComputeUnits?
+
     private func wantedUnits() -> MLComputeUnits {
-        return inBackground ? .cpuOnly : .cpuAndGPU
+        if inBackground { return .cpuOnly }
+        lock.lock()
+        defer { lock.unlock() }
+        return override ?? .cpuAndGPU
     }
 
     /* Loads the model for `wanted` unless it is already loaded so (band queue, or the first load). */
@@ -153,7 +163,7 @@ final class BandModel: BandNetwork {
     }
 
     func run(spec: [Float], wave: [Float]) throws -> (spec: [Float], wave: [Float]) {
-        _ = loaded.wait(timeout: .now() + 600)
+        prepareModel()
         lock.lock()
         let wasReleased = released
         lock.unlock()
@@ -179,6 +189,31 @@ final class BandModel: BandNetwork {
             let cpu = try ensure(.cpuOnly, reason: "GPU run failed")
             return try predict(cpu, spec: spec, wave: wave)
         }
+    }
+
+    /// Waits for the first load and loads for the units wanted now (outside the watchdog's
+    /// clock: a first load can take much longer than a segment).
+    func prepare() throws {
+        prepareModel()
+        _ = try? ensure(wantedUnits(), reason: inBackground ? "app in the background" : "app in front")
+    }
+
+    private func prepareModel() {
+        _ = loaded.wait(timeout: .now() + 120)
+    }
+
+    /// After a stalled run: the model instance it used is left to itself (its thread cannot be
+    /// stopped); the next run loads a new one, on the other compute units. Any thread.
+    func abandon() {
+        lock.lock()
+        let was = units
+        model = nil
+        units = nil
+        inSpec = nil
+        inWave = nil
+        override = was == .cpuOnly ? .cpuAndGPU : .cpuOnly
+        lock.unlock()
+        Diag.shared.log("band: model instance abandoned after a stall; next on \(was == .cpuOnly ? "cpuAndGPU" : "cpuOnly")", error: true)
     }
 
     /* Too many loads in a row without a segment going through: give up for this run. */

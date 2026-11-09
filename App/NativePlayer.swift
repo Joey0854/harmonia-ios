@@ -704,7 +704,8 @@ final class NativePlayer: NSObject {
         return SurroundSettings(key: message["key"] as? String ?? "",
                                 surround: message["surround"] as? Bool ?? false,
                                 irLeft: wav(message["irL"]), irRight: wav(message["irR"]), makeup: makeup,
-                                mode: mode, stage: stage, bandIrs: bandIrs)
+                                mode: mode, stage: stage, bandIrs: bandIrs,
+                                hrirMakeup: (message["hrirMakeup"] as? NSNumber).map { Float(min(16, max(0.01, $0.doubleValue))) })
     }
 
     private func restoreSoundSettings() {

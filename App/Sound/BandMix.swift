@@ -84,4 +84,6 @@ public enum BandStatus: Equatable {
     /// Separation fell behind: the original sound is playing for now.
     case late
     case failed(String)
+    /// Separation held back (`hot`: the phone is too warm); what is ready plays.
+    case paused(String)
 }

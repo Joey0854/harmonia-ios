@@ -197,6 +197,9 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
             case .failed(let message):
                 event["state"] = "failed"
                 event["message"] = String(message.prefix(160))
+            case .paused(let why):
+                event["state"] = "paused"
+                event["message"] = why
             }
             DispatchQueue.main.async {
                 self?.lastBandEvent = event

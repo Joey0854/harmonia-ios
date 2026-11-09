@@ -11,6 +11,9 @@ import Foundation
 /// 8 × segment (source, then left / right), still normalised. Sources in `Demucs.sources` order.
 public protocol BandNetwork: AnyObject {
     func run(spec: [Float], wave: [Float]) throws -> (spec: [Float], wave: [Float])
+    /// See BandWatchdog: work before a run that is not timed, and letting go after a stall.
+    func prepare() throws
+    func abandon()
 }
 
 /// HTDemucs' own pre- and post-processing for one segment (`_spec`, `_ispec`, the mean / std
@@ -254,6 +257,21 @@ public final class BandSplitter {
         accBase = end
     }
 
+    /* Or separated sound read on demand (the disk cache) for the samples before seedEnd. */
+    private var seedSource: ((Int, Int) -> [[Float]]?)?
+
+    /// Like `seed`, with the first `segments` segments read when needed from `source`
+    /// (from, count) -> [source × 2 + channel][sample].
+    public func seed(source: @escaping (Int, Int) -> [[Float]]?, segments: Int) {
+        guard segments > 0, nextIndex == 0 else { return }
+        let end = segments * Demucs.stride
+        seedSource = source
+        seedEnd = end
+        nextIndex = segments
+        finalUpTo = end
+        accBase = end
+    }
+
     /// Converts separated sound to the seed's 16-bit form.
     public static func pack(_ stems: [[Float]]) -> [[Int16]] {
         let g = 1 / seedScale
@@ -340,10 +358,18 @@ public final class BandSplitter {
     public func read(from: Int, count: Int) -> (stems: [[Float]], ready: [Bool]) {
         var stems = [[Float]](repeating: [Float](repeating: 0, count: count), count: 8)
         var ready = [Bool](repeating: false, count: count)
+        if let source = seedSource, from < seedEnd {
+            let m = min(count, seedEnd - max(0, from))
+            if from >= 0, m > 0, let block = source(from, m) {
+                for c in 0..<8 { for j in 0..<min(m, block[c].count) { stems[c][j] = block[c][j] } }
+                for j in 0..<m { ready[j] = true }
+            }
+        }
         for j in 0..<count {
             let n = from + j
             if n >= finalUpTo { break }
             if n < seedEnd {
+                if seedSource != nil { continue }
                 if n >= seedEnd - seedStems[0].count {
                     let k = n - (seedEnd - seedStems[0].count)
                     ready[j] = true

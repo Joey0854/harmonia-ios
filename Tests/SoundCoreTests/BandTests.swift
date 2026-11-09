@@ -324,6 +324,98 @@ final class BandTests: XCTestCase {
         XCTAssertLessThan(worst, 2e-3)
     }
 
+    /// A network whose first run never comes back: the watchdog leaves it, runs the same
+    /// segment again, and a new song separates normally afterwards.
+    func testWatchdogTakesOverAStalledRun() throws {
+        final class Hang: BandNetwork {
+            let lock = NSLock()
+            var calls = 0
+            var abandoned = 0
+            let fake = FakeNetwork()
+            func run(spec: [Float], wave: [Float]) throws -> (spec: [Float], wave: [Float]) {
+                lock.lock()
+                calls += 1
+                let first = calls == 1
+                lock.unlock()
+                if first { DispatchSemaphore(value: 0).wait() }   // never returns
+                return try fake.run(spec: spec, wave: wave)
+            }
+            func abandon() {
+                lock.lock()
+                abandoned += 1
+                lock.unlock()
+            }
+        }
+        let inner = Hang()
+        let dog = BandWatchdog(inner, timeout: 0.5)
+        let n = 9 * 44100
+        let s = signal(n)
+        let offline = try BandSplitter.separateAll(left: s.left, right: s.right, network: FakeNetwork())
+        let identity: (left: [[Float]], right: [[Float]]) = ([[1], [0]], [[0], [1]])
+        for song in 0..<2 {
+            let p = BandProcessor(output: .headphones([identity, identity, identity, identity]),
+                                  network: dog, sampleRate: 44100, queue: nil, mix: BandMix())
+            let out = run(p, s)
+            XCTAssertEqual(out.left.count, n)
+            var worst: Float = 0
+            for i in BandProcessor.fade..<n {
+                let l = offline[0][0][i] + offline[1][0][i] + offline[2][0][i] + offline[3][0][i]
+                worst = max(worst, abs(out.left[i] - l))
+            }
+            XCTAssertLessThan(worst, 1e-4, "song \(song)")
+        }
+        XCTAssertEqual(dog.stalls, 1)
+        XCTAssertEqual(inner.abandoned, 1)
+    }
+
+    /// Too hot: no new separation, the stand-in (here the original) plays.
+    func testHeatPausesSeparation() {
+        BandProcessor.thermal = { 2 }
+        defer { BandProcessor.thermal = { ProcessInfo.processInfo.thermalState.rawValue } }
+        let n = 9 * 44100
+        let s = signal(n)
+        let net = FakeNetwork()
+        var states: [BandStatus] = []
+        let p = BandProcessor(output: .speakers, network: net, sampleRate: 44100, queue: nil, mix: BandMix(),
+                              status: { states.append($0) })
+        let out = run(p, s)
+        XCTAssertEqual(net.calls, 0)
+        XCTAssertTrue(states.contains(.paused("hot")))
+        var worst: Float = 0
+        for i in 0..<n { worst = max(worst, abs(out.left[i] - s.left[i])) }
+        XCTAssertLessThan(worst, 1e-5)
+    }
+
+    /// The parts go to the disk cache as they are separated; the next play reads them
+    /// from there instead of running the network again.
+    func testDiskCacheServesTheNextPlay() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bandcache-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let cache = BandCache(directory: dir)
+        let n = 20 * 44100
+        let s = signal(n)
+        let identity: (left: [[Float]], right: [[Float]]) = ([[1], [0]], [[0], [1]])
+        let first = FakeNetwork()
+        let a = run(BandProcessor(output: .headphones([identity, identity, identity, identity]), network: first,
+                                  sampleRate: 44100, queue: nil, mix: BandMix(), cache: cache, cacheID: "song"), s)
+        XCTAssertEqual(first.calls, 4)
+        XCTAssertEqual(cache.covered("song"), n)
+        let second = FakeNetwork()
+        let b = run(BandProcessor(output: .headphones([identity, identity, identity, identity]), network: second,
+                                  sampleRate: 44100, queue: nil, mix: BandMix(), cache: cache, cacheID: "song"), s)
+        /* three whole segments from the disk, the last one separated again */
+        XCTAssertEqual(second.calls, 1)
+        XCTAssertEqual(b.left.count, n)
+        var err = 0.0, ref = 0.0
+        for i in BandProcessor.fade..<(3 * Demucs.stride) {
+            err += Double(b.left[i] - a.left[i]) * Double(b.left[i] - a.left[i])
+            ref += Double(a.left[i]) * Double(a.left[i])
+        }
+        let db = 10 * log10(err / max(ref, 1e-12))
+        print("RESULT band cache: AAC round trip error \(String(format: "%.1f", db)) dB")
+        XCTAssertLessThan(db, -15)
+    }
+
     private func run(_ p: BandProcessor, _ s: (left: [Float], right: [Float])) -> (left: [Float], right: [Float]) {
         var l = [Float](), r = [Float]()
         let pieces = [4096, 1000, 37, 70000, 513]

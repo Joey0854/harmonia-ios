@@ -18,6 +18,7 @@ final class PerfMonitor {
     private var slowest = 0.0
     private var slow = 0
     private var backgroundSegments = 0
+    private var heatPausedSeconds = 0
     private var backgroundSlow = 0
     private var peakFootprint: UInt64 = 0
     private var worstThermal = 0
@@ -89,6 +90,7 @@ final class PerfMonitor {
         lock.lock()
         peakFootprint = max(peakFootprint, foot)
         worstThermal = max(worstThermal, thermal)
+        if BandProcessor.heldByHeat { heatPausedSeconds += 30 }
         lock.unlock()
         var cpuText = "?"
         let now = ProcessInfo.processInfo.systemUptime
@@ -109,7 +111,7 @@ final class PerfMonitor {
         lock.lock()
         defer {
             segments = 0; totalSeconds = 0; slowest = 0; slow = 0; peakFootprint = 0; worstThermal = 0; warnings = 0
-            backgroundSegments = 0; backgroundSlow = 0
+            backgroundSegments = 0; backgroundSlow = 0; heatPausedSeconds = 0
             lock.unlock()
         }
         peakFootprint = max(peakFootprint, foot)
@@ -123,6 +125,9 @@ final class PerfMonitor {
             "worstThermal": PerfMonitor.thermalName(worstThermal),
             "memoryWarnings": warnings,
             "backgroundSegments": backgroundSegments,
+            "heatPausedSeconds": heatPausedSeconds,
+            "cacheHitSegments": BandProcessor.takeCacheHits(),
+            "cacheMB": BandCache.shared.size() / 1_048_576,
             "backgroundSlowSegments": backgroundSlow,
             "computeUnits": BandModel.shared.label
         ]

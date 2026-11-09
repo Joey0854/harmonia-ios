@@ -185,6 +185,11 @@ public final class BandPrefetch {
         func step() {
             guard current(g) else { return }
             /* the playing song first: only while its band is well ahead */
+            if BandProcessor.thermal() >= 2 {
+                note("waiting: the phone is hot")
+                queue.asyncAfter(deadline: .now() + 5) { step() }
+                return
+            }
             if let lead = BandProcessor.lead, lead < BandPrefetch.minLead {
                 note("waiting: playing song only \(lead) s ahead")
                 queue.asyncAfter(deadline: .now() + 1) { step() }

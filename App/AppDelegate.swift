@@ -12,9 +12,12 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { Diag.shared.sendReport(trigger: "lastRunEnded") }
         }
         /* The band surround modes: the separation model (loaded the first time it is used). */
-        SurroundChain.bandNetwork = { BandModel.shared.network() }
+        /* the model under a watchdog: a run that does not come back holds nothing up */
+        let watched = BandWatchdog(BandModel.shared, log: { Diag.shared.log($0, error: true) })
+        SurroundChain.bandNetwork = { BandModel.shared.network() == nil ? nil : watched }
         SurroundChain.log = { Diag.shared.log($0) }
         BandPrefetch.log = { Diag.shared.log($0) }
+        BandCache.log = { Diag.shared.log($0) }
         PerfMonitor.shared.start()
         BandProcessor.segmentTag = { PerfMonitor.shared.segmentTag() }
         let w = UIWindow(frame: UIScreen.main.bounds)

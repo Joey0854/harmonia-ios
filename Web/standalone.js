@@ -849,23 +849,36 @@
     /* Band modes (test build): the app separates the song with its model. Speakers: no
        impulse responses. Headphones: one pair per separated part. */
     var band = P.band ? P.band() : null;
+    /* Both band modes carry the user's headphone surround along: it plays where the band is
+       not ready (the phone too hot, the model failing), never the bare original. */
+    var hpL = P.irUrl('L'), hpR = P.irUrl('R'), hpKey = (hpL.split('?')[1] || hpL);
     if (band === 'band') {
-      fxSeq++;
-      if (sent.fx === 'band') return;
-      sent.fx = 'band';
-      raw({ cmd: 'fx', key: 'band', surround: true, mode: 'band', irL: null, irR: null, makeup: headroom });
+      var sk2 = 'band|' + hpKey;
+      if (sent.fx === sk2) { fxSeq++; return; }
+      var smine = ++fxSeq;
+      Promise.all([getIr(hpL), getIr(hpR)]).then(function (h) {
+        if (smine !== fxSeq) return;
+        sent.fx = sk2;
+        raw({ cmd: 'fx', key: 'band', surround: true, mode: 'band', irL: B.b64(h[0]), irR: B.b64(h[1]), hrirMakeup: makeupFor(h[0], h[1], headroom), makeup: headroom });
+      }, function () {
+        if (smine !== fxSeq) return;
+        sent.fx = sk2;
+        raw({ cmd: 'fx', key: 'band', surround: true, mode: 'band', irL: null, irR: null, makeup: headroom });
+      });
       return;
     }
     if (band === 'bandHead') {
-      var bq = P.bandIrQuery(), bkey = 'bandHead' + bq;
+      var bq = P.bandIrQuery(), bkey = 'bandHead' + bq + '|' + hpKey;
       if (sent.fx === bkey) { fxSeq++; return; }
       var bmine = ++fxSeq;
       var parts = ['drums', 'bass', 'other', 'vocals'], urls = [];
       var bmx = P.bandMix ? P.bandMix() : null;
       parts.forEach(function (n) { var pq = bandPosQuery(bmx, n); urls.push('/api/ir/band/' + n + '/L.wav' + bq + pq, '/api/ir/band/' + n + '/R.wav' + bq + pq); });
+      urls.push(hpL, hpR);
       Promise.all(urls.map(getIr)).then(function (r) {
         if (bmine !== fxSeq) return;
         sent.fx = bkey;
+        var hp = r.slice(8, 10);
         var ir = {}, e = 0;
         parts.forEach(function (n, i) {
           ir[n] = { L: B.b64(r[2 * i]), R: B.b64(r[2 * i + 1]) };
@@ -873,7 +886,7 @@
           e += (a[0] + b[0] + a[1] + b[1]) / 2 / parts.length;
         });
         var mk = (e > 0 ? Math.min(8, Math.max(0.25, 1 / Math.sqrt(e))) : 1) * headroom;
-        raw({ cmd: 'fx', key: bkey, surround: true, mode: 'bandHead', bandIr: ir, irL: null, irR: null, makeup: mk });
+        raw({ cmd: 'fx', key: bkey, surround: true, mode: 'bandHead', bandIr: ir, irL: B.b64(hp[0]), irR: B.b64(hp[1]), hrirMakeup: makeupFor(hp[0], hp[1], headroom), makeup: mk });
       }, function (err) {
         if (bmine !== fxSeq) return;
         try { console.warn('standalone: band responses not available (' + ((err && err.message) || err) + '), playing without'); } catch (x) {}
@@ -959,7 +972,13 @@
     if (s === 'loading') return '樂團：分軌中…';
     if (s === 'running') return '樂團中（每段 ' + (+bandState.seconds || 0).toFixed(1) + ' 秒，' + (+bandState.realtime || 0).toFixed(1) + '× 即時）';
     if (s === 'late') return '樂團：來不及，暫時播原音';
-    if (s === 'failed') return /model not in the app|does not load/.test(bandState.message || '') ? '樂團：模型載入失敗（播原音）' : '樂團暫停（模型無法執行或記憶體不足，重試中；先播原音）';
+    if (s === 'paused') return '樂團：手機過熱，暫停分軌（先播耳機環繞）';
+    if (s === 'failed') {
+      var msg = bandState.message || '';
+      if (/model not in the app|does not load/.test(msg)) return '樂團：模型載入失敗（播耳機環繞）';
+      if (/^paused:/.test(msg)) return '樂團暫停（重試 3 次都失敗，改播耳機環繞）';
+      return '樂團重試中…（先播耳機環繞）';
+    }
     return '';
   }
   function sendPageInfo() {
