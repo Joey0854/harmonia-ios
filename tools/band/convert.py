@@ -57,39 +57,67 @@ print("trace:", json.dumps(check))
 if trace_only:
     sys.exit(0)
 
+import shutil  # noqa: E402
+
 import coremltools as ct  # noqa: E402
 
-t = time.time()
-mlmodel = ct.convert(
-    traced,
-    inputs=[ct.TensorType(name="spec", shape=tuple(x.shape), dtype=np.float32),
-            ct.TensorType(name="wave", shape=tuple(xt.shape), dtype=np.float32)],
-    outputs=[ct.TensorType(name="spec_out", dtype=np.float32),
-             ct.TensorType(name="wave_out", dtype=np.float32)],
-    convert_to="mlprogram",
-    compute_precision=ct.precision.FLOAT16,
-    minimum_deployment_target=ct.target.iOS16,
-)
-check["convert_seconds"] = round(time.time() - t, 1)
-mlmodel.short_description = "HTDemucs network body (between normalisations); see tools/band/band_ref.py"
-path = os.path.join(out_dir, "HTDemucsBody.mlpackage")
-mlmodel.save(path)
-
-for units in ["CPU_ONLY", "CPU_AND_GPU"]:
+y_ref = R.finish(ref[0].numpy(), ref[1].numpy(), stats)
+# Wanted: every stem within -30 dB of torch. Tried in this order; the first that is good enough
+# is kept as HTDemucsBody.mlpackage. Plain float16 is the smallest, but the group norms over
+# whole segments (hundreds of thousands of values) may not survive it.
+KEEP_FP32 = {"reduce_mean", "reduce_sum", "reduce_sum_square", "square", "pow", "rsqrt", "sqrt",
+             "real_div", "layer_norm", "instance_norm", "batch_norm", "softmax"}
+variants = [
+    ("fp16", ct.precision.FLOAT16),
+    ("mixed", ct.transform.FP16ComputePrecision(op_selector=lambda op: op.op_type not in KEEP_FP32)),
+    ("fp32", ct.precision.FLOAT32),
+]
+chosen = None
+for name, precision in variants:
+    entry = {}
     try:
-        m = ct.models.MLModel(path, compute_units=getattr(ct.ComputeUnit, units))
         t = time.time()
-        pred = m.predict({"spec": x, "wave": xt})
-        secs = time.time() - t
-        a, b = pred["spec_out"], pred["wave_out"]
-        y_ml = R.finish(a, b, stats)
-        y_ref = R.finish(ref[0].numpy(), ref[1].numpy(), stats)
-        stems = {name: round(float(20 * np.log10(rel(y_ml[s], y_ref[s]) + 1e-30)), 1)
-                 for s, name in enumerate(R.SOURCES)}
-        check[units] = {"seconds": round(secs, 2), "rel_spec": rel(a, ref[0]), "rel_wave": rel(b, ref[1]),
-                        "stem_error_db": stems}
-    except Exception as e:  # report and go on: the other unit may still work
-        check[units] = {"error": repr(e)[:500]}
-    print(units, json.dumps(check[units]))
+        mlmodel = ct.convert(
+            traced,
+            inputs=[ct.TensorType(name="spec", shape=tuple(x.shape), dtype=np.float32),
+                    ct.TensorType(name="wave", shape=tuple(xt.shape), dtype=np.float32)],
+            outputs=[ct.TensorType(name="spec_out", dtype=np.float32),
+                     ct.TensorType(name="wave_out", dtype=np.float32)],
+            convert_to="mlprogram",
+            compute_precision=precision,
+            minimum_deployment_target=ct.target.iOS16,
+        )
+        entry["convert_seconds"] = round(time.time() - t, 1)
+        mlmodel.short_description = "HTDemucs network body (between normalisations); see tools/band/band_ref.py"
+        path = os.path.join(out_dir, name + ".mlpackage")
+        mlmodel.save(path)
+        del mlmodel
+        for units in ["CPU_ONLY", "CPU_AND_GPU"]:
+            m = ct.models.MLModel(path, compute_units=getattr(ct.ComputeUnit, units))
+            t = time.time()
+            pred = m.predict({"spec": x, "wave": xt})
+            secs = time.time() - t
+            a, b = pred["spec_out"], pred["wave_out"]
+            y_ml = R.finish(a, b, stats)
+            stems = {s_name: round(float(20 * np.log10(rel(y_ml[s], y_ref[s]) + 1e-30)), 1)
+                     for s, s_name in enumerate(R.SOURCES)}
+            entry[units] = {"seconds": round(secs, 2), "rel_spec": rel(a, ref[0]), "rel_wave": rel(b, ref[1]),
+                            "stem_error_db": stems}
+            del m
+        worst = max(max(entry[u]["stem_error_db"].values()) for u in ["CPU_ONLY", "CPU_AND_GPU"])
+        entry["worst_db"] = worst
+    except Exception as e:  # report and try the next variant
+        entry["error"] = repr(e)[:800]
+        worst = None
+    check[name] = entry
+    print(name, json.dumps(entry), flush=True)
+    if worst is not None and worst < -30:
+        chosen = name
+        break
+check["chosen"] = chosen
 with open(os.path.join(out_dir, "check.json"), "w") as f:
     json.dump(check, f, indent=1)
+if chosen is None:
+    sys.exit("no variant matched torch within -30 dB")
+shutil.copytree(os.path.join(out_dir, chosen + ".mlpackage"), os.path.join(out_dir, "HTDemucsBody.mlpackage"))
+print("chosen:", chosen)

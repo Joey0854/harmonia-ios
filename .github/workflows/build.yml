@@ -49,10 +49,12 @@ jobs:
           python -m venv "$RUNNER_TEMP/band" && . "$RUNNER_TEMP/band/bin/activate"
           pip install -q "numpy<2" torch==2.5.1 torchaudio==2.5.1 demucs==4.0.1 coremltools==8.3.0 2>&1 | tail -5
           python -c "import torch, coremltools, demucs; print('torch', torch.__version__, 'coremltools', coremltools.__version__, 'demucs', demucs.__version__)"
-          python tools/band/convert.py "$RUNNER_TEMP/bandout" 2>&1 | grep -v -i warn | tee band.log
+          status=0
+          python tools/band/convert.py "$RUNNER_TEMP/bandout" 2>&1 | grep -v -i warn | tee band.log || status=$?
+          cp "$RUNNER_TEMP/bandout/check.json" band-check.json || true
+          [ "$status" = 0 ] || exit "$status"
           xcrun coremlcompiler compile "$RUNNER_TEMP/bandout/HTDemucsBody.mlpackage" BandModel/ | tee -a band.log
           du -sh "$RUNNER_TEMP/bandout/HTDemucsBody.mlpackage" BandModel/HTDemucsBody.mlmodelc | tee -a band.log
-          cp "$RUNNER_TEMP/bandout/check.json" band-check.json
       - name: Generate project
         if: always()
         run: |
