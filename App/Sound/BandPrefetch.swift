@@ -99,6 +99,9 @@ public final class BandPrefetch {
             BandPrefetch.log(String(format: "band: starting %@ with the prefetched %d segments (%.1f s), band from the first sample", id, s.segments, Double(s.stems.first?.count ?? 0) / Double(Demucs.sampleRate)))
             return s
         }
+        if let s = ready {
+            stage = "asked for \(id) from \(startTime) s at \(sampleRate) Hz; have \(s.id) from \(s.startTime) s at \(s.sampleRate) Hz"
+        }
         if busyID == id || ready?.id == id {
             BandPrefetch.log("band: prefetch of \(id) not ready for this start; the original plays first")
             key = nil
@@ -156,6 +159,9 @@ public final class BandPrefetch {
             if g == generation {
                 ready = seed
                 busyID = nil
+                stage = "ready: \(id) from \(startTime) s at \(rate) Hz, \(done) segments"
+            } else {
+                stage = "finished for an older request"
             }
             lock.unlock()
             BandPrefetch.log(String(format: "band: prefetched next %@ from %.1f s, %d segments, took %.1f s (%.1f s of network, %d MB)",
