@@ -131,12 +131,25 @@ public final class BandPrefetch {
             BandPrefetch.log("band: prefetch of \(id) cannot decode: \(error)")
             return
         }
+        /* the rate is known once the first piece is there */
+        var first = try? decoder.next()
         let rate = Int(decoder.sampleRate.rounded())
+        guard first != nil, rate >= 8000 else {
+            BandPrefetch.log("band: prefetch of \(id): no sound in the file")
+            return
+        }
         let resample = rate != Demucs.sampleRate
         let into = resample ? [Resampler(from: rate, to: Demucs.sampleRate), Resampler(from: rate, to: Demucs.sampleRate)] : []
         var ended = false
         while splitter.received < need44 {
-            guard let piece = try? decoder.next() else { ended = true; break }
+            let next: (left: [Float], right: [Float])?
+            if let f = first {
+                next = f
+                first = nil
+            } else {
+                next = try? decoder.next()
+            }
+            guard let piece = next else { ended = true; break }
             let l = resample ? into[0].process(piece.left) : piece.left
             let r = resample ? into[1].process(piece.right) : piece.right
             splitter.add(left: l, right: r)
