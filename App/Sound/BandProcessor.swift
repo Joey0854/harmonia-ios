@@ -171,6 +171,8 @@ public final class BandProcessor {
         self.log = log
         self.status = status
         self.mix = mix
+        self.startOffset = startOffset
+        let rate = max(8000, sampleRate)
         switch output {
         case .speakers:
             let p = StagePlacer(sources: 5, sampleRate: sampleRate)
@@ -186,12 +188,11 @@ public final class BandProcessor {
         }
         resampling = self.sampleRate != Demucs.sampleRate
         if resampling {
-            into = (0..<2).map { _ in Resampler(from: self.sampleRate, to: Demucs.sampleRate) }
-            outOf = (0..<8).map { _ in Resampler(from: Demucs.sampleRate, to: self.sampleRate) }
+            into = (0..<2).map { _ in Resampler(from: rate, to: Demucs.sampleRate) }
+            outOf = (0..<8).map { _ in Resampler(from: Demucs.sampleRate, to: rate) }
             log("band: song at \(self.sampleRate) Hz, resampled to \(Demucs.sampleRate) Hz for the model and back")
         }
         self.dry = dry
-        self.startOffset = startOffset
         /* the disk cache first: parts kept from an earlier play need no network at all */
         if let c = cache, let id = cacheID, let reader = c.reader(id), reader.covered > startOffset {
             let k = (reader.covered - startOffset) / Demucs.stride
