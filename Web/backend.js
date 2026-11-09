@@ -4686,6 +4686,33 @@ function buildStyleIr(style) {
       }
     }
   }
+  if (style.distance) {
+    // After the tone correction, which would otherwise undo it. Far away (band headphones): the direct sound duller (a blend towards a 3.5 kHz one-pole
+    // low-pass, up to 75 %), and diffuse low-passed sound from the side and rear speakers.
+    const d = style.distance;
+    const dark = (fq) => { const r = fq / 3500, q = 1 + r * r; return Math.hypot(1 - 0.75 * d + 0.75 * d / q, 0.75 * d * r / q); };
+    for (const pair of res) for (let ear = 0; ear < 2; ear++) {
+      const shaped = spectralShape(pair[ear], dark);
+      for (let i = 0; i < n; i++) pair[ear][i] = shaped[i];
+    }
+    const g = 0.22 * d / (1 + 2.2 * d);
+    const around = { SL: [g, 0], SR: [0, g], RL: [g, 0], RR: [0, g] };
+    const lp = (fq) => 1 / Math.sqrt(1 + (fq / 3500) * (fq / 3500));
+    for (const spk of Object.keys(around)) {
+      for (let input = 0; input < 2; input++) {
+        const gi = around[spk][input];
+        if (!gi) continue;
+        for (let ear = 0; ear < 2; ear++) {
+          const h = new Float64Array(n);
+          const src = wav.channels[HRIR_CH[spk][ear]];
+          for (let i = 0; i < hn; i++) h[PRE + i] = gi * src[i];
+          const shaped = spectralShape(h, lp);
+          // both inputs feed the diffuse sound, as the demo's mono sum does
+          for (let i = 0; i < n; i++) { res[0][ear][i] += shaped[i] / 2; res[1][ear][i] += shaped[i] / 2; }
+        }
+      }
+    }
+  }
   if (style.lowShelfDb) {
     // A first-order low shelf at 150 Hz on the whole response (band headphones: drums and bass).
     const G = Math.pow(10, style.lowShelfDb / 20);
@@ -4946,24 +4973,27 @@ const BAND_MIX = {
 };
 
 // A part at a position: its left input at azimuth - 30 x width, its right input at
-// azimuth + 30 x width, each panned (constant power) between the two nearest of the seven
-// virtual speakers; depth turns the direct sound down and sends some to the rear pair.
-const BAND_SPEAKERS = [['RL', -150], ['SL', -90], ['FL', -30], ['C', 0], ['FR', 30], ['SR', 90], ['RR', 150]];
+// azimuth + 30 x width (all the way round: -180 .. 180, 0 = ahead), each panned (constant power)
+// between the two nearest of the seven virtual speakers. Distance d (0 .. 1) as in the PC demo:
+// the direct sound is divided by 1 + 2.2 d and made duller (buildStyleIr, style.distance), and
+// some diffuse sound comes from the sides and back.
+const BAND_SPEAKERS = [['RL', -150], ['SL', -90], ['FL', -30], ['C', 0], ['FR', 30], ['SR', 90], ['RR', 150], ['RL', 210]];
 function bandPositionMix(az, widthPct, depthPct) {
   const mix = {};
   const add = (spk, input, g) => { if (!mix[spk]) mix[spk] = [0, 0]; mix[spk][input] += g; };
   const w = Math.max(0, Math.min(2, widthPct / 100));
   const d = Math.max(0, Math.min(1, depthPct / 100));
   [az - 30 * w, az + 30 * w].forEach((angle, input) => {
-    const a = Math.max(-150, Math.min(150, angle));
+    let x = ((angle % 360) + 360) % 360;      // 0 .. 360
+    if (x > 180) x -= 360;                    // -180 .. 180
+    if (x < -150) x += 360;                   // between RR (150) and RL (210)
     let i = 0;
-    while (i < BAND_SPEAKERS.length - 2 && a > BAND_SPEAKERS[i + 1][1]) i++;
+    while (i < BAND_SPEAKERS.length - 2 && x > BAND_SPEAKERS[i + 1][1]) i++;
     const [s0, a0] = BAND_SPEAKERS[i], [s1, a1] = BAND_SPEAKERS[i + 1];
-    const t = (a - a0) / (a1 - a0);
-    const g = 0.5 * (1 - 0.35 * d);
+    const t = Math.max(0, Math.min(1, (x - a0) / (a1 - a0)));
+    const g = 0.5 / (1 + 2.2 * d);
     add(s0, input, g * Math.cos(t * Math.PI / 2));
     add(s1, input, g * Math.sin(t * Math.PI / 2));
-    add(input === 0 ? 'RL' : 'RR', input, 0.125 * d);
   });
   return mix;
 }
@@ -4980,7 +5010,7 @@ function getBandIr(name, q) {
   if (!base) return Promise.reject(new Error('no HRIR base available'));
   const num = (k, lo, hi, def) => { const v = q.get(k); const x = Math.round(Number(v)); return v === null || !isFinite(x) ? def : Math.max(lo, Math.min(hi, x)); };
   const positioned = q.get('az') !== null;
-  const az = num('az', -90, 90, 0), w = num('w', 0, 200, 0), d = num('d', 0, 100, 0);
+  const az = num('az', -180, 180, 0), w = num('w', 0, 200, 0), d = num('d', 0, 100, 0);
   const t = num('t', 0, 180, 0);
   const v = name === 'vocals' ? num('v', 0, 80, 0) : 0;
   const lo = name === 'drums' || name === 'bass' ? num('lo', -60, 30, 0) : 0;
@@ -4992,6 +5022,7 @@ function getBandIr(name, q) {
     if (t > 0) style.tone = 0.56 * t / 100;
     if (v > 0) style.vocalTail = 1 - v / 100;
     if (lo !== 0) style.lowShelfDb = lo / 10;
+    if (positioned && d > 0) style.distance = d / 100;
     bandPosCache.set(key, buildStyleIr(style));
     while (bandPosCache.size > 120) bandPosCache.delete(bandPosCache.keys().next().value);
   }

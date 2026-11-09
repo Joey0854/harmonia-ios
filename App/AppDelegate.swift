@@ -14,6 +14,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         /* The band surround modes: the separation model (loaded the first time it is used). */
         SurroundChain.bandNetwork = { BandModel.shared.network() }
         SurroundChain.log = { Diag.shared.log($0) }
+        BandPrefetch.log = { Diag.shared.log($0) }
+        PerfMonitor.shared.start()
+        BandProcessor.segmentTag = { BandModel.shared.label }
         let w = UIWindow(frame: UIScreen.main.bounds)
         w.backgroundColor = .black
         w.rootViewController = PlayerViewController()

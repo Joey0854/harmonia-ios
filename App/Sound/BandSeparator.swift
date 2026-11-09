@@ -235,6 +235,31 @@ public final class BandSplitter {
 
     public init() {}
 
+    /* Separated sound from elsewhere (a prefetch) for the samples before seedEnd, 16-bit. */
+    private var seedStems: [[Int16]] = []
+    private var seedEnd = 0
+    static let seedScale: Float = 2 / 32767
+
+    /// Starts with the first `segments` segments already separated (`final` as `read` gives
+    /// it for [0, segments × stride), [source × 2 + channel][sample], 16-bit with
+    /// `seedScale`). Call before any job is taken. The next segment blends in with only its
+    /// own weight where it overlaps the seed.
+    public func seed(_ final: [[Int16]], segments: Int) {
+        guard segments > 0, final.count == 8, nextIndex == 0 else { return }
+        let end = min(final[0].count, segments * Demucs.stride)
+        seedStems = final.map { Array($0.prefix(end)) }
+        seedEnd = end
+        nextIndex = segments
+        finalUpTo = end
+        accBase = end
+    }
+
+    /// Converts separated sound to the seed's 16-bit form.
+    public static func pack(_ stems: [[Float]]) -> [[Int16]] {
+        let g = 1 / seedScale
+        return stems.map { ch in ch.map { Int16(max(-32767, min(32767, ($0 * g).rounded()))) } }
+    }
+
     public func add(left: [Float], right: [Float]) {
         let n = min(left.count, right.count)
         inLeft.append(contentsOf: left.prefix(n))
@@ -318,6 +343,14 @@ public final class BandSplitter {
         for j in 0..<count {
             let n = from + j
             if n >= finalUpTo { break }
+            if n < seedEnd {
+                if n >= seedEnd - seedStems[0].count {
+                    let k = n - (seedEnd - seedStems[0].count)
+                    ready[j] = true
+                    for c in 0..<8 { stems[c][j] = Float(seedStems[c][k]) * BandSplitter.seedScale }
+                }
+                continue
+            }
             let i = n - accBase
             guard i >= 0, i < weight.count, weight[i] > 0 else { continue }
             ready[j] = true
@@ -329,6 +362,12 @@ public final class BandSplitter {
 
     /// Forgets results before `sample` (already played) and input no segment needs any more.
     public func drop(before sample: Int) {
+        /* the seed: what has been played goes */
+        let gone = min(sample, seedEnd) - (seedEnd - (seedStems.first?.count ?? 0))
+        if gone > Demucs.stride / 4, let n = seedStems.first?.count {
+            let k = min(gone, n)
+            for c in 0..<8 { seedStems[c].removeFirst(k) }
+        }
         /* in large steps only: every removal moves what is left */
         let cut = min(sample, finalUpTo) - accBase
         if cut > Demucs.stride / 4 {

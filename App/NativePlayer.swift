@@ -551,6 +551,8 @@ final class NativePlayer: NSObject {
         case .none(let reason):
             line = "no mix \(a) -> \(b.isEmpty ? "-" : b): \(reason)"
             sound.setMixOffer(nil, id: b, file: nil, reason: "the queue changed (\(reason))")
+            /* no mix: the next song simply follows, from its start */
+            if let f = file, !b.isEmpty { sound.prefetchBand(id: b, file: f, from: 0, seconds: 20) }
         }
         if line != lastMixLog {
             lastMixLog = line
@@ -930,6 +932,15 @@ final class NativePlayer: NSObject {
         /* `exact`: the length is the song's own (measured by the app or given by the page), not
            what the file claims - which can be twice as long. */
         onEvent?(["type": "time", "t": t, "dur": dur, "playing": playing, "exact": usingEngine && knownDuration > 0])
+    }
+
+    /// Everything the page needs after it was loaded again: the song, position, length and
+    /// whether it plays (also when paused).
+    func resync() {
+        var event: [String: Any] = ["type": "resync", "t": currentTime(), "dur": itemDuration(), "playing": isPlaying()]
+        if let id = currentID { event["id"] = id }
+        onEvent?(event)
+        sendState()
     }
 
     private func sendState() {

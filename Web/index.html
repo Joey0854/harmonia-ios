@@ -113,7 +113,7 @@ svg{width:24px;height:24px;fill:currentColor;display:block}
 .ftitle{font-size:20px;font-weight:700;word-break:break-word}
 .fsub{font-size:14px;color:var(--fg2);margin-top:2px;word-break:break-word}
 .fstatrow{display:flex;align-items:center;gap:10px;margin-top:6px;min-height:44px}
-.fstat{font-size:12px;color:var(--accent);flex:1;min-width:0;word-break:break-word}
+.fstat{font-size:12px;color:var(--accent);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:18px;height:18px}
 .fstatrow .btn{min-height:44px;padding:0 16px;font-size:13px}
 .fstatrow .btn[hidden]{display:none}
 .seekrow{margin-top:4px}
@@ -958,7 +958,7 @@ function bandMixParams(mode) {
   BAND_PARTS.forEach(function (bp) {
     var n = bp[0], d = BAND_DEFAULT[mode][n], s = (saved && saved[n]) || {};
     out[n] = { gain: num(s.gain, 100, 0, 150), solo: !!s.solo, mute: !!s.mute,
-      az: num(s.az, d.az, -90, 90), depth: num(s.depth, d.depth, 0, 100), width: num(s.width, d.width, 0, 200) };
+      az: num(s.az, d.az, mode === 'band' ? -90 : -180, mode === 'band' ? 90 : 180), depth: num(s.depth, d.depth, 0, 100), width: num(s.width, d.width, 0, 200) };
   });
   return out;
 }
@@ -978,11 +978,99 @@ function bandControls(body, mode) {
   st.setAttribute('style', 'margin:0 0 12px;font-weight:600');
   body.appendChild(st);
   bandStatusEl = st;
-  var hint = el('p', null, '想知道分得乾不乾淨：按某一軌的「獨奏」只聽那一軌（例如人聲獨奏時聽不到鼓與貝斯就是分得好）。調整約 4 秒內聽得到。');
+  var hint = el('p', null, '想知道分得乾不乾淨：按某一軌的「獨奏」只聽那一軌（例如人聲獨奏時聽不到鼓與貝斯就是分得好）。調整約 4 到 5 秒內聽得到，不會重新分軌。');
   hint.setAttribute('style', 'margin:0 0 12px;opacity:.8;font-size:13px');
   body.appendChild(hint);
   var controls = [];
   var save = function () { bandMixSave(mode, p); fxApply(); };
+  var maxAz = mode === 'band' ? 90 : 180;
+  /* Seen from above, the listener in the middle, ahead is up: drag a part to set its direction
+     and distance together (the sliders below follow). */
+  var NS = 'http://www.w3.org/2000/svg';
+  var view = document.createElementNS(NS, 'svg');
+  view.setAttribute('viewBox', '-110 -110 220 220');
+  view.setAttribute('style', 'width:100%;max-width:300px;display:block;margin:0 auto 6px;touch-action:none;background:rgba(255,255,255,.04);border-radius:50%');
+  view.setAttribute('aria-label', '俯視圖：拖動各軌調整方位與遠近');
+  var ring = function (r, dash) {
+    var c = document.createElementNS(NS, 'circle');
+    c.setAttribute('r', String(r));
+    c.setAttribute('fill', 'none');
+    c.setAttribute('stroke', 'rgba(255,255,255,.18)');
+    if (dash) c.setAttribute('stroke-dasharray', '3 4');
+    view.appendChild(c);
+  };
+  ring(30, true); ring(65, true); ring(100, false);
+  if (mode === 'band') {
+    /* speakers: only the front half */
+    var half = document.createElementNS(NS, 'path');
+    half.setAttribute('d', 'M -100 0 A 100 100 0 0 1 100 0 Z');
+    half.setAttribute('fill', 'rgba(120,200,255,.06)');
+    view.appendChild(half);
+  }
+  var me = document.createElementNS(NS, 'circle');
+  me.setAttribute('r', '6');
+  me.setAttribute('fill', 'rgba(255,255,255,.7)');
+  view.appendChild(me);
+  var front = document.createElementNS(NS, 'text');
+  front.setAttribute('y', '-102');
+  front.setAttribute('text-anchor', 'middle');
+  front.setAttribute('font-size', '9');
+  front.setAttribute('fill', 'rgba(255,255,255,.6)');
+  front.textContent = '前';
+  view.appendChild(front);
+  var COLORS = { vocals: '#ff6b9a', drums: '#ffc04d', bass: '#6bd1ff', other: '#9dff7a' };
+  var radius = function (depth) { return 22 + 0.78 * depth; };
+  var dots = {};
+  var placeDot = function (n) {
+    var part = p[n], a = part.az * Math.PI / 180, r = radius(part.depth);
+    dots[n].setAttribute('transform', 'translate(' + (r * Math.sin(a)).toFixed(1) + ' ' + (-r * Math.cos(a)).toFixed(1) + ')');
+  };
+  BAND_PARTS.forEach(function (bp) {
+    var g = document.createElementNS(NS, 'g');
+    var c = document.createElementNS(NS, 'circle');
+    c.setAttribute('r', '11');
+    c.setAttribute('fill', COLORS[bp[0]]);
+    c.setAttribute('fill-opacity', '.85');
+    g.appendChild(c);
+    var t = document.createElementNS(NS, 'text');
+    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('dy', '4');
+    t.setAttribute('font-size', '10');
+    t.setAttribute('fill', '#000');
+    t.textContent = bp[1].slice(0, 2);
+    g.appendChild(t);
+    g.style.cursor = 'grab';
+    view.appendChild(g);
+    dots[bp[0]] = g;
+    placeDot(bp[0]);
+    g.addEventListener('pointerdown', function (ev) {
+      ev.preventDefault();
+      try { g.setPointerCapture(ev.pointerId); } catch (e) {}
+      var move = function (e2) {
+        var box = view.getBoundingClientRect();
+        var x = (e2.clientX - box.left) / box.width * 220 - 110, y = (e2.clientY - box.top) / box.height * 220 - 110;
+        var az = Math.round(Math.atan2(x, -y) * 180 / Math.PI / 5) * 5;
+        var depth = Math.round(Math.max(0, Math.min(100, (Math.sqrt(x * x + y * y) - 22) / 0.78)) / 5) * 5;
+        var part = p[bp[0]];
+        part.az = Math.max(-maxAz, Math.min(maxAz, az));
+        part.depth = depth;
+        placeDot(bp[0]);
+        controls.forEach(function (f) { f(); });
+        save();
+      };
+      var up = function () { g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); };
+      g.addEventListener('pointermove', move);
+      g.addEventListener('pointerup', up);
+      g.addEventListener('pointercancel', up);
+    });
+  });
+  body.appendChild(view);
+  if (mode === 'band') {
+    var lim = el('p', null, '喇叭模式只能放在前方（方位 −90°～90°），拖到後方會停在兩側。');
+    lim.setAttribute('style', 'margin:0 0 10px;opacity:.7;font-size:12px;text-align:center');
+    body.appendChild(lim);
+  }
+  controls.push(function () { BAND_PARTS.forEach(function (bp) { placeDot(bp[0]); }); });
   var slider = function (part, k, label, min, max, step, unit) {
     var row = el('div', 'eqrow');
     var l = el('div', 'eql');
@@ -997,7 +1085,7 @@ function bandControls(body, mode) {
     input.step = String(step);
     input.value = part[k];
     input.setAttribute('aria-label', label);
-    input.addEventListener('input', function () { part[k] = +input.value; val.textContent = part[k] + unit; save(); });
+    input.addEventListener('input', function () { part[k] = +input.value; val.textContent = part[k] + unit; if (k === 'az' || k === 'depth') { BAND_PARTS.forEach(function (bp) { if (dots[bp[0]]) placeDot(bp[0]); }); } save(); });
     row.appendChild(input);
     controls.push(function () { input.value = part[k]; val.textContent = part[k] + unit; });
     return row;
@@ -1025,8 +1113,8 @@ function bandControls(body, mode) {
     head.appendChild(toggle('mute', '靜音 M'));
     box.appendChild(head);
     box.appendChild(slider(part, 'gain', '音量', 0, 150, 5, '%'));
-    box.appendChild(slider(part, 'az', '方位（左 − / 右 +）', -90, 90, 5, '°'));
-    box.appendChild(slider(part, 'depth', mode === 'bandHead' ? '深度（多送一點到後方喇叭）' : '深度', 0, 100, 5, ''));
+    box.appendChild(slider(part, 'az', mode === 'band' ? '方位（左 − / 右 +，喇叭只到 ±90°）' : '方位（左 − / 右 +，±180° 是正後方）', -maxAz, maxAz, 5, '°'));
+    box.appendChild(slider(part, 'depth', '遠近（遠＝較小聲、較暗、多一點空間聲）', 0, 100, 5, ''));
     box.appendChild(slider(part, 'width', '寬度', 0, 200, 10, '%'));
     body.appendChild(box);
   });
@@ -1601,6 +1689,19 @@ window.__ytmNativeEvent = function (e) {
     if (was && e.playing) { a.emit('play'); a.emit('playing'); }
     else if (!was && !e.playing) a.emit('pause');
     else if (e.playing) a.emit('playing');
+  } else if (e.type === 'resync') {
+    /* the page was loaded again (its process had been ended) while the app played on:
+       everything about the song in one go, paused or not */
+    if (e.dur > 0) a.duration = e.dur;
+    if (typeof e.t === 'number') { a.T = e.t; a.TT = performance.now(); }
+    if (S.cur && (!e.id || e.id === S.vid)) { S.ready = true; S.loading = false; S.err = ''; }
+    else dbg('W', 'resync-other-song', { app: e.id || '', page: S.vid || '' });
+    a.paused = !e.playing;
+    a.emit('loadedmetadata');
+    a.emit('durationchange');
+    a.emit('timeupdate');
+    a.emit(e.playing ? 'playing' : 'pause');
+    renderPlayer();
   } else if (e.type === 'ready') {
     if (e.dur > 0) a.duration = e.dur;
     a.emit('loadedmetadata');

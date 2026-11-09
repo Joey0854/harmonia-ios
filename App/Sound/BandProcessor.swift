@@ -27,9 +27,28 @@ public final class BandProcessor {
         case headphones([(left: [[Float]], right: [[Float]])])
     }
 
-    /// Input held back before output (at 44.1 kHz): one segment and one step, so the next
-    /// segment can be worked on while the current one plays.
-    public static let lookahead = Demucs.segment + Demucs.stride
+    /// Input held back before output (at 44.1 kHz): one segment and two steps (19.5 s), so
+    /// separation can run up to about 17 s ahead of what is handed on: a cushion for slower
+    /// moments (the app going to the background, where only the CPU may be used). Costs about
+    /// 40 MB of buffers (the parts are kept as 32-bit sums until handed on).
+    public static let lookahead = Demucs.segment + 2 * Demucs.stride
+    /// Called after every separated segment with its time and how many times faster than
+    /// playback it was (any thread). For the app's performance log.
+    public static var onSegment: ((Double, Double) -> Void)?
+    private static let leadLock = NSLock()
+    private static var leadValue: Double?
+    /// Seconds of separated sound ahead of what was last handed on (nil: no band running).
+    public static var lead: Double? {
+        leadLock.lock()
+        defer { leadLock.unlock() }
+        return leadValue
+    }
+    static func setLead(_ v: Double?) {
+        leadLock.lock()
+        leadValue = v
+        leadLock.unlock()
+    }
+
     /// Samples over which the band fades in, and a volume change glides.
     public static let fade = 2048
 
@@ -79,6 +98,12 @@ public final class BandProcessor {
     private var wasReady = false
     private var everReady = false
     private var lastRun: BandStatus = .loading
+    private var retry: BandSplitter.Job?
+    private var errors = 0
+    /// Network failures in a row before the band gives up for the song.
+    public static let maxTries = 3
+    /// What is appended to each segment's log line (the app: compute units, background).
+    public static var segmentTag: (() -> String)?
     private var late = false
     private var skippedShown = 0
     private var mixVersion = -1
@@ -104,7 +129,7 @@ public final class BandProcessor {
     /// `queue` nil runs the network inside `process` / `drain` (tests). `log` gets one line per
     /// segment and per change between band and original; `status` the same for the page.
     public init(output: Output, network: BandNetwork, sampleRate: Int, queue: DispatchQueue?,
-                mix: BandMix = .shared,
+                mix: BandMix = .shared, seed: BandSeed? = nil,
                 log: @escaping (String) -> Void = { _ in },
                 status: @escaping (BandStatus) -> Void = { _ in }) {
         self.network = network
@@ -131,6 +156,13 @@ public final class BandProcessor {
             into = (0..<2).map { _ in Resampler(from: self.sampleRate, to: Demucs.sampleRate) }
             outOf = (0..<8).map { _ in Resampler(from: Demucs.sampleRate, to: self.sampleRate) }
             log("band: song at \(self.sampleRate) Hz, resampled to \(Demucs.sampleRate) Hz for the model and back")
+        }
+        if let s = seed {
+            splitter.seed(s.stems, segments: s.segments)
+            /* separated already: the band from the very first sample, no fade-in */
+            everReady = true
+            wasReady = true
+            amount = 1
         }
         applyMix(crossfade: false)
         status(.loading)
@@ -197,6 +229,7 @@ public final class BandProcessor {
         lock.lock()
         failed = true
         lock.unlock()
+        BandProcessor.setLead(nil)
         return out
     }
 
@@ -221,6 +254,10 @@ public final class BandProcessor {
         lock.lock()
         defer { lock.unlock() }
         if failed { return nil }
+        if let again = retry {
+            retry = nil
+            return again
+        }
         return splitter.takeJob(wanted: wanted)
     }
 
@@ -243,7 +280,12 @@ public final class BandProcessor {
             let took = Date().timeIntervalSince(start)
             let audio = Double(Demucs.stride) / Double(Demucs.sampleRate)
             let speed = audio / max(took, 1e-6)
-            log(String(format: "band: segment %d took %.2f s (realtime x%.2f)", job.index, took, speed))
+            let tag = BandProcessor.segmentTag?() ?? ""
+            log(String(format: "band: segment %d took %.2f s (realtime x%.2f)", job.index, took, speed) + (tag.isEmpty ? "" : " [" + tag + "]"))
+            BandProcessor.onSegment?(took, speed)
+            lock.lock()
+            errors = 0
+            lock.unlock()
             let s = BandStatus.running(seconds: took, realtime: speed)
             lock.lock()
             splitter.complete(job, stems: stems)
@@ -253,12 +295,22 @@ public final class BandProcessor {
             /* while the original is playing, the page keeps saying so */
             if !behind { status(s) }
         } catch {
-            log("band: the network failed (\(error)); playing the original")
+            /* The same segment again (the network reloads its model, e.g. after a memory
+               warning), up to maxTries times in a row; the original plays meanwhile. */
             lock.lock()
-            failed = true
-            failure = "\(error)"
+            errors += 1
+            let n = errors
+            let giveUp = n >= BandProcessor.maxTries
+            if giveUp {
+                failed = true
+                failure = "\(error)"
+            } else {
+                retry = job
+            }
             lock.unlock()
+            log("band: the network failed on segment \(job.index), try \(n) of \(BandProcessor.maxTries) (\(error)); " + (giveUp ? "playing the original for this song" : "trying again"))
             status(.failed("\(error)"))
+            if !giveUp { Thread.sleep(forTimeInterval: 2) }
         }
         wake.signal()
     }
@@ -446,6 +498,7 @@ public final class BandProcessor {
                 wasReady = ready
             }
         }
+        BandProcessor.setLead(Double(max(0, readyUpTo() - emitted - count)) / Double(sampleRate))
         var stems = part.stems
         let step = 1 / Float(BandProcessor.fade)
         for s in 0..<4 {

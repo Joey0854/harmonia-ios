@@ -267,6 +267,63 @@ final class BandTests: XCTestCase {
         XCTAssertLessThan(worst, 1e-4)
     }
 
+    /// A processor seeded with the first segments (as a prefetch gives them) plays the band
+    /// from its first sample and runs on from there.
+    func testSeededStartIsBandFromTheFirstSample() throws {
+        let n = 16 * 44100
+        let s = signal(n)
+        let offline = try BandSplitter.separateAll(left: s.left, right: s.right, network: FakeNetwork())
+        let pre = BandSplitter()
+        pre.add(left: s.left, right: s.right)
+        for _ in 0..<2 {
+            let job = pre.takeJob()!
+            pre.complete(job, stems: try Demucs.separate(left: job.left, right: job.right, network: FakeNetwork()))
+        }
+        XCTAssertEqual(pre.finalUpTo, 2 * Demucs.stride)
+        let seed = BandSeed(id: "x", startTime: 0, sampleRate: 44100,
+                            stems: BandSplitter.pack(pre.read(from: 0, count: 2 * Demucs.stride).stems), segments: 2)
+        let identity: (left: [[Float]], right: [[Float]]) = ([[1], [0]], [[0], [1]])
+        let net = FakeNetwork()
+        let p = BandProcessor(output: .headphones([identity, identity, identity, identity]),
+                              network: net, sampleRate: 44100, queue: nil, mix: BandMix(), seed: seed)
+        let out = run(p, s)
+        XCTAssertEqual(out.left.count, n)
+        /* 16 s: segments at 0, 1, 2 (the last one partial); the first two came with the seed */
+        XCTAssertEqual(net.calls, 1)
+        func sum(_ i: Int) -> Float { return offline[0][0][i] + offline[1][0][i] + offline[2][0][i] + offline[3][0][i] }
+        var worst: Float = 0
+        for i in 0..<(2 * Demucs.stride) { worst = max(worst, abs(out.left[i] - sum(i))) }
+        XCTAssertLessThan(worst, 1e-3)
+        XCTAssertEqual(out.left[0], sum(0), accuracy: 1e-3)
+    }
+
+    /// The prefetch decodes the start of a file itself and gives the same parts as the
+    /// processor works out when it plays the file.
+    func testPrefetchMatchesPlaying() throws {
+        let url = Fixtures.url("song-plain.m4a")
+        let pf = BandPrefetch()
+        pf.prepare(id: "song", file: url, from: 0, seconds: 5, network: FakeNetwork(), queue: DispatchQueue(label: "test.prefetch"))
+        let decoder = try SongDecoder(url: url)
+        var l = [Float](), r = [Float]()
+        while let piece = try decoder.next() { l += piece.left; r += piece.right }
+        let rate = Int(decoder.sampleRate.rounded())
+        for _ in 0..<600 where !pf.hasSeed(for: "song") { Thread.sleep(forTimeInterval: 0.05) }
+        let seed = pf.take(id: "song", startTime: decoder.startTime, sampleRate: rate)
+        guard let s = seed else { return XCTFail("no prefetch") }
+        XCTAssertEqual(s.segments, 1)
+        let identity: (left: [[Float]], right: [[Float]]) = ([[1], [0]], [[0], [1]])
+        let plain = run(BandProcessor(output: .headphones([identity, identity, identity, identity]),
+                                      network: FakeNetwork(), sampleRate: rate, queue: nil, mix: BandMix()), (l, r))
+        let seeded = run(BandProcessor(output: .headphones([identity, identity, identity, identity]),
+                                       network: FakeNetwork(), sampleRate: rate, queue: nil, mix: BandMix(), seed: s), (l, r))
+        XCTAssertEqual(plain.left.count, seeded.left.count)
+        var worst: Float = 0
+        /* up to where the seed ends (after it, the seeded one has the next segment alone) */
+        let end = min(plain.left.count, Demucs.stride * rate / 44100) - 400
+        for i in BandProcessor.fade..<end { worst = max(worst, abs(plain.left[i] - seeded.left[i])) }
+        XCTAssertLessThan(worst, 2e-3)
+    }
+
     private func run(_ p: BandProcessor, _ s: (left: [Float], right: [Float])) -> (left: [Float], right: [Float]) {
         var l = [Float](), r = [Float]()
         let pieces = [4096, 1000, 37, 70000, 513]

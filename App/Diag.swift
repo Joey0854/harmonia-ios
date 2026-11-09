@@ -55,6 +55,8 @@ final class Diag {
     private var reportBase: URL?
     private var lastSongReport = Date.distantPast
     private var settings: [String: Any] = [:]
+    /// The performance statistics since the last report (PerfMonitor); called on Diag's queue.
+    var perfProvider: (() -> [String: Any])?
     /// The log the previous run left behind (read before this run adds to it).
     private let previousLog: String
 
@@ -272,6 +274,7 @@ final class Diag {
             "settings": settings, "log": lines.joined(separator: "\n")
         ]
         if previous { info["lastLog"] = Diag.mask(previousLog) }
+        if let perf = perfProvider?() { info["perf"] = perf }
         guard let body = try? JSONSerialization.data(withJSONObject: info) else {
             done?("report could not be encoded")
             return

@@ -88,6 +88,10 @@ import WebKit
 final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, UIGestureRecognizerDelegate {
     private var webView: WKWebView!
     private let player = NativePlayer()
+    /* the page was loaded again after its process ended; the last band status sent to it */
+    private var pageReloaded = false
+    private var lastBandEvent: [String: Any]?
+    private var lastBandState: String { return lastBandEvent?["state"] as? String ?? "none" }
     /// Only for relative addresses in `load`/`dl` and as the optional debug-log target; the
     /// page itself no longer comes from here.
     private var baseURL = URL(string: "http://127.0.0.1:8787")!
@@ -194,7 +198,10 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
                 event["state"] = "failed"
                 event["message"] = String(message.prefix(160))
             }
-            DispatchQueue.main.async { self?.send(event) }
+            DispatchQueue.main.async {
+                self?.lastBandEvent = event
+                self?.send(event)
+            }
         }
         /* The stored sign-in stopped working: the page asks the user to sign in again. Checked
            once a few seconds after start, and whenever an account request notices it. */
@@ -276,12 +283,26 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
     /* iOS can end the page's process to free memory while music keeps playing in the
        background. Without this the user would come back to a blank screen. */
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        Diag.shared.log("page: the web view's process was ended by the system; the page is loaded again", error: true)
+        Diag.shared.log("page: the web view's process was ended by the system; the page is loaded again (app footprint \(PerfMonitor.mb(PerfMonitor.footprint())) MB, available \(PerfMonitor.mb(PerfMonitor.available())) MB, band \(lastBandState), model \(BandModel.shared.label))", error: true)
+        pageReloaded = true
         /* The page is told it is a reload, so that it can open the player again and follow the
            music that is still playing. */
         let tell = WKUserScript(source: "window.__ytmReloaded = true;", injectionTime: .atDocumentStart, forMainFrameOnly: true)
         webView.configuration.userContentController.addUserScript(tell)
         loadPage()
+    }
+
+    /* After a reload the page knows nothing of what is playing: tell it everything once it is
+       up (song, position, length, playing or not, band state), paused or not. */
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard pageReloaded else { return }
+        pageReloaded = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self = self else { return }
+            self.player.resync()
+            if let band = self.lastBandEvent { self.send(band) }
+            Diag.shared.log("page: state sent again after the reload")
+        }
     }
 
     // MARK: page -> app

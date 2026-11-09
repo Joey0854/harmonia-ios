@@ -70,6 +70,9 @@ KEEP_FP32 = {"reduce_mean", "reduce_sum", "reduce_sum_square", "square", "pow", 
 variants = [
     ("fp16", ct.precision.FLOAT16),
     ("mixed", ct.transform.FP16ComputePrecision(op_selector=lambda op: op.op_type not in KEEP_FP32)),
+    # float32 computing with 8-bit weights (per channel, symmetric): a quarter of the file; on
+    # iOS 16 the weights are expanded when the model loads (memory at run time: not measured)
+    ("w8", ct.precision.FLOAT32),
     ("fp32", ct.precision.FLOAT32),
 ]
 chosen = None
@@ -87,11 +90,17 @@ for name, precision in variants:
             compute_precision=precision,
             minimum_deployment_target=ct.target.iOS16,
         )
+        if name == "w8":
+            op_config = ct.optimize.coreml.OpLinearQuantizerConfig(mode="linear_symmetric", dtype="int8",
+                                                                   granularity="per_channel")
+            mlmodel = ct.optimize.coreml.linear_quantize_weights(
+                mlmodel, config=ct.optimize.coreml.OptimizationConfig(global_config=op_config))
         entry["convert_seconds"] = round(time.time() - t, 1)
         mlmodel.short_description = "HTDemucs network body (between normalisations); see tools/band/band_ref.py"
         path = os.path.join(out_dir, name + ".mlpackage")
         mlmodel.save(path)
         del mlmodel
+        entry["package_mb"] = round(sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(path) for f in fs) / 1e6, 1)
         for units in ["CPU_ONLY", "CPU_AND_GPU"]:
             m = ct.models.MLModel(path, compute_units=getattr(ct.ComputeUnit, units))
             t = time.time()

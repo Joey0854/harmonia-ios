@@ -493,6 +493,21 @@
     try { if (pageHandler) return pageHandler(e); } catch (x) {}
   }
   function redraw() { try { if (P && P.render) P.render(); } catch (e) {} }
+  /* At most once a second, and only when the status line would read differently. */
+  var redrawTimer = null, redrawAt = 0, shownStatus = null;
+  function redrawSoon() {
+    if (redrawTimer) return;
+    var wait = Math.max(0, 1000 - (Date.now() - redrawAt));
+    redrawTimer = setTimeout(function () {
+      redrawTimer = null;
+      var now = '';
+      try { now = String(glueStatus(true)); } catch (e) {}
+      if (now === shownStatus) return;
+      shownStatus = now;
+      redrawAt = Date.now();
+      redraw();
+    }, wait);
+  }
   function setProgress(t) {
     if (cur.progress === t) return;
     cur.progress = t;
@@ -655,7 +670,7 @@
     if (e.type === 'band') {
       bandState = { state: String(e.state || 'off'), seconds: e.seconds, realtime: e.realtime, message: e.message ? String(e.message) : '' };
       if (bandState.state === 'failed' || bandState.state === 'late') plog('W', 'band-' + bandState.state, { message: bandState.message });
-      redraw();
+      redrawSoon();
       try { if (P && P.bandStatusChanged) P.bandStatusChanged(bandStatusText(), bandState); } catch (x) {}
       return;
     }
@@ -698,8 +713,19 @@
       }
       return toPage(e);
     }
+    if (e.type === 'resync') {
+      /* the page was loaded again while the app played on */
+      cur.lookup = '';
+      if (cur.progress) cur.progress = '';
+      if (typeof e.t === 'number') cur.t = e.t;
+      plog('W', 'resync', { id: e.id || '', t: e.t, playing: !!e.playing });
+      toPage(e);
+      redraw();
+      return;
+    }
     if (e.type === 'time' || e.type === 'ready') {
       /* The address was found and the song is here: the waiting line goes away. */
+      var lookupWas = !!cur.lookup;
       cur.lookup = '';
       /* The player can report about twice the real length for this kind of file. The length the
          PC gave is used; without one the page keeps to the length from its song list. */
@@ -707,6 +733,8 @@
          app's own measured length is used once it has one. */
       if (cur.dur > 0) e.dur = cur.dur;
       else if (!(e.exact === true && e.dur > 0)) delete e.dur;
+      /* the line said "fetching the song": once the song plays it must go */
+      if (lookupWas) redrawSoon();
       if (e.type === 'time') {
         if (heldAdvance && typeof e.t === 'number') releaseAdvance(e.t);
         if (cur.fresh && typeof e.t === 'number') { cur.fresh = false; cur.t0 = e.t; }
@@ -924,13 +952,14 @@
       try { console.warn('standalone: band mixer responses not available (' + ((err && err.message) || err) + ')'); } catch (x) {}
     });
   }
+  function glueStatus(surround) { return cur.progress || cur.lookup || (mixRun ? '轉場中 → ' + (mixRun.title || '下一首') : '') || (surround ? (P && P.band && P.band() ? (bandStatusText() || 'App：樂團模式') : (P && P.stage && P.stage() ? 'App：舞台模式' : 'App：手機處理環繞')) : 'App：環繞關閉'); }
   function bandStatusText() {
     if (!(P && P.band && P.band()) || !bandState) return '';
     var s = bandState.state;
     if (s === 'loading') return '樂團：分軌中…';
     if (s === 'running') return '樂團中（每段 ' + (+bandState.seconds || 0).toFixed(1) + ' 秒，' + (+bandState.realtime || 0).toFixed(1) + '× 即時）';
     if (s === 'late') return '樂團：來不及，暫時播原音';
-    if (s === 'failed') return '樂團：模型載入失敗（播原音）';
+    if (s === 'failed') return /model not in the app|does not load/.test(bandState.message || '') ? '樂團：模型載入失敗（播原音）' : '樂團暫停（模型無法執行或記憶體不足，重試中；先播原音）';
     return '';
   }
   function sendSound() {
@@ -1375,7 +1404,7 @@
     sound: soundSoon,
     bandStatus: function () { return bandStatusText(); },
     /* the line under the player */
-    status: function (surround) { return cur.progress || cur.lookup || (mixRun ? '轉場中 → ' + (mixRun.title || '下一首') : '') || (surround ? (P && P.band && P.band() ? (bandStatusText() || 'App：樂團模式') : (P && P.stage && P.stage() ? 'App：舞台模式' : 'App：手機處理環繞')) : 'App：環繞關閉'); },
+    status: function (surround) { return glueStatus(surround); },
     /* the mixing switch was moved */
     mix: sendMix,
     /* title, artist, artwork and length of a song as it was last sent to the app in a queue */

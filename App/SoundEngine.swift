@@ -458,10 +458,24 @@ final class SoundEngine {
             if let o = offer, o.plan == plan, o.id == id { return }
             offer = Offer(plan: plan, id: id, file: file)
             current.setPlan(plan)
+            /* band modes: the incoming song's first segments separated before the mix */
+            prefetchBand(id: id, file: file, from: plan.bOffset, seconds: plan.overlap + 15)
         } else {
             offer = nil
             current.setPlan(nil)
         }
+    }
+
+    /// Band modes: separate the start of the next song ahead of time (for a mix from
+    /// `position`; without one from its start). Nothing in other modes.
+    func prefetchBand(id: String, file: URL, from position: Double, seconds: Double) {
+        guard let s = settings, s.surround, s.mode == .band || s.mode == .bandHead,
+              let network = SurroundChain.bandNetwork?() else {
+            BandPrefetch.shared.cancel("not in a band mode")
+            return
+        }
+        BandPrefetch.shared.prepare(id: id, file: file, from: position, seconds: seconds,
+                                    network: network, queue: SurroundChain.bandQueue)
     }
 
     /// The plan of the mix under way, if any.
@@ -509,6 +523,7 @@ final class SoundEngine {
         offer = nil
         current.setPlan(nil)
         guard let m = mix else { return }
+        BandPrefetch.shared.cancel("mix cancelled: \(reason)")
         mix = nil
         Diag.shared.log("mix cancel: \(reason)", song: m.id)
         _ = spare.newGeneration(plan: nil, joinRunning: false)
@@ -679,7 +694,7 @@ final class SoundEngine {
             fail(path, g, "unusable sample rate \(rate)", at: position)
             return
         }
-        let chain = SurroundChain(settings: settings, sampleRate: Int(rate.rounded()))
+        let chain = SurroundChain(settings: settings, sampleRate: Int(rate.rounded()), song: label, startTime: decoder.startTime)
         if let problem = chain.problem { Diag.shared.log("engine: \(problem)", error: true) }
         let startTime = decoder.startTime
         let stated = decoder.statedDuration

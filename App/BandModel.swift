@@ -1,5 +1,6 @@
 import CoreML
 import Foundation
+import UIKit
 
 /// The HTDemucs network body as a Core ML model, for the "band" surround modes. The model is
 /// made from demucs' htdemucs by tools/band/convert.py on the build machine and lies in the app
@@ -7,95 +8,213 @@ import Foundation
 /// App/Sound (`Demucs`, `BandSplitter`, `BandProcessor`).
 ///
 /// Loading takes a while and starts the first time a band mode is used; the network handed
-/// out waits for it on the band queue, never on the thread that feeds playback. If the model
-/// is missing or does not load, every run fails and the band modes play the original sound.
+/// out waits for it on the band queue, never on the thread that feeds playback.
+///
+/// Compute units: GPU and CPU in front; CPU only while the app is in the background, where iOS
+/// refuses GPU work (Metal command buffers fail with "background execution not permitted").
+/// The model is reloaded for the other units when the app changes state, and a GPU run that
+/// fails anyway is done again on the CPU, so no segment is lost. The Neural Engine is not used
+/// (its compile of a model this size can take minutes; whether it may run in the background is
+/// not verified).
+///
+/// On a memory warning the model is let go; it is loaded again for the next segment, at most
+/// `maxReloads` times in a row without a segment going through, each try logged.
 final class BandModel: BandNetwork {
     static let shared = BandModel()
-
-    /// GPU and CPU: the Neural Engine is left out, since its compile of a model this size can
-    /// take minutes and the inverse transforms it cannot do anyway are not in the model.
-    static let computeUnits = MLComputeUnits.cpuAndGPU
+    static let maxReloads = 3
 
     private let lock = NSLock()
     private var model: MLModel?
+    private var units: MLComputeUnits?
     private var trouble: String?
     private var loading = false
+    private var observing = false
+    private var background = false
+    private var released = false
+    private var reloads = 0
     private let loaded = DispatchSemaphore(value: 0)
+    /* the input arrays, made once and filled for every segment */
+    private var inSpec: MLMultiArray?
+    private var inWave: MLMultiArray?
 
     struct Unavailable: Error, CustomStringConvertible {
         let description: String
     }
 
-    /// Starts loading (once) and returns the network; for `SurroundChain.bandNetwork`.
+    /// The compute units now in use, and whether the app is in the background (for the log).
+    var label: String {
+        lock.lock()
+        defer { lock.unlock() }
+        let u = units == .cpuOnly ? "cpuOnly" : (units == nil ? "none" : "cpuAndGPU")
+        return background ? "\(u), background" : u
+    }
+
+    var inBackground: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return background
+    }
+
+    /// Starts loading (once) and returns the network; for `SurroundChain.bandNetwork`. Main queue.
     func network() -> BandNetwork? {
         lock.lock()
         let start = !loading
         loading = true
+        let watch = !observing
+        observing = true
         lock.unlock()
+        if watch {
+            let center = NotificationCenter.default
+            center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in self?.setBackground(true) }
+            center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in self?.setBackground(false) }
+            center.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in self?.memoryWarning() }
+            /* applicationState is for the main thread only */
+            if Thread.isMainThread {
+                setBackground(UIApplication.shared.applicationState == .background)
+            } else {
+                DispatchQueue.main.async { self.setBackground(UIApplication.shared.applicationState == .background) }
+            }
+        }
         if start {
             /* not on the band queue: the network waits for this there */
-            DispatchQueue.global(qos: .userInitiated).async { self.load() }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let units = self.wantedUnits()
+                _ = try? self.ensure(units, reason: "first use")
+                for _ in 0..<64 { self.loaded.signal() }
+            }
         }
         return self
     }
 
-    private func load() {
-        let began = Date()
-        var made: MLModel?
-        var problem: String?
-        let url = Bundle.main.bundleURL.appendingPathComponent("BandModel/HTDemucsBody.mlmodelc")
-        if FileManager.default.fileExists(atPath: url.path) {
-            let config = MLModelConfiguration()
-            config.computeUnits = BandModel.computeUnits
-            do {
-                made = try MLModel(contentsOf: url, configuration: config)
-            } catch {
-                problem = "model does not load: \(error)"
-            }
-        } else {
-            problem = "model not in the app"
-        }
+    private func setBackground(_ on: Bool) {
         lock.lock()
-        model = made
-        trouble = problem
+        let changed = background != on
+        background = on
         lock.unlock()
-        if let p = problem {
-            Diag.shared.log("band: \(p)", error: true)
-        } else {
-            Diag.shared.log(String(format: "band: model loaded in %.1f s (compute units: cpuAndGPU)", Date().timeIntervalSince(began)))
+        if changed { Diag.shared.log("band: app \(on ? "in the background: next segments on the CPU only" : "in front again: next segments on GPU and CPU")") }
+    }
+
+    private func memoryWarning() {
+        lock.lock()
+        let had = model != nil
+        model = nil
+        units = nil
+        inSpec = nil
+        inWave = nil
+        released = had
+        lock.unlock()
+        if had { Diag.shared.log("band: memory warning, model let go; it is loaded again for the next segment", error: true) }
+    }
+
+    private func wantedUnits() -> MLComputeUnits {
+        return inBackground ? .cpuOnly : .cpuAndGPU
+    }
+
+    /* Loads the model for `wanted` unless it is already loaded so (band queue, or the first load). */
+    private func ensure(_ wanted: MLComputeUnits, reason: String) throws -> MLModel {
+        lock.lock()
+        if let m = model, units == wanted {
+            lock.unlock()
+            return m
         }
-        /* everybody who waits gets through */
-        for _ in 0..<64 { loaded.signal() }
+        /* the old one goes first: two copies of 200 MB do not fit */
+        model = nil
+        units = nil
+        lock.unlock()
+        let url = Bundle.main.bundleURL.appendingPathComponent("BandModel/HTDemucsBody.mlmodelc")
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            lock.lock()
+            trouble = "model not in the app"
+            lock.unlock()
+            Diag.shared.log("band: model not in the app", error: true)
+            throw Unavailable(description: "model not in the app")
+        }
+        let name = wanted == .cpuOnly ? "cpuOnly" : "cpuAndGPU"
+        let began = Date()
+        let config = MLModelConfiguration()
+        config.computeUnits = wanted
+        do {
+            let made = try MLModel(contentsOf: url, configuration: config)
+            lock.lock()
+            model = made
+            units = wanted
+            trouble = nil
+            lock.unlock()
+            Diag.shared.log(String(format: "band: model loaded in %.1f s (compute units: %@, reason: %@), footprint %d MB",
+                                   Date().timeIntervalSince(began), name, reason, PerfMonitor.mb(PerfMonitor.footprint())))
+            return made
+        } catch {
+            lock.lock()
+            trouble = "model does not load: \(error)"
+            lock.unlock()
+            Diag.shared.log("band: model does not load (\(name), \(reason)): \(error)", error: true)
+            throw error
+        }
     }
 
     func run(spec: [Float], wave: [Float]) throws -> (spec: [Float], wave: [Float]) {
+        _ = loaded.wait(timeout: .now() + 600)
         lock.lock()
-        var m = model
-        var t = trouble
+        let wasReleased = released
         lock.unlock()
-        if m == nil && t == nil {
-            _ = loaded.wait(timeout: .now() + 600)
+        let wanted = wantedUnits()
+        var mlmodel: MLModel
+        do {
+            mlmodel = try ensure(wanted, reason: wasReleased ? "after a memory warning" : (wanted == .cpuOnly ? "app in the background" : "app in front"))
+        } catch {
+            try countFailure(error)
+            mlmodel = try ensure(wanted, reason: "retry")
+        }
+        do {
+            let out = try predict(mlmodel, spec: spec, wave: wave)
             lock.lock()
-            m = model
-            t = trouble
+            reloads = 0
+            released = false
             lock.unlock()
+            return out
+        } catch let error where wanted != .cpuOnly {
+            /* most likely the GPU refused (the app went to the background mid-segment): the same
+               segment again on the CPU */
+            Diag.shared.log("band: GPU run failed (\(error)); this segment again on the CPU only")
+            let cpu = try ensure(.cpuOnly, reason: "GPU run failed")
+            return try predict(cpu, spec: spec, wave: wave)
         }
-        guard let mlmodel = m else { throw Unavailable(description: t ?? "model not loaded") }
-
-        let plane = Demucs.bins * Demucs.frames
-        let a = try MLMultiArray(shape: [1, 4, NSNumber(value: Demucs.bins), NSNumber(value: Demucs.frames)], dataType: .float32)
-        let b = try MLMultiArray(shape: [1, 2, NSNumber(value: Demucs.segment)], dataType: .float32)
-        try BandModel.fill(a, spec, count: 4 * plane)
-        try BandModel.fill(b, wave, count: 2 * Demucs.segment)
-        let input = try MLDictionaryFeatureProvider(dictionary: ["spec": MLFeatureValue(multiArray: a),
-                                                                 "wave": MLFeatureValue(multiArray: b)])
-        let out = try mlmodel.prediction(from: input)
-        guard let s = out.featureValue(for: "spec_out")?.multiArrayValue,
-              let w = out.featureValue(for: "wave_out")?.multiArrayValue else {
-            throw Unavailable(description: "model gave no spec_out / wave_out")
-        }
-        return (try BandModel.read(s), try BandModel.read(w))
     }
+
+    /* Too many loads in a row without a segment going through: give up for this run. */
+    private func countFailure(_ error: Error) throws {
+        lock.lock()
+        reloads += 1
+        let n = reloads
+        lock.unlock()
+        Diag.shared.log("band: load try \(n) of \(BandModel.maxReloads) failed: \(error)", error: true)
+        if n >= BandModel.maxReloads { throw error }
+    }
+
+    private func predict(_ mlmodel: MLModel, spec: [Float], wave: [Float]) throws -> (spec: [Float], wave: [Float]) {
+        return try autoreleasepool { () throws -> (spec: [Float], wave: [Float]) in
+            let plane = Demucs.bins * Demucs.frames
+            lock.lock()
+            if inSpec == nil {
+                inSpec = try? MLMultiArray(shape: [1, 4, NSNumber(value: Demucs.bins), NSNumber(value: Demucs.frames)], dataType: .float32)
+                inWave = try? MLMultiArray(shape: [1, 2, NSNumber(value: Demucs.segment)], dataType: .float32)
+            }
+            let a = inSpec, b = inWave
+            lock.unlock()
+            guard let a = a, let b = b else { throw Unavailable(description: "no memory for the inputs") }
+            try BandModel.fill(a, spec, count: 4 * plane)
+            try BandModel.fill(b, wave, count: 2 * Demucs.segment)
+            let input = try MLDictionaryFeatureProvider(dictionary: ["spec": MLFeatureValue(multiArray: a),
+                                                                     "wave": MLFeatureValue(multiArray: b)])
+            let out = try mlmodel.prediction(from: input)
+            guard let s = out.featureValue(for: "spec_out")?.multiArrayValue,
+                  let w = out.featureValue(for: "wave_out")?.multiArrayValue else {
+                throw Unavailable(description: "model gave no spec_out / wave_out")
+            }
+            return (try BandModel.read(s), try BandModel.read(w))
+        }
+    }
+
 
     private static func fill(_ array: MLMultiArray, _ values: [Float], count: Int) throws {
         guard values.count == count, array.count == count else {
