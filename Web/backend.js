@@ -3900,8 +3900,10 @@ async function getQueue(videoId, playlistId) {
   body.playlistId = playlistId || (videoId ? 'RDAMVM' + videoId : '');
   const { json } = await ytApi('next', body);
   const items = parseQueue(json);
-  /* a playlist the user chose is played as it is; only the automatic radio is thinned out */
-  return { items: playlistId ? items : withoutSameSong(items), continuation: radioContinuation(json) };
+  /* a playlist or album the user chose is played as it is; the automatic radios ("RD..." mixes,
+     which is also what the home page's songs carry) are thinned out */
+  const radio = !playlistId || /^RD/.test(playlistId);
+  return { items: radio ? withoutSameSong(items) : items, continuation: radioContinuation(json) };
 }
 /* The token with which the official player asks for the rest of the same radio. */
 function radioContinuation(json) {

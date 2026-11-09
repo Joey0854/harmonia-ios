@@ -256,6 +256,11 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
     /* iOS can end the page's process to free memory while music keeps playing in the
        background. Without this the user would come back to a blank screen. */
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        Diag.shared.log("page: the web view's process was ended by the system; the page is loaded again", error: true)
+        /* The page is told it is a reload, so that it can open the player again and follow the
+           music that is still playing. */
+        let tell = WKUserScript(source: "window.__ytmReloaded = true;", injectionTime: .atDocumentStart, forMainFrameOnly: true)
+        webView.configuration.userContentController.addUserScript(tell)
         loadPage()
     }
 

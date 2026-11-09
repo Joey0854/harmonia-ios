@@ -1424,6 +1424,12 @@ window.__ytmNativeEvent = function (e) {
     if (e.dur > 0) a.duration = e.dur;
     a.emit('timeupdate');
   } else if (e.type === 'state') {
+    /* the page was loaded again while the app kept playing: the song restored from the saved state is the one playing */
+    if (window.__ytmReloaded && e.playing && !S.ready && S.cur && !S.loading && !S.wantPlay) {
+      S.ready = true;
+      dbg('W', 'resync-after-reload', { id: S.vid });
+      renderPlayer();
+    }
     var was = a.paused;
     a.paused = !e.playing;
     if (was && e.playing) { a.emit('play'); a.emit('playing'); }
@@ -1770,6 +1776,9 @@ function playFromList(list, item) {
   if (i < 0) i = 0;
   if (!songs.length) return;
   S.queue = songs.slice(i);
+  /* The song that was tapped is not queued again in another version right after it. */
+  var tapped = songKey(S.queue[0].title);
+  S.queue = S.queue.filter(function (x, n) { return n === 0 || songKey(x.title) !== tapped; });
   S.index = 0;
   playTrack(S.queue[0], true);
 }
@@ -1792,6 +1801,18 @@ function playSingle(item) {
     var rest = ((d && d.items) || []).filter(function (x) {
       return isSong(x) && x.videoId !== item.videoId;
     });
+    /* A radio must not lead to the same song again in another version (a playlist or album the
+       user chose is left as it is). */
+    if (!item.playlistId || /^RD/.test(item.playlistId)) {
+      var seenKey = {};
+      seenKey[songKey(item.title)] = 1;
+      rest = rest.filter(function (x) {
+        var k = songKey(x.title);
+        if (seenKey[k]) return false;
+        seenKey[k] = 1;
+        return true;
+      });
+    }
     /* where this radio goes on when the queue runs low */
     S.radioQ = S.queue;
     S.radioCont = (d && d.continuation) || '';
@@ -2089,6 +2110,7 @@ function renderQueue() {
 
 function openFull() {
   var f = $('full');
+  lsSet('ytm_full', '1');
   f.scrollTop = 0;
   f.classList.add('open');
   setThemeColor(BAR.tint || '#030303');
@@ -2098,6 +2120,7 @@ function openFull() {
 }
 function closeFull() {
   var f = $('full');
+  lsSet('ytm_full', '0');
   f.classList.remove('open');
   setThemeColor('#030303');
   f.style.transform = '';
@@ -3597,6 +3620,8 @@ document.addEventListener('visibilitychange', function () { if (document.hidden)
 
 bindUI();
 restoreState();
+/* loaded again after the system ended the page: the player that was open is opened again */
+if (window.__ytmReloaded && lsGet('ytm_full') === '1' && S.cur) openFull();
 renderQueue();
 route(true);
 })();
