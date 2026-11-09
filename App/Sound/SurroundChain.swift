@@ -55,6 +55,8 @@ public final class SurroundChain {
     public static var bandNetwork: (() -> BandNetwork?)?
     /// Where the band modes write what they do (timings, fallbacks).
     public static var log: (String) -> Void = { _ in }
+    /// What the band modes are doing, for the page (`.off` when a chain without them starts).
+    public static var status: (BandStatus) -> Void = { _ in }
     /// The one queue all band separation runs on, so two songs never compete for it.
     public static let bandQueue = DispatchQueue(label: "band.network", qos: .userInitiated)
 
@@ -68,6 +70,9 @@ public final class SurroundChain {
 
     public init(settings: SurroundSettings?, sampleRate: Int, blockSize: Int = 4096) {
         makeup = settings?.makeup ?? 1
+        if !(settings?.surround ?? false) || !(settings?.mode == .band || settings?.mode == .bandHead) {
+            SurroundChain.status(.off)
+        }
         guard let s = settings, s.surround else {
             convolver = nil
             stage = nil
@@ -100,11 +105,13 @@ public final class SurroundChain {
             }
             if trouble == nil, let network = SurroundChain.bandNetwork?() {
                 band = BandProcessor(output: output, network: network, sampleRate: sampleRate,
-                                     queue: SurroundChain.bandQueue, log: SurroundChain.log)
+                                     queue: SurroundChain.bandQueue, log: SurroundChain.log,
+                                     status: SurroundChain.status)
             } else {
                 band = nil
                 if trouble == nil { trouble = "band: the separation model is not available; playing the original" }
             }
+            if let t = trouble { SurroundChain.status(.failed(t)) }
             problem = trouble
             return
         }

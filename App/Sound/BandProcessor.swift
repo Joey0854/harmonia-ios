@@ -6,12 +6,16 @@ import Foundation
 /// - `.headphones`: each through its own pair of head-related responses (virtual speakers
 ///   chosen per part), for headphones.
 ///
-/// The network runs on `queue`, one segment (7.8 s) at a time, while the song plays. To give it
-/// time, output is held back `lookahead` samples behind the input (the decoder simply reads
-/// further ahead). Where a part of the song is not separated when it has to be handed on (the
-/// phone too slow, the first seconds after a start or a seek), the original sound is handed on
-/// instead and the band fades in once it is ready. Nothing ever waits for the network except
-/// `drain`, and that only when it is told playback is not short of sound.
+/// The network runs on `queue`, one segment (7.8 s at 44.1 kHz) at a time, while the song plays.
+/// Songs at another rate are resampled to 44.1 kHz for it and the parts back to the song's rate.
+/// To give the network time, output is held back `lookahead` samples behind the input (the
+/// decoder simply reads further ahead). Where a part of the song is not separated when it has
+/// to be handed on (the phone too slow, the first seconds after a start or a seek), the
+/// original sound is handed on instead and the band fades in once it is ready.
+///
+/// The mixer (`BandMix`: volume, solo, mute, positions, and for headphones new responses) is
+/// read every time sound is handed on and applies from there, without the network running
+/// again; volumes glide, new responses cross-fade.
 ///
 /// Output sample n belongs to input sample n. Call `process` for each piece, then `drain`
 /// until it returns nil, then `finish`. Use from one thread (the network has its own).
@@ -23,14 +27,15 @@ public final class BandProcessor {
         case headphones([(left: [[Float]], right: [[Float]])])
     }
 
-    /// Input held back before output: one segment and one step, so the next segment can be
-    /// worked on while the current one plays.
+    /// Input held back before output (at 44.1 kHz): one segment and one step, so the next
+    /// segment can be worked on while the current one plays.
     public static let lookahead = Demucs.segment + Demucs.stride
-    /// Samples over which the band fades in.
+    /// Samples over which the band fades in, and a volume change glides.
     public static let fade = 2048
 
-    /// Where the four parts stand on the stage (`Demucs.sources` order): drums behind the
-    /// singer, bass a little left, other (guitars, keys) wide, vocals at the front and narrow.
+    /// Where the four parts stand on the stage by default (`Demucs.sources` order): drums
+    /// behind the singer, bass a little left, other (guitars, keys) wide, vocals at the front
+    /// and narrow. The gains here are part of the placement, the mixer's volume comes on top.
     public static let positions: [StagePosition] = {
         let m: Float = 1 / (1 - 0.35 * 0.3)
         return [
@@ -45,18 +50,26 @@ public final class BandProcessor {
     private let sampleRate: Int
     private let queue: DispatchQueue?
     private let log: (String) -> Void
+    private let status: (BandStatus) -> Void
+    private let mix: BandMix
+    private let headphones: Bool
 
     /* Shared with the network's thread, under `lock`. */
     private let lock = NSLock()
     private let splitter = BandSplitter()
     private var working = false
     private var failed = false
+    private var failure: String?
     private var wanted = 0
     private let wake = DispatchSemaphore(value: 0)
 
     /* The caller's side. */
     private let placer: StagePlacer?
-    private let convolvers: [TrueStereoConvolver]
+    private var convolvers: [TrueStereoConvolver]
+    private var fading: [TrueStereoConvolver]?
+    private var fadeLeft = 0
+    private var history = [[Float]](repeating: [], count: 8)
+    private var fed = 0
     private var original: [[Float]] = [[], []]
     private var originalStart = 0
     private var received = 0
@@ -64,16 +77,42 @@ public final class BandProcessor {
     private var amount: Float = 0
     private var direct: [[Float]] = [[], []]
     private var wasReady = false
+    private var everReady = false
+    private var lastRun: BandStatus = .loading
+    private var late = false
     private var skippedShown = 0
+    private var mixVersion = -1
+    private var irVersion = 0
+    private var gainTarget: [Float] = [1, 1, 1, 1]
+    private var gainNow: [Float] = [1, 1, 1, 1]
+
+    /* Other sample rates: resamplers into and out of the network's rate, and the parts at the
+       song's rate (`store`, from `storeBase` on) with whether each sample is separated. */
+    private let resampling: Bool
+    private var into: [Resampler] = []
+    private var outOf: [Resampler] = []
+    private var inputEnded = false
+    private var cursor = 0
+    private var flushed = false
+    private var ready44: [Bool] = []
+    private var ready44Base = 0
+    private var produced = 0
+    private var store = [[Float]](repeating: [], count: 8)
+    private var storeReady: [Bool] = []
+    private var storeBase = 0
 
     /// `queue` nil runs the network inside `process` / `drain` (tests). `log` gets one line per
-    /// segment and per change between band and original.
+    /// segment and per change between band and original; `status` the same for the page.
     public init(output: Output, network: BandNetwork, sampleRate: Int, queue: DispatchQueue?,
-                log: @escaping (String) -> Void = { _ in }) {
+                mix: BandMix = .shared,
+                log: @escaping (String) -> Void = { _ in },
+                status: @escaping (BandStatus) -> Void = { _ in }) {
         self.network = network
-        self.sampleRate = sampleRate
+        self.sampleRate = max(8000, sampleRate)
         self.queue = queue
         self.log = log
+        self.status = status
+        self.mix = mix
         switch output {
         case .speakers:
             let p = StagePlacer(sources: 5, sampleRate: sampleRate)
@@ -81,37 +120,57 @@ public final class BandProcessor {
             p.positions = BandProcessor.positions + [.neutral]
             placer = p
             convolvers = []
+            headphones = false
         case .headphones(let irs):
             placer = nil
             convolvers = irs.prefix(4).map { TrueStereoConvolver(irLeft: $0.left, irRight: $0.right) }
+            headphones = true
         }
-        if sampleRate != Demucs.sampleRate {
-            log("band: song at \(sampleRate) Hz, the model expects \(Demucs.sampleRate) Hz; used as it is")
+        resampling = self.sampleRate != Demucs.sampleRate
+        if resampling {
+            into = (0..<2).map { _ in Resampler(from: self.sampleRate, to: Demucs.sampleRate) }
+            outOf = (0..<8).map { _ in Resampler(from: Demucs.sampleRate, to: self.sampleRate) }
+            log("band: song at \(self.sampleRate) Hz, resampled to \(Demucs.sampleRate) Hz for the model and back")
         }
+        applyMix(crossfade: false)
+        status(.loading)
     }
 
     public func process(left: [Float], right: [Float]) -> (left: [Float], right: [Float]) {
         let n = min(left.count, right.count)
-        original[0].append(contentsOf: left.prefix(n))
-        original[1].append(contentsOf: right.prefix(n))
+        let l = Array(left.prefix(n)), r = Array(right.prefix(n))
+        original[0].append(contentsOf: l)
+        original[1].append(contentsOf: r)
         received += n
+        let a = resampling ? into[0].process(l) : l
+        let b = resampling ? into[1].process(r) : r
         lock.lock()
-        splitter.add(left: Array(left.prefix(n)), right: Array(right.prefix(n)))
+        splitter.add(left: a, right: b)
         lock.unlock()
         kick()
-        return emit(upTo: received - BandProcessor.lookahead)
+        let hold = resampling ? BandProcessor.lookahead * sampleRate / Demucs.sampleRate : BandProcessor.lookahead
+        return emit(upTo: received - hold)
     }
 
     /// After the last `process`: hands on what is ready. When nothing is ready, waits a moment
     /// for the network and returns nothing, unless `urgent` (playback is running short), in
     /// which case half a second goes on as it is. Nil when everything has been handed on.
     public func drain(urgent: Bool) -> (left: [Float], right: [Float])? {
-        lock.lock()
-        splitter.end()
-        let ready = failed ? received : splitter.finalUpTo
-        lock.unlock()
+        if !inputEnded {
+            inputEnded = true
+            if resampling {
+                let a = into[0].finish(), b = into[1].finish()
+                lock.lock()
+                splitter.add(left: a, right: b)
+                lock.unlock()
+            }
+            lock.lock()
+            splitter.end()
+            lock.unlock()
+        }
         kick()
         if emitted >= received { return nil }
+        let ready = readyUpTo()
         if ready > emitted { return emit(upTo: min(ready, emitted + sampleRate)) }
         if urgent { return emit(upTo: min(received, emitted + sampleRate / 2)) }
         _ = wake.wait(timeout: .now() + 0.05)
@@ -121,6 +180,7 @@ public final class BandProcessor {
     /// The rest (whatever `drain` left, and the tails held inside the impulse responses).
     public func finish() -> (left: [Float], right: [Float]) {
         var out = emit(upTo: received)
+        fading = nil
         if !convolvers.isEmpty {
             var l = [Float](), r = [Float]()
             for (i, c) in convolvers.enumerated() {
@@ -181,18 +241,168 @@ public final class BandProcessor {
         do {
             let stems = try Demucs.separate(left: job.left, right: job.right, network: network)
             let took = Date().timeIntervalSince(start)
-            let audio = Double(Demucs.stride) / Double(sampleRate)
-            log(String(format: "band: segment %d took %.2f s (realtime x%.2f)", job.index, took, audio / max(took, 1e-6)))
+            let audio = Double(Demucs.stride) / Double(Demucs.sampleRate)
+            let speed = audio / max(took, 1e-6)
+            log(String(format: "band: segment %d took %.2f s (realtime x%.2f)", job.index, took, speed))
+            let s = BandStatus.running(seconds: took, realtime: speed)
             lock.lock()
             splitter.complete(job, stems: stems)
+            lastRun = s
+            let behind = late
             lock.unlock()
+            /* while the original is playing, the page keeps saying so */
+            if !behind { status(s) }
         } catch {
             log("band: the network failed (\(error)); playing the original")
             lock.lock()
             failed = true
+            failure = "\(error)"
             lock.unlock()
+            status(.failed("\(error)"))
         }
         wake.signal()
+    }
+
+    // MARK: - separated parts at the song's rate
+
+    /// Song samples before this are separated or never will be.
+    private func readyUpTo() -> Int {
+        lock.lock()
+        let broken = failed
+        let final44 = splitter.finalUpTo
+        let total44 = splitter.total
+        lock.unlock()
+        if broken { return received }
+        if !resampling {
+            if let t = total44, final44 >= t { return received }
+            return final44
+        }
+        pull()
+        if flushed { return received }
+        return storeBase + storeReady.count
+    }
+
+    /* Brings newly separated parts over to the song's rate. */
+    private func pull() {
+        guard resampling, !flushed else { return }
+        lock.lock()
+        let final44 = splitter.finalUpTo
+        let total44 = splitter.total
+        var part: (stems: [[Float]], ready: [Bool])?
+        if final44 > cursor {
+            part = splitter.read(from: cursor, count: final44 - cursor)
+            cursor = final44
+        }
+        lock.unlock()
+        var outs = [[Float]](repeating: [], count: 8)
+        if let p = part {
+            ready44 += p.ready
+            for c in 0..<8 { outs[c] = outOf[c].process(p.stems[c]) }
+        }
+        if let t = total44, cursor >= t {
+            for c in 0..<8 { outs[c] += outOf[c].finish() }
+            flushed = true
+        }
+        let k = outs[0].count
+        if k == 0 { return }
+        for c in 0..<8 { store[c] += outs[c] }
+        for m in produced..<(produced + k) {
+            let i = m * Demucs.sampleRate / sampleRate - ready44Base
+            storeReady.append(i >= 0 && i < ready44.count ? ready44[i] : false)
+        }
+        produced += k
+    }
+
+    private func read(from: Int, count: Int) -> (stems: [[Float]], ready: [Bool]) {
+        if !resampling {
+            lock.lock()
+            defer { lock.unlock() }
+            return splitter.read(from: from, count: count)
+        }
+        pull()
+        var stems = [[Float]](repeating: [Float](repeating: 0, count: count), count: 8)
+        var ready = [Bool](repeating: false, count: count)
+        for j in 0..<count {
+            let i = from + j - storeBase
+            guard i >= 0, i < storeReady.count else { continue }
+            ready[j] = storeReady[i]
+            for c in 0..<8 { stems[c][j] = store[c][i] }
+        }
+        return (stems, ready)
+    }
+
+    private func forget(before sample: Int) {
+        let at44 = resampling ? sample * Demucs.sampleRate / sampleRate : sample
+        lock.lock()
+        splitter.drop(before: resampling ? min(cursor, max(0, at44 - 64)) : at44)
+        wanted = at44
+        lock.unlock()
+        guard resampling else { return }
+        let cut = min(sample - storeBase, storeReady.count)
+        if cut > 1 << 16 {
+            for c in 0..<8 { store[c].removeFirst(cut) }
+            storeReady.removeFirst(cut)
+            storeBase += cut
+        }
+        let cut44 = min(max(0, at44 - 64) - ready44Base, ready44.count)
+        if cut44 > 1 << 16 {
+            ready44.removeFirst(cut44)
+            ready44Base += cut44
+        }
+    }
+
+    // MARK: - mixer
+
+    private func applyMix(crossfade: Bool) {
+        let now = mix.current()
+        guard now.version != mixVersion else { return }
+        mixVersion = now.version
+        guard let s = now.settings, s.headphones == headphones else { return }
+        gainTarget = s.effectiveGains
+        if !crossfade { gainNow = gainTarget }
+        if let p = placer {
+            p.positions = (0..<4).map { i in
+                var q = i < s.parts.count ? s.parts[i].position : BandProcessor.positions[i]
+                q.gain = BandProcessor.positions[i].gain
+                return q
+            } + [.neutral]
+        }
+        if headphones, let irs = s.irs, irs.count == 4, now.irVersion != irVersion {
+            irVersion = now.irVersion
+            do {
+                let made = try irs.map {
+                    TrueStereoConvolver(irLeft: try SurroundChain.prepare($0.left, sampleRate: sampleRate),
+                                        irRight: try SurroundChain.prepare($0.right, sampleRate: sampleRate))
+                }
+                replaceResponses(with: made, crossfade: crossfade && fed > 0)
+            } catch {
+                log("band: mixer responses not usable (\(error)); kept the previous ones")
+            }
+        }
+    }
+
+    /* New responses: primed with the last blocks of input so that their output lines up with
+       the old ones, then cross-faded over one block. */
+    private func replaceResponses(with made: [TrueStereoConvolver], crossfade: Bool) {
+        guard crossfade, let block = convolvers.first?.blockSize else {
+            convolvers = made
+            return
+        }
+        let pending = fed % block
+        var prime = pending
+        while prime + block <= history[0].count && prime + block <= 2 * block + pending { prime += block }
+        prime = min(prime, history[0].count)
+        if prime < pending {
+            convolvers = made
+            return
+        }
+        for (s, c) in made.enumerated() {
+            let l = Array(history[s * 2].suffix(prime)), r = Array(history[s * 2 + 1].suffix(prime))
+            _ = c.process(left: l, right: r)
+        }
+        fading = convolvers
+        convolvers = made
+        fadeLeft = block
     }
 
     // MARK: - output
@@ -200,11 +410,11 @@ public final class BandProcessor {
     private func emit(upTo limit: Int) -> (left: [Float], right: [Float]) {
         let count = min(limit, received) - emitted
         if count <= 0 { return ([], []) }
+        applyMix(crossfade: true)
+        let part = read(from: emitted, count: count)
+        forget(before: emitted)
         lock.lock()
-        let part = splitter.read(from: emitted, count: count)
         let skipped = splitter.skipped
-        splitter.drop(before: emitted)
-        wanted = emitted + count
         let broken = failed
         lock.unlock()
         if skipped > skippedShown {
@@ -226,11 +436,29 @@ public final class BandProcessor {
                 let at = Double(emitted + j) / Double(sampleRate)
                 log(ready ? String(format: "band: separated sound from %.1f s", at)
                           : String(format: "band: not separated in time at %.1f s, playing the original", at))
+                lock.lock()
+                let run = lastRun
+                late = !ready && everReady && !broken
+                let nowLate = late
+                lock.unlock()
+                if ready { status(run) } else if nowLate { status(.late) }
+                if ready { everReady = true }
                 wasReady = ready
             }
         }
         var stems = part.stems
-        for c in 0..<8 { for j in 0..<count { stems[c][j] *= gains[j] } }
+        let step = 1 / Float(BandProcessor.fade)
+        for s in 0..<4 {
+            var g = gainNow[s]
+            let target = gainTarget[s]
+            for j in 0..<count {
+                if g < target { g = min(target, g + step) } else if g > target { g = max(target, g - step) }
+                let k = gains[j] * g
+                stems[s * 2][j] *= k
+                stems[s * 2 + 1][j] *= k
+            }
+            gainNow[s] = g
+        }
         var dryLeft = [Float](repeating: 0, count: count), dryRight = [Float](repeating: 0, count: count)
         for j in 0..<count {
             dryLeft[j] = original[0][o + j] * (1 - gains[j])
@@ -249,12 +477,24 @@ public final class BandProcessor {
             sources.append([dryLeft, dryRight])
             return p.process(sources)
         }
-        var l = [Float](), r = [Float]()
-        for (s, c) in convolvers.enumerated() {
-            let t = c.process(left: stems[s * 2], right: stems[s * 2 + 1])
-            if s == 0 { l = t.left; r = t.right } else {
-                for j in 0..<min(l.count, t.left.count) { l[j] += t.left[j]; r[j] += t.right[j] }
+        /* remember the last blocks fed, for responses that arrive later */
+        let keep = 3 * (convolvers.first?.blockSize ?? 4096)
+        for c in 0..<8 {
+            history[c] += stems[c]
+            if history[c].count > 2 * keep { history[c].removeFirst(history[c].count - keep) }
+        }
+        fed += count
+        var (l, r) = sum(convolvers, stems)
+        if let old = fading {
+            let (ol, or) = sum(old, stems)
+            let block = Float(convolvers.first?.blockSize ?? 4096)
+            for j in 0..<min(l.count, ol.count) {
+                let w = fadeLeft > 0 ? 1 - Float(fadeLeft) / block : 1
+                l[j] = l[j] * w + ol[j] * (1 - w)
+                r[j] = r[j] * w + or[j] * (1 - w)
+                if fadeLeft > 0 { fadeLeft -= 1 }
             }
+            if fadeLeft == 0 { fading = nil }
         }
         direct[0] += dryLeft
         direct[1] += dryRight
@@ -262,6 +502,17 @@ public final class BandProcessor {
         for j in 0..<m { l[j] += direct[0][j]; r[j] += direct[1][j] }
         direct[0].removeFirst(m)
         direct[1].removeFirst(m)
+        return (l, r)
+    }
+
+    private func sum(_ set: [TrueStereoConvolver], _ stems: [[Float]]) -> ([Float], [Float]) {
+        var l = [Float](), r = [Float]()
+        for (s, c) in set.enumerated() {
+            let t = c.process(left: stems[s * 2], right: stems[s * 2 + 1])
+            if s == 0 { l = t.left; r = t.right } else {
+                for j in 0..<min(l.count, t.left.count) { l[j] += t.left[j]; r[j] += t.right[j] }
+            }
+        }
         return (l, r)
     }
 }

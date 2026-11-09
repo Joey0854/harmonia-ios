@@ -648,6 +648,17 @@
       setProgress(pct >= 0 ? '下載中 ' + pct + '%' : '下載中…');
       return;
     }
+    if (e.type === 'report' || e.type === 'headroom') {
+      try { if (reportUi && reportUi.update) reportUi.update(e); } catch (x) {}
+      return;
+    }
+    if (e.type === 'band') {
+      bandState = { state: String(e.state || 'off'), seconds: e.seconds, realtime: e.realtime, message: e.message ? String(e.message) : '' };
+      if (bandState.state === 'failed' || bandState.state === 'late') plog('W', 'band-' + bandState.state, { message: bandState.message });
+      redraw();
+      try { if (P && P.bandStatusChanged) P.bandStatusChanged(bandStatusText(), bandState); } catch (x) {}
+      return;
+    }
     if (e.type === 'lufs') {
       if (e.id && typeof e.lufs === 'number' && isFinite(e.lufs)) {
         appLufs[e.id] = e.lufs;
@@ -765,7 +776,7 @@
      The app applies surround (two impulse responses, made here by the bundled server code),
      the five-band equaliser and loudness balancing itself. Each is sent once at the start and
      again only when it has changed. */
-  var sent = { fx: null, eq: null, norm: null }, fxSeq = 0, soundTimer = null;
+  var sent = { fx: null, eq: null, norm: null, mix: null, mixIr: null, profile: null }, fxSeq = 0, mixSeq = 0, soundTimer = null, bandState = null;
   function wavEnergy(u) {
     /* sum of squares of each channel of a 16-bit WAV, samples scaled to -1..1 */
     var dv = new DataView(u.buffer, u.byteOffset, u.byteLength), pos = 12, ch = 2, e = [0, 0];
@@ -822,7 +833,8 @@
       if (sent.fx === bkey) { fxSeq++; return; }
       var bmine = ++fxSeq;
       var parts = ['drums', 'bass', 'other', 'vocals'], urls = [];
-      parts.forEach(function (n) { urls.push('/api/ir/band/' + n + '/L.wav' + bq, '/api/ir/band/' + n + '/R.wav' + bq); });
+      var bmx = P.bandMix ? P.bandMix() : null;
+      parts.forEach(function (n) { var pq = bandPosQuery(bmx, n); urls.push('/api/ir/band/' + n + '/L.wav' + bq + pq, '/api/ir/band/' + n + '/R.wav' + bq + pq); });
       Promise.all(urls.map(getIr)).then(function (r) {
         if (bmine !== fxSeq) return;
         sent.fx = bkey;
@@ -867,6 +879,59 @@
       raw({ cmd: 'fx', key: 'off', surround: false, irL: null, irR: null, makeup: headroom });
     });
   }
+  /* Band mixer: volumes, solo, mute and positions per part. Sent apart from fx so that the app
+     applies them without starting over (and without separating again). For headphones the
+     positions are made into responses here, and sent along when they change. */
+  var BAND_NAMES = ['drums', 'bass', 'other', 'vocals'];
+  function bandPosQuery(bm, n) {
+    var p = bm && bm.parts && bm.parts[n];
+    if (!p) return '';
+    return '&az=' + Math.round(p.az) + '&w=' + Math.round(p.width) + '&d=' + Math.round(p.depth);
+  }
+  function sendBandMix() {
+    var bm = P.bandMix ? P.bandMix() : null;
+    if (!bm || !P.surround()) { sent.mix = null; return; }
+    var parts = {};
+    BAND_NAMES.forEach(function (n) {
+      var p = bm.parts[n];
+      parts[n] = { gain: p.gain / 100, solo: !!p.solo, mute: !!p.mute, az: p.az, depth: p.depth, width: p.width };
+    });
+    var key = bm.mode + JSON.stringify(parts);
+    if (sent.mix === key) return;
+    if (bm.mode !== 'bandHead') {
+      sent.mix = key;
+      raw({ cmd: 'bandMix', mode: bm.mode, parts: parts });
+      return;
+    }
+    var bq = P.bandIrQuery(), irKey = bq + BAND_NAMES.map(function (n) { return bandPosQuery(bm, n); }).join('|');
+    if (sent.mixIr === irKey) {
+      sent.mix = key;
+      raw({ cmd: 'bandMix', mode: bm.mode, parts: parts });
+      return;
+    }
+    var mine = ++mixSeq;
+    var urls = [];
+    BAND_NAMES.forEach(function (n) { var pq = bandPosQuery(bm, n); urls.push('/api/ir/band/' + n + '/L.wav' + bq + pq, '/api/ir/band/' + n + '/R.wav' + bq + pq); });
+    Promise.all(urls.map(getIr)).then(function (r) {
+      if (mine !== mixSeq) return;
+      var ir = {};
+      BAND_NAMES.forEach(function (n, i) { ir[n] = { L: B.b64(r[2 * i]), R: B.b64(r[2 * i + 1]) }; });
+      sent.mix = key;
+      sent.mixIr = irKey;
+      raw({ cmd: 'bandMix', mode: bm.mode, parts: parts, ir: ir });
+    }, function (err) {
+      try { console.warn('standalone: band mixer responses not available (' + ((err && err.message) || err) + ')'); } catch (x) {}
+    });
+  }
+  function bandStatusText() {
+    if (!(P && P.band && P.band()) || !bandState) return '';
+    var s = bandState.state;
+    if (s === 'loading') return '樂團：分軌中…';
+    if (s === 'running') return '樂團中（每段 ' + (+bandState.seconds || 0).toFixed(1) + ' 秒，' + (+bandState.realtime || 0).toFixed(1) + '× 即時）';
+    if (s === 'late') return '樂團：來不及，暫時播原音';
+    if (s === 'failed') return '樂團：模型載入失敗（播原音）';
+    return '';
+  }
   function sendSound() {
     if (!P) return;
     try {
@@ -875,6 +940,9 @@
       var n = { cmd: 'normTarget', on: !!P.normOn(), target: P.normTarget() }, nk = JSON.stringify(n);
       if (sent.norm !== nk) { sent.norm = nk; raw(n); }
       sendFx();
+      sendBandMix();
+      var prof = P.profile ? String(P.profile()) : '';
+      if (sent.profile !== prof) { sent.profile = prof; raw({ cmd: 'pageInfo', profile: prof }); }
     } catch (e) { try { console.error('standalone: sound settings', e); } catch (x) {} }
   }
   function soundSoon() {
@@ -909,6 +977,61 @@
   }
   function diagShow() { if (diagBox) diagBox.textContent = diagText(); }
   var BTN = 'padding:9px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:inherit;font:inherit';
+  /* Reports to a PC receiver (its own address, not the PC address above: setting it never
+     makes the page use a PC). The app keeps the address and sends; this only asks it to. */
+  var reportUi = null;
+  function reportControls(panel) {
+    var h = document.createElement('h3');
+    h.textContent = '診斷報告傳到電腦';
+    panel.appendChild(h);
+    var input = document.createElement('input');
+    input.type = 'url';
+    input.placeholder = 'http://100.66.200.10:8790';
+    input.setAttribute('aria-label', '報告接收位址');
+    input.setAttribute('style', 'width:100%;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.25);color:inherit;font:inherit;margin:4px 0 8px');
+    panel.appendChild(input);
+    var row = document.createElement('div');
+    row.setAttribute('style', 'display:flex;flex-wrap:wrap;gap:8px;margin:0 0 6px');
+    var mk = function (text, fn) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('style', BTN);
+      b.textContent = text;
+      b.addEventListener('click', fn);
+      row.appendChild(b);
+      return b;
+    };
+    var note = document.createElement('p');
+    note.setAttribute('style', 'margin:0 0 10px;opacity:.8;font-size:13px');
+    note.textContent = '留空＝不傳。設定後會自動傳送：App 進入背景、每首歌結束（至少間隔 2 分鐘）、上次異常結束。';
+    mk('儲存位址', function () { note.textContent = '儲存中…'; raw({ cmd: 'report', action: 'set', base: input.value.trim() }); });
+    mk('測試連線', function () { note.textContent = '測試中…'; raw({ cmd: 'report', action: 'ping', base: input.value.trim() }); });
+    mk('立即傳送報告', function () { note.textContent = '傳送中…'; raw({ cmd: 'report', action: 'set', base: input.value.trim() }); setTimeout(function () { raw({ cmd: 'report', action: 'send' }); }, 300); });
+    panel.appendChild(row);
+    panel.appendChild(note);
+    var hr = document.createElement('label');
+    hr.setAttribute('style', 'display:flex;gap:8px;align-items:center;margin:0 0 12px');
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.addEventListener('change', function () { raw({ cmd: 'headroom', on: !!cb.checked }); });
+    hr.appendChild(cb);
+    hr.appendChild(document.createTextNode('自動保留餘裕（避免低音重時人聲被壓低，最多降 3 dB）'));
+    panel.appendChild(hr);
+    var NAMES = { set: '儲存', ping: '測試連線', send: '傳送報告', get: '' };
+    reportUi = {
+      update: function (e) {
+        if (e.type === 'headroom') { cb.checked = !!e.on; return; }
+        if (e.action === 'get') { if (document.activeElement !== input) input.value = e.base || ''; return; }
+        if (e.action === 'set' && e.ok) { input.value = e.base || ''; note.textContent = e.base ? '已儲存：' + e.base : '已關閉報告傳送'; return; }
+        if (e.action === 'set' && !e.ok) { note.textContent = '沒有儲存：' + (e.message || ''); return; }
+        if (e.action === 'ping') { note.textContent = e.ok ? '連線成功' : '連線失敗：' + (e.message || ''); return; }
+        note.textContent = (NAMES[e.action] || e.action) + (e.ok ? '：成功' : '：失敗 ' + (e.message || ''));
+      }
+    };
+    raw({ cmd: 'report', action: 'get' });
+    raw({ cmd: 'headroom' });
+  }
   function sheetExtras(panel) {
     try {
       /* the ambient light (only where the app is there to talk to the controller) */
@@ -964,6 +1087,7 @@
       });
       panel.appendChild(b);
       panel.appendChild(box);
+      if (hasApp) reportControls(panel);
     } catch (e) {}
   }
 
@@ -1248,8 +1372,9 @@
     },
     /* a sound setting was changed (fxApply and the loudness controls) */
     sound: soundSoon,
+    bandStatus: function () { return bandStatusText(); },
     /* the line under the player */
-    status: function (surround) { return cur.progress || cur.lookup || (mixRun ? '轉場中 → ' + (mixRun.title || '下一首') : '') || (surround ? (P && P.band && P.band() ? 'App：樂團模式' : (P && P.stage && P.stage() ? 'App：舞台模式' : 'App：手機處理環繞')) : 'App：環繞關閉'); },
+    status: function (surround) { return cur.progress || cur.lookup || (mixRun ? '轉場中 → ' + (mixRun.title || '下一首') : '') || (surround ? (P && P.band && P.band() ? (bandStatusText() || 'App：樂團模式') : (P && P.stage && P.stage() ? 'App：舞台模式' : 'App：手機處理環繞')) : 'App：環繞關閉'); },
     /* the mixing switch was moved */
     mix: sendMix,
     /* title, artist, artwork and length of a song as it was last sent to the app in a queue */

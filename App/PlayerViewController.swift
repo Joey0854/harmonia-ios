@@ -179,6 +179,23 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
         view.addGestureRecognizer(tap)
 
         player.onEvent = { [weak self] event in self?.send(event) }
+        /* What the band modes are doing, for the page's status line. */
+        SurroundChain.status = { [weak self] status in
+            var event: [String: Any] = ["type": "band"]
+            switch status {
+            case .off: event["state"] = "off"
+            case .loading: event["state"] = "loading"
+            case .running(let seconds, let realtime):
+                event["state"] = "running"
+                event["seconds"] = (seconds * 100).rounded() / 100
+                event["realtime"] = (realtime * 100).rounded() / 100
+            case .late: event["state"] = "late"
+            case .failed(let message):
+                event["state"] = "failed"
+                event["message"] = String(message.prefix(160))
+            }
+            DispatchQueue.main.async { self?.send(event) }
+        }
         /* The stored sign-in stopped working: the page asks the user to sign in again. Checked
            once a few seconds after start, and whenever an account request notices it. */
         Account.shared.onExpired = { [weak self] in self?.send(["type": "accountExpired"]) }
@@ -372,14 +389,57 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
             if let id = body["id"] as? String { Downloads.shared.remove(id: id) }
         case "dlList":
             send(["type": "dlList", "items": Downloads.shared.list()])
+        case "bandMix":
+            let mix = NativePlayer.bandMix(from: body)
+            BandMix.shared.set(mix)
+            let text = mix.parts.enumerated().map { i, p -> String in
+                let pct = Int((p.gain * 100).rounded())
+                return "\(Demucs.sources[i]) \(pct)%" + (p.solo ? " S" : "") + (p.mute ? " M" : "")
+            }.joined(separator: ", ")
+            Diag.shared.log("band: mixer " + text + (mix.irs != nil ? ", new responses" : ""))
         case "fx":
             player.setEffect(NativePlayer.effect(from: body), message: body)
+            Diag.shared.setSetting("mode", (body["surround"] as? Bool ?? false) ? (body["mode"] as? String ?? "hrir") : "off")
         case "eq":
             let gains = (body["gains"] as? [Any] ?? []).map { Float(number($0)) }
             if gains.count == 5 { player.setEQ(gains) }
+            Diag.shared.setSetting("eq", gains.map { Double($0) })
         case "normTarget":
             let target = body["target"] == nil ? -9 : number(body["target"])
             player.setLoudness(on: body["on"] as? Bool ?? false, target: target)
+            Diag.shared.setSetting("loudness", ["on": body["on"] as? Bool ?? false, "target": target])
+        case "pageInfo":
+            if let profile = body["profile"] as? String { Diag.shared.setSetting("profile", String(profile.prefix(20))) }
+        case "headroom":
+            /* the automatic headroom before the limiter (on unless turned off) */
+            if let on = body["on"] as? Bool {
+                SoundEngine.autoHeadroom = on
+                Diag.shared.log("engine: automatic headroom \(on ? "on" : "off")")
+            }
+            send(["type": "headroom", "on": SoundEngine.autoHeadroom])
+        case "report":
+            /* the report receiver: get / set its address, test it, send a report now */
+            let action = body["action"] as? String ?? "get"
+            func answer(_ problem: String?, _ extra: [String: Any] = [:]) {
+                var event: [String: Any] = ["type": "report", "action": action, "ok": problem == nil,
+                                            "base": Diag.shared.reportAddress, "message": problem ?? ""]
+                for (k, v) in extra { event[k] = v }
+                DispatchQueue.main.async { self.send(event) }
+            }
+            switch action {
+            case "set":
+                if Diag.shared.setReportBase(body["base"] as? String ?? "") == nil {
+                    answer("位址要是 http:// 或 https:// 開頭，並且有主機名稱")
+                } else {
+                    answer(nil)
+                }
+            case "ping":
+                Diag.shared.ping(body["base"] as? String ?? Diag.shared.reportAddress) { answer($0) }
+            case "send":
+                Diag.shared.sendReport(trigger: "manual") { answer($0) }
+            default:
+                answer(nil)
+            }
         case "diag":
             send(["type": "diag", "text": Diag.shared.tail(80)])
         case "login":
@@ -517,6 +577,7 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
 
     /// Main queue only (WebKit). Every caller already runs there.
     private func send(_ event: [String: Any]) {
+        if let type = event["type"] as? String, type == "advanced" || type == "ended" { Diag.shared.songEnded() }
         guard let data = try? JSONSerialization.data(withJSONObject: event),
               let json = String(data: data, encoding: .utf8) else { return }
         let type = event["type"] as? String ?? ""

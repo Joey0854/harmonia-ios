@@ -116,7 +116,7 @@ final class BandTests: XCTestCase {
         /* responses that pass each part through unchanged: the output is the sum of the parts */
         let identity: (left: [[Float]], right: [[Float]]) = ([[1], [0]], [[0], [1]])
         let p = BandProcessor(output: .headphones([identity, identity, identity, identity]),
-                              network: FakeNetwork(), sampleRate: 44100, queue: nil)
+                              network: FakeNetwork(), sampleRate: 44100, queue: nil, mix: BandMix())
         let out = run(p, s)
         XCTAssertEqual(out.left.count, n)
         XCTAssertEqual(out.right.count, n)
@@ -135,7 +135,7 @@ final class BandTests: XCTestCase {
         let n = 9 * 44100 + 123
         let s = signal(n)
         let offline = try BandSplitter.separateAll(left: s.left, right: s.right, network: FakeNetwork())
-        let p = BandProcessor(output: .speakers, network: FakeNetwork(), sampleRate: 44100, queue: nil)
+        let p = BandProcessor(output: .speakers, network: FakeNetwork(), sampleRate: 44100, queue: nil, mix: BandMix())
         let out = run(p, s)
         XCTAssertEqual(out.left.count, n)
         let placer = StagePlacer(sources: 4, sampleRate: 44100)
@@ -156,7 +156,7 @@ final class BandTests: XCTestCase {
         let n = 3 * 44100
         let s = signal(n)
         let p = BandProcessor(output: .speakers, network: Never(), sampleRate: 44100,
-                              queue: DispatchQueue(label: "test.band"))
+                              queue: DispatchQueue(label: "test.band"), mix: BandMix())
         var l = [Float](), r = [Float]()
         let a = p.process(left: s.left, right: s.right)
         l += a.left; r += a.right
@@ -167,6 +167,102 @@ final class BandTests: XCTestCase {
         var worst: Float = 0
         for i in 0..<n { worst = max(worst, abs(l[i] - s.left[i]), abs(r[i] - s.right[i])) }
         XCTAssertLessThan(worst, 1e-6)
+    }
+
+    /// Solo on the vocals: only the vocals, placed as they are by default.
+    func testSoloLeavesOnlyThatPart() throws {
+        let n = 9 * 44100
+        let s = signal(n)
+        let offline = try BandSplitter.separateAll(left: s.left, right: s.right, network: FakeNetwork())
+        let mix = BandMix()
+        var parts = BandProcessor.positions.map { BandPart(position: $0) }
+        parts[3].solo = true
+        parts[0].gain = 1.5
+        mix.set(BandMixSettings(headphones: false, parts: parts))
+        let p = BandProcessor(output: .speakers, network: FakeNetwork(), sampleRate: 44100, queue: nil, mix: mix)
+        let out = run(p, s)
+        let placer = StagePlacer(sources: 4, sampleRate: 44100)
+        placer.positions = BandProcessor.positions
+        let silent = [Float](repeating: 0, count: n)
+        let ref = placer.process([[silent, silent], [silent, silent], [silent, silent], offline[3]])
+        var worst: Float = 0
+        for i in 4096..<n { worst = max(worst, abs(out.left[i] - ref.left[i]), abs(out.right[i] - ref.right[i])) }
+        XCTAssertLessThan(worst, 1e-4)
+    }
+
+    /// A volume change while playing applies from the sound not handed on yet, gliding, and
+    /// the network does not run again.
+    func testVolumeChangeWhilePlaying() throws {
+        let n = 20 * 44100
+        let s = signal(n)
+        let offline = try BandSplitter.separateAll(left: s.left, right: s.right, network: FakeNetwork())
+        let mix = BandMix()
+        let net = FakeNetwork()
+        let p = BandProcessor(output: .speakers, network: net, sampleRate: 44100, queue: nil, mix: mix)
+        var l = [Float](), r = [Float]()
+        var at = 0
+        var changedAt = -1
+        while at < n {
+            let m = min(8192, n - at)
+            if changedAt < 0 && at >= n / 2 {
+                var parts = BandProcessor.positions.map { BandPart(position: $0) }
+                parts[0].mute = true
+                mix.set(BandMixSettings(headphones: false, parts: parts))
+                changedAt = l.count
+            }
+            let o = p.process(left: Array(s.left[at..<(at + m)]), right: Array(s.right[at..<(at + m)]))
+            l += o.left; r += o.right
+            at += m
+        }
+        while let part = p.drain(urgent: false) { l += part.left; r += part.right }
+        let rest = p.finish()
+        l += rest.left; r += rest.right
+        XCTAssertEqual(l.count, n)
+        XCTAssertEqual(net.calls, 4)
+        XCTAssertGreaterThan(changedAt, 0)
+        /* reference: drums silent from the change on (compared once the glide is over) */
+        var drums = offline[0]
+        for c in 0..<2 { for i in changedAt..<n { drums[c][i] = 0 } }
+        let placer = StagePlacer(sources: 4, sampleRate: 44100)
+        placer.positions = BandProcessor.positions
+        let ref = placer.process([drums, offline[1], offline[2], offline[3]])
+        var worst: Float = 0
+        for i in (changedAt + 3 * BandProcessor.fade)..<n { worst = max(worst, abs(l[i] - ref.left[i]), abs(r[i] - ref.right[i])) }
+        XCTAssertLessThan(worst, 1e-4)
+        /* before the change, drums are still there */
+        let before = placer2(offline, upTo: changedAt)
+        var worstBefore: Float = 0
+        for i in 4096..<changedAt { worstBefore = max(worstBefore, abs(l[i] - before.left[i])) }
+        XCTAssertLessThan(worstBefore, 1e-4)
+    }
+
+    private func placer2(_ stems: [[[Float]]], upTo n: Int) -> (left: [Float], right: [Float]) {
+        let placer = StagePlacer(sources: 4, sampleRate: 44100)
+        placer.positions = BandProcessor.positions
+        return placer.process(stems.map { [Array($0[0].prefix(n)), Array($0[1].prefix(n))] })
+    }
+
+    /// A 48 kHz song goes to the network at 44.1 kHz and comes back at 48 kHz.
+    func testResamplesOtherRates() throws {
+        let n = 10 * 48000 + 321
+        let s = signal(n)
+        let l44 = Resampler.convert(s.left, from: 48000, to: 44100)
+        let r44 = Resampler.convert(s.right, from: 48000, to: 44100)
+        let offline = try BandSplitter.separateAll(left: l44, right: r44, network: FakeNetwork())
+        var sumL = [Float](repeating: 0, count: l44.count), sumR = sumL
+        for st in offline { for i in 0..<sumL.count { sumL[i] += st[0][i]; sumR[i] += st[1][i] } }
+        let refL = Resampler.convert(sumL, from: 44100, to: 48000)
+        let refR = Resampler.convert(sumR, from: 44100, to: 48000)
+        let identity: (left: [[Float]], right: [[Float]]) = ([[1], [0]], [[0], [1]])
+        let p = BandProcessor(output: .headphones([identity, identity, identity, identity]),
+                              network: FakeNetwork(), sampleRate: 48000, queue: nil, mix: BandMix())
+        let out = run(p, s)
+        XCTAssertEqual(out.left.count, n)
+        let end = min(refL.count, n) - 200
+        XCTAssertGreaterThan(end, n - 400)
+        var worst: Float = 0
+        for i in BandProcessor.fade..<end { worst = max(worst, abs(out.left[i] - refL[i]), abs(out.right[i] - refR[i])) }
+        XCTAssertLessThan(worst, 1e-4)
     }
 
     private func run(_ p: BandProcessor, _ s: (left: [Float], right: [Float])) -> (left: [Float], right: [Float]) {

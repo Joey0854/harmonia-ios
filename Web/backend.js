@@ -4937,8 +4937,50 @@ const BAND_MIX = {
 };
 const bandIrCache = new Map();
 
+// A part at a position: its left input at azimuth - 30 x width, its right input at
+// azimuth + 30 x width, each panned (constant power) between the two nearest of the seven
+// virtual speakers; depth turns the direct sound down and sends some to the rear pair.
+const BAND_SPEAKERS = [['RL', -150], ['SL', -90], ['FL', -30], ['C', 0], ['FR', 30], ['SR', 90], ['RR', 150]];
+function bandPositionMix(az, widthPct, depthPct) {
+  const mix = {};
+  const add = (spk, input, g) => { if (!mix[spk]) mix[spk] = [0, 0]; mix[spk][input] += g; };
+  const w = Math.max(0, Math.min(2, widthPct / 100));
+  const d = Math.max(0, Math.min(1, depthPct / 100));
+  [az - 30 * w, az + 30 * w].forEach((angle, input) => {
+    const a = Math.max(-150, Math.min(150, angle));
+    let i = 0;
+    while (i < BAND_SPEAKERS.length - 2 && a > BAND_SPEAKERS[i + 1][1]) i++;
+    const [s0, a0] = BAND_SPEAKERS[i], [s1, a1] = BAND_SPEAKERS[i + 1];
+    const t = (a - a0) / (a1 - a0);
+    const g = 0.5 * (1 - 0.35 * d);
+    add(s0, input, g * Math.cos(t * Math.PI / 2));
+    add(s1, input, g * Math.sin(t * Math.PI / 2));
+    add(input === 0 ? 'RL' : 'RR', input, 0.125 * d);
+  });
+  return mix;
+}
+const bandPosCache = new Map();
+
 // All four parts for one base, with one common scale so that their levels stay as mixed.
 function getBandIrs(q) {
+  if (q.get('az') !== null) {
+    const wanted = q.get('b') || 'dh';
+    const have = (b) => fs.existsSync(path.join(APO_DIR, 'config', 'HeSuVi', 'hrir', b.hrir));
+    const base = BASES.find((b) => b.id === wanted && have(b)) || BASES.find(have);
+    if (!base) return Promise.reject(new Error('no HRIR base available'));
+    const num = (k, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(q.get(k)) || 0)));
+    const az = num('az', -90, 90), w = num('w', 0, 200), d = num('d', 0, 100);
+    const key = [base.id, az, w, d].join('|');
+    if (!bandPosCache.has(key)) {
+      // one fixed scale per base (that of its plain stereo spread), so levels do not move with position
+      const sk = 'scale|' + base.id;
+      if (!bandPosCache.has(sk)) bandPosCache.set(sk, buildStyleIr({ hrir: base.hrir, mix: UPMIX.standard, keepLeadIn: true }).scale);
+      const ir = buildStyleIr({ hrir: base.hrir, mix: bandPositionMix(az, w, d), keepLeadIn: true, scale: bandPosCache.get(sk) });
+      bandPosCache.set(key, { drums: ir, bass: ir, other: ir, vocals: ir });
+      while (bandPosCache.size > 80) bandPosCache.delete(bandPosCache.keys().next().value);
+    }
+    return Promise.resolve(bandPosCache.get(key));
+  }
   const wanted = q.get('b') || 'dh';
   const have = (b) => fs.existsSync(path.join(APO_DIR, 'config', 'HeSuVi', 'hrir', b.hrir));
   const base = BASES.find((b) => b.id === wanted && have(b)) || BASES.find(have);

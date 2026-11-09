@@ -943,6 +943,105 @@ function bandSetting() {
   var m = stageMode();
   return m === 'band' || m === 'bandHead' ? m : null;
 }
+/* The band mixer, per mode and profile: per part volume (0-150 %), solo, mute and position
+   (azimuth -90..90, depth 0..100, width 0..200 %). Parts in the app's order. */
+var BAND_PARTS = [['vocals', '人聲'], ['drums', '鼓'], ['bass', '貝斯'], ['other', '其他樂器']];
+var BAND_DEFAULT = {
+  band: { vocals: { az: 0, depth: 5, width: 60 }, drums: { az: 0, depth: 50, width: 130 }, bass: { az: -12, depth: 30, width: 40 }, other: { az: 0, depth: 35, width: 170 } },
+  bandHead: { vocals: { az: 0, depth: 0, width: 0 }, drums: { az: 0, depth: 0, width: 100 }, bass: { az: 0, depth: 0, width: 0 }, other: { az: 0, depth: 0, width: 200 } }
+};
+function bandMixParams(mode) {
+  var saved = null;
+  try { saved = JSON.parse(lsGet('ytm_band_mix_' + mode + psuf()) || 'null'); } catch (e) { saved = null; }
+  var num = function (v, def, lo, hi) { v = Math.round(+v); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def; };
+  var out = {};
+  BAND_PARTS.forEach(function (bp) {
+    var n = bp[0], d = BAND_DEFAULT[mode][n], s = (saved && saved[n]) || {};
+    out[n] = { gain: num(s.gain, 100, 0, 150), solo: !!s.solo, mute: !!s.mute,
+      az: num(s.az, d.az, -90, 90), depth: num(s.depth, d.depth, 0, 100), width: num(s.width, d.width, 0, 200) };
+  });
+  return out;
+}
+function bandMixSave(mode, p) { lsSet('ytm_band_mix_' + mode + psuf(), JSON.stringify(p)); }
+function bandMixSetting() {
+  var m = bandSetting();
+  return m ? { mode: m, parts: bandMixParams(m) } : null;
+}
+/* The mixer rows in the surround panel. Volume, solo and mute act at once (within about 4 s:
+   what is already handed to the player stays as it was); positions the same way. */
+var bandStatusEl = null;
+function bandControls(body, mode) {
+  var p = bandMixParams(mode);
+  var st = el('p', null, (window.__ytmGlue && window.__ytmGlue.bandStatus && window.__ytmGlue.bandStatus()) || '樂團：等待播放');
+  st.setAttribute('style', 'margin:0 0 12px;font-weight:600');
+  body.appendChild(st);
+  bandStatusEl = st;
+  var hint = el('p', null, '想知道分得乾不乾淨：按某一軌的「獨奏」只聽那一軌（例如人聲獨奏時聽不到鼓與貝斯就是分得好）。調整約 4 秒內聽得到。');
+  hint.setAttribute('style', 'margin:0 0 12px;opacity:.8;font-size:13px');
+  body.appendChild(hint);
+  var controls = [];
+  var save = function () { bandMixSave(mode, p); fxApply(); };
+  var slider = function (part, k, label, min, max, step, unit) {
+    var row = el('div', 'eqrow');
+    var l = el('div', 'eql');
+    l.appendChild(el('span', null, label));
+    var val = el('span', null, part[k] + unit);
+    l.appendChild(val);
+    row.appendChild(l);
+    var input = document.createElement('input');
+    input.type = 'range';
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = part[k];
+    input.setAttribute('aria-label', label);
+    input.addEventListener('input', function () { part[k] = +input.value; val.textContent = part[k] + unit; save(); });
+    row.appendChild(input);
+    controls.push(function () { input.value = part[k]; val.textContent = part[k] + unit; });
+    return row;
+  };
+  BAND_PARTS.forEach(function (bp) {
+    var part = p[bp[0]];
+    var box = el('div');
+    box.setAttribute('style', 'margin:0 0 14px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05)');
+    var head = el('div');
+    head.setAttribute('style', 'display:flex;align-items:center;gap:8px;margin-bottom:6px');
+    var name = el('span', null, bp[1]);
+    name.setAttribute('style', 'flex:1;font-weight:600');
+    head.appendChild(name);
+    var toggle = function (k, text) {
+      var b = el('button', 'btn ghost', text);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', part[k] ? 'true' : 'false');
+      var paint = function () { b.setAttribute('aria-pressed', part[k] ? 'true' : 'false'); b.style.opacity = part[k] ? '1' : '.45'; b.style.fontWeight = part[k] ? '700' : '400'; };
+      paint();
+      b.addEventListener('click', function () { part[k] = !part[k]; paint(); save(); });
+      controls.push(paint);
+      return b;
+    };
+    head.appendChild(toggle('solo', '獨奏 S'));
+    head.appendChild(toggle('mute', '靜音 M'));
+    box.appendChild(head);
+    box.appendChild(slider(part, 'gain', '音量', 0, 150, 5, '%'));
+    box.appendChild(slider(part, 'az', '方位（左 − / 右 +）', -90, 90, 5, '°'));
+    box.appendChild(slider(part, 'depth', mode === 'bandHead' ? '深度（多送一點到後方喇叭）' : '深度', 0, 100, 5, ''));
+    box.appendChild(slider(part, 'width', '寬度', 0, 200, 10, '%'));
+    body.appendChild(box);
+  });
+  var btns = el('div', 'sheetbtns');
+  var reset = el('button', 'btn ghost', '回到建議值');
+  reset.type = 'button';
+  reset.addEventListener('click', function () {
+    BAND_PARTS.forEach(function (bp) {
+      var d = BAND_DEFAULT[mode][bp[0]], part = p[bp[0]];
+      part.gain = 100; part.solo = false; part.mute = false; part.az = d.az; part.depth = d.depth; part.width = d.width;
+    });
+    controls.forEach(function (f) { f(); });
+    save();
+  });
+  btns.appendChild(reset);
+  body.appendChild(btns);
+}
 /* the HRIR set the headphone band uses: the style editor's base */
 function bandIrQuery() {
   var b = styleParams().b;
@@ -1422,6 +1521,9 @@ if (window.__ytmGlue && window.__ytmGlue.page) window.__ytmGlue.page({
   stage: stageSetting,
   band: bandSetting,
   bandIrQuery: bandIrQuery,
+  bandMix: bandMixSetting,
+  profile: function () { return isCar() ? 'car' : 'head'; },
+  bandStatusChanged: function (text) { if (bandStatusEl && document.body.contains(bandStatusEl)) bandStatusEl.textContent = text || '樂團：等待播放'; },
   vid: function () { return S.vid || ''; },
   addHistory: function (items) {
     var n = HIST.addNative(items);
@@ -2770,6 +2872,7 @@ function openStyles() {
         : '用模型把歌分成人聲、鼓、貝斯與其他樂器，各自用耳機環繞的虛擬喇叭擺位（耳機）。基底沿用耳機環繞的設定。手機算不及時會先播原音。');
       bt.setAttribute('style', 'margin:0 0 12px;opacity:.8');
       body.appendChild(bt);
+      bandControls(body, bandSetting());
       return;
     }
     var p = styleParams();

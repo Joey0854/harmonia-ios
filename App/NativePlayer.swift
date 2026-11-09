@@ -632,6 +632,43 @@ final class NativePlayer: NSObject {
         }
     }
 
+    /// Reads a page `bandMix` command: per part (by name) gain 0 … 1.5, solo, mute, azimuth
+    /// −90 … 90, depth 0 … 100, width 0 … 200; for headphones also `ir` (as `bandIr` of `fx`).
+    static func bandMix(from message: [String: Any]) -> BandMixSettings {
+        func number(_ v: Any?, _ def: Double, _ lo: Double, _ hi: Double) -> Float {
+            guard let n = v as? NSNumber, n.doubleValue.isFinite else { return Float(def) }
+            return Float(min(hi, max(lo, n.doubleValue)))
+        }
+        func wav(_ value: Any?) -> Data? {
+            guard let text = value as? String, !text.isEmpty else { return nil }
+            return Data(base64Encoded: text, options: .ignoreUnknownCharacters)
+        }
+        let partsIn = message["parts"] as? [String: Any] ?? [:]
+        var parts: [BandPart] = []
+        for (i, name) in Demucs.sources.enumerated() {
+            let p = partsIn[name] as? [String: Any] ?? [:]
+            let d = BandProcessor.positions[i]
+            let position = StagePosition(azimuth: number(p["az"], Double(d.azimuth), -90, 90),
+                                         depth: number(p["depth"], Double(d.depth) * 100, 0, 100) / 100,
+                                         width: number(p["width"], Double(d.width) * 100, 0, 200) / 100,
+                                         gain: 1)
+            parts.append(BandPart(gain: number(p["gain"], 1, 0, 1.5),
+                                  solo: p["solo"] as? Bool ?? false,
+                                  mute: p["mute"] as? Bool ?? false,
+                                  position: position))
+        }
+        var irs: [(left: Data, right: Data)]?
+        if let set = message["ir"] as? [String: Any] {
+            var list: [(left: Data, right: Data)] = []
+            for name in Demucs.sources {
+                guard let pair = set[name] as? [String: Any], let l = wav(pair["L"]), let r = wav(pair["R"]) else { break }
+                list.append((l, r))
+            }
+            if list.count == 4 { irs = list }
+        }
+        return BandMixSettings(headphones: message["mode"] as? String == "bandHead", parts: parts, irs: irs)
+    }
+
     /// Reads a page `fx` command (also the copy kept on disk).
     static func effect(from message: [String: Any]) -> SurroundSettings {
         func wav(_ value: Any?) -> Data? {

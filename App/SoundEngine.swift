@@ -1,3 +1,4 @@
+import Accelerate
 import AVFoundation
 
 /// One song's way through the engine: its own player node and its own loudness gain. There
@@ -181,6 +182,26 @@ final class SoundEngine {
     /// The mix that is under way: the current song's processing has taken the plan up.
     private var mix: Offer?
 
+    /* Peaks just before the limiter (a tap on the equaliser's output, read on the tap's own
+       thread, never the audio one): logged, and used to give each song a little headroom so
+       that the limiter rarely has to act. */
+    private static let ceiling: Float = 0.891     // the limiter starts at about -1 dBFS
+    private static let maxCut: Float = 3          // dB the automatic headroom may take at most
+    private let peakLock = NSLock()
+    private var overBlocks = 0                    // since the last log line
+    private var worstOver: Float = 0              // dB above the ceiling, since the last line
+    private var songOver = 0
+    private var songWorst: Float = 0
+    private var cutTarget: Float = 0
+    private var cutNow: Float = 0
+    private var peakTicks = 0
+    private var peakTimer: Timer?
+    /// Automatic headroom on (default) or off (UserDefaults "autoHeadroom").
+    static var autoHeadroom: Bool {
+        get { return UserDefaults.standard.object(forKey: "autoHeadroom") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "autoHeadroom") }
+    }
+
     init() {
         engine.attach(sum)
         engine.attach(eq)
@@ -212,7 +233,14 @@ final class SoundEngine {
             engine.attach(unit)
             /* Parameter 2 = pre-gain in dB, scope 0 = global (kLimiterParam_PreGain, kAudioUnitScope_Global). */
             let status = AudioUnitSetParameter(unit.audioUnit, 2, 0, 0, 1.0, 0)
-            Diag.shared.log("engine: limiter present, pre-gain status \(status)")
+            /* Parameter 1 = release (kLimiterParam_DecayTime, seconds, 0.001 ... 0.06, default
+               0.024): the longest, so what the limiter still does is not heard as pumping.
+               Read back for the log, since the range is from the header, not measured. */
+            let decay = AudioUnitSetParameter(unit.audioUnit, 1, 0, 0, 0.06, 0)
+            var attackNow: AudioUnitParameterValue = 0, decayNow: AudioUnitParameterValue = 0
+            AudioUnitGetParameter(unit.audioUnit, 0, 0, 0, &attackNow)
+            AudioUnitGetParameter(unit.audioUnit, 1, 0, 0, &decayNow)
+            Diag.shared.log("engine: limiter present, pre-gain status \(status), decay status \(decay), attack \(attackNow) s, decay \(decayNow) s")
             limiter = unit
         } else {
             Diag.shared.log("engine: no limiter on this system", error: true)
@@ -231,6 +259,12 @@ final class SoundEngine {
             for path in paths { connect(path, bus) }
         }
         engine.mainMixerNode.outputVolume = 0.891
+        eq.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
+            self?.measure(buffer)
+        }
+        peakTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            self?.peakTick()
+        }
         NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
             self?.configurationChanged()
         }
@@ -995,8 +1029,76 @@ final class SoundEngine {
     }
 
     /// A run has played its last piece.
+    // MARK: peaks before the limiter
+
+    private func measure(_ buffer: AVAudioPCMBuffer) {
+        guard let data = buffer.floatChannelData else { return }
+        let n = vDSP_Length(buffer.frameLength)
+        var peak: Float = 0
+        for c in 0..<Int(buffer.format.channelCount) {
+            var m: Float = 0
+            vDSP_maxmgv(data[c], 1, &m, n)
+            peak = max(peak, m)
+        }
+        guard peak > SoundEngine.ceiling else { return }
+        let over = 20 * log10(peak / SoundEngine.ceiling)
+        peakLock.lock()
+        overBlocks += 1
+        songOver += 1
+        worstOver = max(worstOver, over)
+        songWorst = max(songWorst, over)
+        peakLock.unlock()
+    }
+
+    private var modeName: String {
+        guard let s = settings, s.surround else { return "off" }
+        return s.mode.rawValue
+    }
+
+    /* Ten times a second: the headroom glides (at most 0.5 dB a second) towards what this
+       song's peaks ask for; every 30 s a log line if the ceiling was crossed. */
+    private func peakTick() {
+        peakLock.lock()
+        let worst = songWorst
+        peakLock.unlock()
+        if SoundEngine.autoHeadroom {
+            if worst > 0 { cutTarget = min(SoundEngine.maxCut, max(cutTarget, worst + 0.3)) }
+        } else {
+            cutTarget = 0
+        }
+        if cutNow != cutTarget {
+            cutNow = cutNow < cutTarget ? min(cutTarget, cutNow + 0.05) : max(cutTarget, cutNow - 0.05)
+            sum.outputVolume = powf(10, -cutNow / 20)
+        }
+        peakTicks += 1
+        if peakTicks >= 300 {
+            peakTicks = 0
+            peakLock.lock()
+            let blocks = overBlocks, over = worstOver
+            overBlocks = 0
+            worstOver = 0
+            peakLock.unlock()
+            if blocks > 0 {
+                Diag.shared.log(String(format: "engine: over ceiling %d blocks, worst +%.1f dB, mode %@, headroom -%.1f dB", blocks, over, modeName, cutNow))
+            }
+        }
+    }
+
+    /* At the end of a song: one line for it, and the next song starts without the cut (it
+       glides back up). */
+    private func peaksSongEnd() {
+        peakLock.lock()
+        let blocks = songOver, over = songWorst
+        songOver = 0
+        songWorst = 0
+        peakLock.unlock()
+        Diag.shared.log(String(format: "engine: song end: over ceiling %d blocks, worst +%.1f dB, mode %@, headroom -%.1f dB%@", blocks, over, modeName, cutNow, SoundEngine.autoHeadroom ? "" : " (auto headroom off)"))
+        cutTarget = 0
+    }
+
     private func finished(_ path: SoundPath, _ g: Int) {
         guard path.isCurrent(g) else { return }
+        peaksSongEnd()
         path.lock.lock()
         let end = path.scheduledEnd
         path.lock.unlock()
