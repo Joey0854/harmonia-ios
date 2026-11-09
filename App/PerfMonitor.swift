@@ -6,7 +6,7 @@ import UIKit
 /// How the phone is doing, for the log and the reports: every 30 seconds one line with the
 /// app's memory footprint, the memory still available to it, CPU use, thermal state, low power
 /// mode, battery level and how far the band separation is ahead of what is handed to the
-/// player; memory warnings as they come; and per report period the band segment timings
+/// player; memory warnings as they come; and the band segment timings since the app started
 /// (`perf` in /api/report). Main queue.
 final class PerfMonitor {
     static let shared = PerfMonitor()
@@ -19,6 +19,7 @@ final class PerfMonitor {
     private var slow = 0
     private var backgroundSegments = 0
     private var heatPausedSeconds = 0
+    private var cacheHits = 0
     private var backgroundSlow = 0
     private var peakFootprint: UInt64 = 0
     private var worstThermal = 0
@@ -108,12 +109,11 @@ final class PerfMonitor {
     /* The statistics since the last report, then from zero again (Diag's queue). */
     private func take() -> [String: Any] {
         let foot = PerfMonitor.footprint()
+        /* for the whole session: reports go often (song ends, background), and counting from
+           zero each time left the manual report with nothing */
         lock.lock()
-        defer {
-            segments = 0; totalSeconds = 0; slowest = 0; slow = 0; peakFootprint = 0; worstThermal = 0; warnings = 0
-            backgroundSegments = 0; backgroundSlow = 0; heatPausedSeconds = 0
-            lock.unlock()
-        }
+        defer { lock.unlock() }
+        cacheHits += BandProcessor.takeCacheHits()
         peakFootprint = max(peakFootprint, foot)
         return [
             "segments": segments,
@@ -126,7 +126,7 @@ final class PerfMonitor {
             "memoryWarnings": warnings,
             "backgroundSegments": backgroundSegments,
             "heatPausedSeconds": heatPausedSeconds,
-            "cacheHitSegments": BandProcessor.takeCacheHits(),
+            "cacheHitSegments": cacheHits,
             "cacheMB": BandCache.shared.size() / 1_048_576,
             "backgroundSlowSegments": backgroundSlow,
             "computeUnits": BandModel.shared.label

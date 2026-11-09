@@ -237,14 +237,18 @@ final class Diag {
 
     /// Whether the last run ended while the app was in front (a crash, or killed by the
     /// system), as noted at the start of this run. Call once, early.
+    /* In a file written at once, not UserDefaults: a process killed right after going to the
+       front (1.3.9, 03:24:46 → 03:25:08) had not saved "running" there yet. */
+    private var runFile: URL { return file.deletingLastPathComponent().appendingPathComponent("diag-run-state") }
+
     func noteStart() -> Bool {
-        let before = UserDefaults.standard.string(forKey: Diag.runKey)
-        UserDefaults.standard.set("running", forKey: Diag.runKey)
+        let before = (try? String(contentsOf: runFile, encoding: .utf8)) ?? UserDefaults.standard.string(forKey: Diag.runKey)
+        noteBackground(false)
         return before == "running"
     }
 
     func noteBackground(_ inBackground: Bool) {
-        UserDefaults.standard.set(inBackground ? "background" : "running", forKey: Diag.runKey)
+        try? (inBackground ? "background" : "running").write(to: runFile, atomically: true, encoding: .utf8)
     }
 
     /// After a song: a report, unless one went less than 2 minutes ago.

@@ -368,6 +368,33 @@ final class BandTests: XCTestCase {
         XCTAssertEqual(inner.abandoned, 1)
     }
 
+    /// As seen on the phone: after many good runs one never comes back. The next segments
+    /// and the next song go on.
+    func testWatchdogAfterManyGoodRuns() throws {
+        final class LateHang: BandNetwork {
+            let lock = NSLock()
+            var calls = 0
+            let fake = FakeNetwork()
+            func run(spec: [Float], wave: [Float]) throws -> (spec: [Float], wave: [Float]) {
+                lock.lock()
+                calls += 1
+                let hang = calls == 6
+                lock.unlock()
+                if hang { DispatchSemaphore(value: 0).wait() }
+                return try fake.run(spec: spec, wave: wave)
+            }
+        }
+        let dog = BandWatchdog(LateHang(), timeout: 0.5)
+        let n = 20 * 44100      // four segments per song
+        let s = signal(n)
+        for _ in 0..<3 {
+            let p = BandProcessor(output: .speakers, network: dog, sampleRate: 44100, queue: nil, mix: BandMix())
+            let out = run(p, s)
+            XCTAssertEqual(out.left.count, n)
+        }
+        XCTAssertEqual(dog.stalls, 1)
+    }
+
     /// Too hot: no new separation, the stand-in (here the original) plays.
     func testHeatPausesSeparation() {
         BandProcessor.thermal = { 2 }
@@ -411,14 +438,27 @@ final class BandTests: XCTestCase {
         /* three whole segments from the disk, the last one separated again */
         XCTAssertEqual(second.calls, 1)
         XCTAssertEqual(b.left.count, n)
-        var err = 0.0, ref = 0.0
-        for i in BandProcessor.fade..<(3 * Demucs.stride) {
-            err += Double(b.left[i] - a.left[i]) * Double(b.left[i] - a.left[i])
-            ref += Double(a.left[i]) * Double(a.left[i])
+        /* aligned to the sample (an encoder delay left in would show as a lag), and close */
+        func error(lag: Int) -> Double {
+            var err = 0.0, ref = 0.0
+            for i in 10000..<(3 * Demucs.stride - 10000) {
+                let d = Double(b.left[i + lag] - a.left[i])
+                err += d * d
+                ref += Double(a.left[i]) * Double(a.left[i])
+            }
+            return 10 * log10(err / max(ref, 1e-12))
         }
-        let db = 10 * log10(err / max(ref, 1e-12))
-        print("RESULT band cache: AAC round trip error \(String(format: "%.1f", db)) dB")
-        XCTAssertLessThan(db, -15)
+        var best = 0
+        var bestDb = error(lag: 0)
+        for lag in stride(from: -2200, through: 2200, by: 1) where lag != 0 && (lag % 64 == 0 || abs(lag) <= 8) {
+            let e = error(lag: lag)
+            if e < bestDb { bestDb = e; best = lag }
+        }
+        let db = error(lag: 0)
+        print("RESULT band cache: AAC round trip error \(String(format: "%.1f", db)) dB at lag 0, best lag \(best)")
+        XCTAssertEqual(best, 0)
+        /* the test signal is mostly white noise, which AAC does not keep closely */
+        XCTAssertLessThan(db, -10)
     }
 
     private func run(_ p: BandProcessor, _ s: (left: [Float], right: [Float])) -> (left: [Float], right: [Float]) {
