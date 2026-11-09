@@ -3869,30 +3869,50 @@ function parseQueue(json) {
   return items.filter((i) => (seen.has(i.videoId) ? false : seen.add(i.videoId)));
 }
 
-/* The same song in another version (live, cover, MV, a bracketed tag, a '/ covered by ...' tail) has
-   the same key. "SOS /covered by X" and "SOS" are one song. */
-function sameSongKey(title) {
+/* ---- the same song in another version (official video, lyric video, "Artist - Title", bonus track) ---- */
+function qdupLetters(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+/* the title without bracketed tags and without a tail after a slash or a spaced dash */
+function qdupCore(title) {
   let s = String(title || '').toLowerCase();
-  /* bracketed tags: (Live) [MV] （合作演出：X） 【公式】 */
   s = s.replace(/[(\[（【「『〔][^)\]）】」』〕]*[)\]）】」』〕]/g, ' ');
-  /* a tail after a slash or a spaced dash: "SOS /covered by X", "Song - Remastered" */
   s = s.replace(/\s*(?:[\/／|｜]|\s[-–—]\s).*$/, ' ');
-  /* only letters and digits of any script count */
-  const key = s.replace(/[^\p{L}\p{N}]+/gu, '');
-  return key || String(title || '').toLowerCase().replace(/\s+/g, '');
+  return qdupLetters(s) || qdupLetters(title);
 }
+/* the names of the artists in a subtitle such as "A 和 B", "A、B", "A • plays • Album" */
+function qdupArtists(sub) {
+  const out = [];
+  String(sub || '').split(/\s*(?:[•·,，、&＆\/／]|\s和\s|\sx\s|\sfeat\.?\s|\sft\.?\s|\sand\s)\s*/i).forEach(function (p) {
+    const k = qdupLetters(p);
+    if (k && out.indexOf(k) < 0) out.push(k);
+  });
+  return out;
+}
+function qdupInfo(item) {
+  const title = String((item && item.title) || '');
+  return { core: qdupCore(title), full: qdupLetters(title), artists: qdupArtists(item && item.subtitle) };
+}
+function qdupSame(a, b) {
+  if (!a.core || !b.core) return false;
+  if (a.core === b.core) return true;
+  /* one title inside the other ("Watch me!" in "YOASOBI「Watch me!」Official Music Video") counts
+     when an artist is shared, and the inner title is not just a short common word */
+  if (!a.artists.some(function (x) { return b.artists.indexOf(x) >= 0; })) return false;
+  const long = function (k) { return k.length >= 6 || (k.length >= 2 && /[぀-ヿ㐀-鿿가-힯]/.test(k)); };
+  return (long(a.core) && b.full.indexOf(a.core) >= 0) || (long(b.core) && a.full.indexOf(b.core) >= 0);
+}
+
 /* The automatic queue after a song should lead to other songs, not to the same one again. */
 function withoutSameSong(items) {
   if (items.length < 3) return items;
-  const seen = new Set([sameSongKey(items[0].title)]);
-  const out = [items[0]];
+  const kept = [items[0]];
+  const infos = [qdupInfo(items[0])];
   for (let i = 1; i < items.length; i++) {
-    const k = sameSongKey(items[i].title);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(items[i]);
+    const info = qdupInfo(items[i]);
+    if (infos.some(function (k) { return qdupSame(k, info); })) continue;
+    kept.push(items[i]);
+    infos.push(info);
   }
-  return out.length >= 3 ? out : items;
+  return kept.length >= 3 ? kept : items;
 }
 async function getQueue(videoId, playlistId) {
   const body = { enablePersistentPlaylistPanel: true, isAudioOnly: true, tunerSettingValue: 'AUTOMIX_SETTING_NORMAL' };

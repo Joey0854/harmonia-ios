@@ -1561,13 +1561,36 @@ function realDur(a) {
 
 /* When only a couple of songs are left, append related ones, like autoplay in YT Music. */
 var extending = false;
-/* The same song in another version (a bracketed tag, a tail after a slash or dash) has the same key. */
-function songKey(title) {
-  var s = String(title || '').toLowerCase();
+/* ---- the same song in another version (official video, lyric video, "Artist - Title", bonus track) ---- */
+function qdupLetters(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+/* the title without bracketed tags and without a tail after a slash or a spaced dash */
+function qdupCore(title) {
+  let s = String(title || '').toLowerCase();
   s = s.replace(/[(\[（【「『〔][^)\]）】」』〕]*[)\]）】」』〕]/g, ' ');
   s = s.replace(/\s*(?:[\/／|｜]|\s[-–—]\s).*$/, ' ');
-  var k = s.replace(/[^\p{L}\p{N}]+/gu, '');
-  return k || String(title || '').toLowerCase().replace(/\s+/g, '');
+  return qdupLetters(s) || qdupLetters(title);
+}
+/* the names of the artists in a subtitle such as "A 和 B", "A、B", "A • plays • Album" */
+function qdupArtists(sub) {
+  const out = [];
+  String(sub || '').split(/\s*(?:[•·,，、&＆\/／]|\s和\s|\sx\s|\sfeat\.?\s|\sft\.?\s|\sand\s)\s*/i).forEach(function (p) {
+    const k = qdupLetters(p);
+    if (k && out.indexOf(k) < 0) out.push(k);
+  });
+  return out;
+}
+function qdupInfo(item) {
+  const title = String((item && item.title) || '');
+  return { core: qdupCore(title), full: qdupLetters(title), artists: qdupArtists(item && item.subtitle) };
+}
+function qdupSame(a, b) {
+  if (!a.core || !b.core) return false;
+  if (a.core === b.core) return true;
+  /* one title inside the other ("Watch me!" in "YOASOBI「Watch me!」Official Music Video") counts
+     when an artist is shared, and the inner title is not just a short common word */
+  if (!a.artists.some(function (x) { return b.artists.indexOf(x) >= 0; })) return false;
+  const long = function (k) { return k.length >= 6 || (k.length >= 2 && /[぀-ヿ㐀-鿿가-힯]/.test(k)); };
+  return (long(a.core) && b.full.indexOf(a.core) >= 0) || (long(b.core) && a.full.indexOf(b.core) >= 0);
 }
 function extendQueue() {
   /* With "repeat all" the queue loops instead of growing. */
@@ -1586,11 +1609,16 @@ function extendQueue() {
       S.radioCont = (d && d.continuation) || '';
       if (!(d && d.items && d.items.length)) { S.radioCont = ''; return; }
     }
-    var have = {}, haveTitle = {};
-    q.forEach(function (x) { have[x.videoId] = 1; haveTitle[songKey(x.title)] = 1; });
+    var have = {}, infos = [];
+    q.forEach(function (x) { have[x.videoId] = 1; infos.push(qdupInfo(x)); });
     ((d && d.items) || []).forEach(function (x) {
       /* the same song in another version is not queued again */
-      if (isSong(x) && !have[x.videoId] && !haveTitle[songKey(x.title)]) { have[x.videoId] = 1; haveTitle[songKey(x.title)] = 1; q.push(x); }
+      if (!isSong(x) || have[x.videoId]) return;
+      var info = qdupInfo(x);
+      if (infos.some(function (k) { return qdupSame(k, info); })) return;
+      have[x.videoId] = 1;
+      infos.push(info);
+      q.push(x);
     });
     if (S.shuffle) shuffleUpcoming();
     renderQueue();
@@ -1777,8 +1805,8 @@ function playFromList(list, item) {
   if (!songs.length) return;
   S.queue = songs.slice(i);
   /* The song that was tapped is not queued again in another version right after it. */
-  var tapped = songKey(S.queue[0].title);
-  S.queue = S.queue.filter(function (x, n) { return n === 0 || songKey(x.title) !== tapped; });
+  var tapped = qdupInfo(S.queue[0]);
+  S.queue = S.queue.filter(function (x, n) { return n === 0 || !qdupSame(tapped, qdupInfo(x)); });
   S.index = 0;
   playTrack(S.queue[0], true);
 }
@@ -1804,12 +1832,11 @@ function playSingle(item) {
     /* A radio must not lead to the same song again in another version (a playlist or album the
        user chose is left as it is). */
     if (!item.playlistId || /^RD/.test(item.playlistId)) {
-      var seenKey = {};
-      seenKey[songKey(item.title)] = 1;
+      var seen = [qdupInfo(item)];
       rest = rest.filter(function (x) {
-        var k = songKey(x.title);
-        if (seenKey[k]) return false;
-        seenKey[k] = 1;
+        var info = qdupInfo(x);
+        if (seen.some(function (k) { return qdupSame(k, info); })) return false;
+        seen.push(info);
         return true;
       });
     }
