@@ -52,6 +52,9 @@ for f in [0, 1, 5, 100, 1000, 2047]:
         points.append([f, t, float(z[f, t].real), float(z[f, t].imag)])
 out["spectrum"] = {"points": points, "max": float(np.abs(z).max())}
 x, xt, stats = R.prepare(seg)
+# _spec drops the Nyquist bin and _ispec the edges, so the round trip is not exact (also in demucs)
+y = R.ispec(R.spec(seg[1]))
+out["roundtrip_db"] = float(10 * np.log10(((y - seg[1]) ** 2).sum() / (seg[1] ** 2).sum()))
 out["stats"] = [float(v) for v in stats]
 
 stems = R.finish(*fake(x, xt), stats)

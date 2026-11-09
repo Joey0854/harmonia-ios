@@ -51,7 +51,10 @@ final class BandTests: XCTestCase {
         }
     }
 
-    func testInverseUndoesSpectrum() {
+    /// As far as demucs' own transform pair goes back (it drops the Nyquist bin): the same
+    /// error as the reference.
+    func testInverseUndoesSpectrum() throws {
+        let expected = try fixture()["roundtrip_db"] as! Double
         let x = signal(Demucs.segment).right
         let z = Demucs.spectrum(x)
         let y = Demucs.inverse(re: z.re, im: z.im)
@@ -61,7 +64,7 @@ final class BandTests: XCTestCase {
             err += Double(y[i] - x[i]) * Double(y[i] - x[i])
             ref += Double(x[i]) * Double(x[i])
         }
-        XCTAssertLessThan(10 * log10(err / ref), -100)
+        XCTAssertEqual(10 * log10(err / ref), expected, accuracy: 0.2)
     }
 
     func testOneSegmentMatchesReference() throws {

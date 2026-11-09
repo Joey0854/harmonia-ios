@@ -20,6 +20,9 @@ out_dir = sys.argv[1]
 trace_only = "--trace-only" in sys.argv
 os.makedirs(out_dir, exist_ok=True)
 torch.set_grad_enabled(False)
+# nn.MultiheadAttention's fused fast path (aten::_native_multi_head_attention) has no Core ML
+# conversion; the plain path computes the same.
+torch.backends.mha.set_fastpath_enabled(False)
 
 
 def test_signal():
@@ -38,6 +41,8 @@ t = time.time()
 ref = body(tx, txt)
 eager_s = time.time() - t
 traced = torch.jit.trace(body, (tx, txt), check_trace=False)
+fused = [n.kind() for n in traced.inlined_graph.nodes() if "native_multi_head" in n.kind()]
+assert not fused, fused
 again = traced(tx, txt)
 
 

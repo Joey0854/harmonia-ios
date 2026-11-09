@@ -82,7 +82,31 @@ class Body(nn.Module):
         return x, xt
 
 
+def _constant_embeddings():
+    """The cross-transformer's position embeddings depend only on shapes. Cached, they enter a
+    trace as constants instead of arange / sin / in-place slice writes (which Core ML lacks)."""
+    import demucs.transformer as T
+    if getattr(T, "_band_cached", False):
+        return
+    for name in ["create_sin_embedding", "create_2d_sin_embedding"]:
+        original = getattr(T, name)
+        cache = {}
+
+        def cached(*args, _f=original, _c=cache, **kwargs):
+            # under a trace the sizes are traced values: plain ints make the key stable
+            args = tuple(int(a) if isinstance(a, (int, torch.Tensor)) else a for a in args)
+            kwargs = {k: int(v) if isinstance(v, (int, torch.Tensor)) else v for k, v in kwargs.items()}
+            key = repr((args, sorted(kwargs.items())))
+            if key not in _c:
+                with torch.no_grad():
+                    _c[key] = _f(*args, **kwargs).detach()
+            return _c[key]
+        setattr(T, name, cached)
+    T._band_cached = True
+
+
 def load_body():
+    _constant_embeddings()
     from demucs.pretrained import get_model
     bag = get_model("htdemucs")
     model = bag.models[0] if hasattr(bag, "models") else bag
