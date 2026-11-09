@@ -9,6 +9,14 @@ public struct BandSeed {
     /// [source × 2 + channel][sample] at 44.1 kHz, 16-bit (`BandSplitter.seedScale`).
     public let stems: [[Int16]]
     public let segments: Int
+
+    public init(id: String, startTime: Double, sampleRate: Int, stems: [[Int16]], segments: Int) {
+        self.id = id
+        self.startTime = startTime
+        self.sampleRate = sampleRate
+        self.stems = stems
+        self.segments = segments
+    }
 }
 
 /// Separates the start of the next song while the current one plays, so that a mix into it
