@@ -34,6 +34,18 @@ public final class BandPrefetch {
     private var key: String?
     private var ready: BandSeed?
     private var busyID: String?
+    private var stage = "idle"
+    /// What the prefetch is doing (tests, diagnosis).
+    public var progress: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return stage
+    }
+    private func note(_ s: String) {
+        lock.lock()
+        stage = s
+        lock.unlock()
+    }
 
     public init() {}
 
@@ -131,6 +143,7 @@ public final class BandPrefetch {
             splitter.end()
         }
         let startTime = decoder.startTime
+        note("decoded \(splitter.received) samples, ended \(ended), need \(need44), segments \(segments)")
         var packed = [[Int16]](repeating: [], count: 8)
         var done = 0
         var computing = 0.0
@@ -154,10 +167,14 @@ public final class BandPrefetch {
             guard current(g) else { return }
             /* the playing song first: only while its band is well ahead */
             if let lead = BandProcessor.lead, lead < BandPrefetch.minLead {
+                note("waiting: playing song only \(lead) s ahead")
                 queue.asyncAfter(deadline: .now() + 1) { step() }
                 return
             }
-            guard done < segments, let job = splitter.takeJob() else { return finish() }
+            guard done < segments, let job = splitter.takeJob() else {
+                note("finishing after \(done) segments")
+                return finish()
+            }
             let t0 = Date()
             do {
                 let stems = try Demucs.separate(left: job.left, right: job.right, network: network)

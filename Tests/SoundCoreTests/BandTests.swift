@@ -309,7 +309,7 @@ final class BandTests: XCTestCase {
         let rate = Int(decoder.sampleRate.rounded())
         for _ in 0..<600 where !pf.hasSeed(for: "song") { Thread.sleep(forTimeInterval: 0.05) }
         let seed = pf.take(id: "song", startTime: decoder.startTime, sampleRate: rate)
-        guard let s = seed else { return XCTFail("no prefetch") }
+        guard let s = seed else { return XCTFail("no prefetch: " + pf.progress) }
         XCTAssertEqual(s.segments, 1)
         let identity: (left: [[Float]], right: [[Float]]) = ([[1], [0]], [[0], [1]])
         let plain = run(BandProcessor(output: .headphones([identity, identity, identity, identity]),
