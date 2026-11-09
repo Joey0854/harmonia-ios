@@ -886,7 +886,8 @@
   function bandPosQuery(bm, n) {
     var p = bm && bm.parts && bm.parts[n];
     if (!p) return '';
-    return '&az=' + Math.round(p.az) + '&w=' + Math.round(p.width) + '&d=' + Math.round(p.depth);
+    return '&az=' + Math.round(p.az) + '&w=' + Math.round(p.width) + '&d=' + Math.round(p.depth) +
+      ((n === 'drums' || n === 'bass') && bm.low ? '&lo=' + Math.round(bm.low) : '');
   }
   function sendBandMix() {
     var bm = P.bandMix ? P.bandMix() : null;
@@ -896,7 +897,7 @@
       var p = bm.parts[n];
       parts[n] = { gain: p.gain / 100, solo: !!p.solo, mute: !!p.mute, az: p.az, depth: p.depth, width: p.width };
     });
-    var key = bm.mode + JSON.stringify(parts);
+    var key = bm.mode + JSON.stringify(parts) + '|' + (bm.low || 0) + '|' + (bm.mode === 'bandHead' ? P.bandIrQuery() : '');
     if (sent.mix === key) return;
     if (bm.mode !== 'bandHead') {
       sent.mix = key;

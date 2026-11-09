@@ -193,7 +193,7 @@ final class BandTests: XCTestCase {
     /// A volume change while playing applies from the sound not handed on yet, gliding, and
     /// the network does not run again.
     func testVolumeChangeWhilePlaying() throws {
-        let n = 20 * 44100
+        let n = 30 * 44100
         let s = signal(n)
         let offline = try BandSplitter.separateAll(left: s.left, right: s.right, network: FakeNetwork())
         let mix = BandMix()
@@ -204,7 +204,8 @@ final class BandTests: XCTestCase {
         var changedAt = -1
         while at < n {
             let m = min(8192, n - at)
-            if changedAt < 0 && at >= n / 2 {
+            /* once some band sound has been handed on (output lags input by the lookahead) */
+            if changedAt < 0 && l.count >= 6 * 44100 {
                 var parts = BandProcessor.positions.map { BandPart(position: $0) }
                 parts[0].mute = true
                 mix.set(BandMixSettings(headphones: false, parts: parts))
@@ -218,8 +219,9 @@ final class BandTests: XCTestCase {
         let rest = p.finish()
         l += rest.left; r += rest.right
         XCTAssertEqual(l.count, n)
-        XCTAssertEqual(net.calls, 4)
-        XCTAssertGreaterThan(changedAt, 0)
+        XCTAssertEqual(net.calls, 6)
+        XCTAssertGreaterThan(changedAt, 4096)
+        guard changedAt > 4096 else { return }
         /* reference: drums silent from the change on (compared once the glide is over) */
         var drums = offline[0]
         for c in 0..<2 { for i in changedAt..<n { drums[c][i] = 0 } }

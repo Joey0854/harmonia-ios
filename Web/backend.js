@@ -4686,6 +4686,15 @@ function buildStyleIr(style) {
       }
     }
   }
+  if (style.lowShelfDb) {
+    // A first-order low shelf at 150 Hz on the whole response (band headphones: drums and bass).
+    const G = Math.pow(10, style.lowShelfDb / 20);
+    const shelf = (fq) => { const r = (fq / 150) * (fq / 150); return Math.sqrt((G * G + r) / (1 + r)); };
+    for (const pair of res) for (let ear = 0; ear < 2; ear++) {
+      const shaped = spectralShape(pair[ear], shelf);
+      for (let i = 0; i < n; i++) pair[ear][i] = shaped[i];
+    }
+  }
   let peak = 1e-9;
   let last = 0;
   let first = n;
@@ -4935,7 +4944,6 @@ const BAND_MIX = {
   other: { FL: [0.4, 0], FR: [0, 0.4], SL: [0.35, -0.15], SR: [-0.15, 0.35] },
   vocals: { C: [0.5, 0.5] },
 };
-const bandIrCache = new Map();
 
 // A part at a position: its left input at azimuth - 30 x width, its right input at
 // azimuth + 30 x width, each panned (constant power) between the two nearest of the seven
@@ -4961,39 +4969,33 @@ function bandPositionMix(az, widthPct, depthPct) {
 }
 const bandPosCache = new Map();
 
-// All four parts for one base, with one common scale so that their levels stay as mixed.
-function getBandIrs(q) {
-  if (q.get('az') !== null) {
-    const wanted = q.get('b') || 'dh';
-    const have = (b) => fs.existsSync(path.join(APO_DIR, 'config', 'HeSuVi', 'hrir', b.hrir));
-    const base = BASES.find((b) => b.id === wanted && have(b)) || BASES.find(have);
-    if (!base) return Promise.reject(new Error('no HRIR base available'));
-    const num = (k, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(q.get(k)) || 0)));
-    const az = num('az', -90, 90), w = num('w', 0, 200), d = num('d', 0, 100);
-    const key = [base.id, az, w, d].join('|');
-    if (!bandPosCache.has(key)) {
-      // one fixed scale per base (that of its plain stereo spread), so levels do not move with position
-      const sk = 'scale|' + base.id;
-      if (!bandPosCache.has(sk)) bandPosCache.set(sk, buildStyleIr({ hrir: base.hrir, mix: UPMIX.standard, keepLeadIn: true }).scale);
-      const ir = buildStyleIr({ hrir: base.hrir, mix: bandPositionMix(az, w, d), keepLeadIn: true, scale: bandPosCache.get(sk) });
-      bandPosCache.set(key, { drums: ir, bass: ir, other: ir, vocals: ir });
-      while (bandPosCache.size > 80) bandPosCache.delete(bandPosCache.keys().next().value);
-    }
-    return Promise.resolve(bandPosCache.get(key));
-  }
+// One part's responses: at its position (az, w, d; without them the fixed default mix), with
+// the user's tone correction (t, as the headphone style uses it), the vocal tail (v, vocals
+// only) and a low shelf (lo, tenths of a dB, drums and bass only). One fixed scale per base
+// (that of its plain stereo spread), so levels do not move with position or between parts.
+function getBandIr(name, q) {
   const wanted = q.get('b') || 'dh';
   const have = (b) => fs.existsSync(path.join(APO_DIR, 'config', 'HeSuVi', 'hrir', b.hrir));
   const base = BASES.find((b) => b.id === wanted && have(b)) || BASES.find(have);
   if (!base) return Promise.reject(new Error('no HRIR base available'));
-  if (!bandIrCache.has(base.id)) {
-    const first = {};
-    for (const name of Object.keys(BAND_MIX)) first[name] = buildStyleIr({ hrir: base.hrir, mix: BAND_MIX[name], keepLeadIn: true });
-    const scale = Math.min(...Object.values(first).map((x) => x.scale));
-    const out = {};
-    for (const name of Object.keys(BAND_MIX)) out[name] = buildStyleIr({ hrir: base.hrir, mix: BAND_MIX[name], keepLeadIn: true, scale });
-    bandIrCache.set(base.id, out);
+  const num = (k, lo, hi, def) => { const v = q.get(k); const x = Math.round(Number(v)); return v === null || !isFinite(x) ? def : Math.max(lo, Math.min(hi, x)); };
+  const positioned = q.get('az') !== null;
+  const az = num('az', -90, 90, 0), w = num('w', 0, 200, 0), d = num('d', 0, 100, 0);
+  const t = num('t', 0, 180, 0);
+  const v = name === 'vocals' ? num('v', 0, 80, 0) : 0;
+  const lo = name === 'drums' || name === 'bass' ? num('lo', -60, 30, 0) : 0;
+  const key = [name, base.id, positioned ? [az, w, d].join(',') : 'default', t, v, lo].join('|');
+  if (!bandPosCache.has(key)) {
+    const sk = 'scale|' + base.id;
+    if (!bandPosCache.has(sk)) bandPosCache.set(sk, buildStyleIr({ hrir: base.hrir, mix: UPMIX.standard, keepLeadIn: true }).scale);
+    const style = { hrir: base.hrir, mix: positioned ? bandPositionMix(az, w, d) : BAND_MIX[name], keepLeadIn: true, scale: bandPosCache.get(sk) };
+    if (t > 0) style.tone = 0.56 * t / 100;
+    if (v > 0) style.vocalTail = 1 - v / 100;
+    if (lo !== 0) style.lowShelfDb = lo / 10;
+    bandPosCache.set(key, buildStyleIr(style));
+    while (bandPosCache.size > 120) bandPosCache.delete(bandPosCache.keys().next().value);
   }
-  return Promise.resolve(bandIrCache.get(base.id));
+  return Promise.resolve(bandPosCache.get(key));
 }
 
 function getStyleIr(id) {
@@ -5149,8 +5151,8 @@ async function handle(req, res) {
     m = /^\/api\/ir\/band\/(drums|bass|other|vocals)\/([LR])\.wav$/.exec(p);
     if (GET && m) {
       let irs;
-      try { irs = await getBandIrs(url.searchParams); } catch (e) { return send(res, 404, { error: String(e.message || e) }); }
-      return send(res, 200, irs[m[1]][m[2]], 'audio/wav');
+      try { irs = await getBandIr(m[1], url.searchParams); } catch (e) { return send(res, 404, { error: String(e.message || e) }); }
+      return send(res, 200, irs[m[2]], 'audio/wav');
     }
     m = /^\/api\/ir\/([\w-]{1,32})\/([LR])\.wav$/.exec(p);
     if (GET && m) {

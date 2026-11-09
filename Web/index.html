@@ -963,9 +963,11 @@ function bandMixParams(mode) {
   return out;
 }
 function bandMixSave(mode, p) { lsSet('ytm_band_mix_' + mode + psuf(), JSON.stringify(p)); }
+/* headphones only: low shelf on drums and bass, in tenths of a dB (-60 .. +30) */
+function bandLow() { var v = Math.round(+lsGet('ytm_band_low' + psuf())); return isFinite(v) ? Math.max(-60, Math.min(30, v)) : 0; }
 function bandMixSetting() {
   var m = bandSetting();
-  return m ? { mode: m, parts: bandMixParams(m) } : null;
+  return m ? { mode: m, parts: bandMixParams(m), low: m === 'bandHead' ? bandLow() : 0 } : null;
 }
 /* The mixer rows in the surround panel. Volume, solo and mute act at once (within about 4 s:
    what is already handed to the player stays as it was); positions the same way. */
@@ -1028,10 +1030,32 @@ function bandControls(body, mode) {
     box.appendChild(slider(part, 'width', '寬度', 0, 200, 10, '%'));
     body.appendChild(box);
   });
+  var low = null;
+  if (mode === 'bandHead') {
+    var lrow = el('div', 'eqrow');
+    var ll = el('div', 'eql');
+    ll.appendChild(el('span', null, '低頻（鼓與貝斯，150 Hz 以下）'));
+    var fmt = function (t) { return (t > 0 ? '+' : '') + (t / 10).toFixed(1) + ' dB'; };
+    var lval = el('span', null, fmt(bandLow()));
+    ll.appendChild(lval);
+    lrow.appendChild(ll);
+    low = document.createElement('input');
+    low.type = 'range';
+    low.min = '-60';
+    low.max = '30';
+    low.step = '5';
+    low.value = bandLow();
+    low.setAttribute('aria-label', '低頻');
+    low.addEventListener('input', function () { lsSet('ytm_band_low' + psuf(), String(+low.value)); lval.textContent = fmt(+low.value); fxApply(); });
+    lrow.appendChild(low);
+    body.appendChild(lrow);
+    controls.push(function () { low.value = bandLow(); lval.textContent = fmt(bandLow()); });
+  }
   var btns = el('div', 'sheetbtns');
   var reset = el('button', 'btn ghost', '回到建議值');
   reset.type = 'button';
   reset.addEventListener('click', function () {
+    if (low) lsSet('ytm_band_low' + psuf(), '0');
     BAND_PARTS.forEach(function (bp) {
       var d = BAND_DEFAULT[mode][bp[0]], part = p[bp[0]];
       part.gain = 100; part.solo = false; part.mute = false; part.az = d.az; part.depth = d.depth; part.width = d.width;
@@ -1044,8 +1068,9 @@ function bandControls(body, mode) {
 }
 /* the HRIR set the headphone band uses: the style editor's base */
 function bandIrQuery() {
-  var b = styleParams().b;
-  return '?b=' + enc(b === 'hesuvi' ? 'dh' : b);
+  var sp = styleParams(), b = sp.b;
+  /* the headphone style's tone correction and vocal tail apply to the band's responses too */
+  return '?b=' + enc(b === 'hesuvi' ? 'dh' : b) + '&t=' + sp.t + '&v=' + sp.v;
 }
 function irUrl(ch) {
   var p = styleParams();
