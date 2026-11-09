@@ -28,20 +28,38 @@ Plays by itself without a PC, keeps playing with the screen off, shows on the lo
 
 <table>
   <tr>
-    <td align="center" width="50%">
-      <img src="docs/screenshots/surround.png" width="300" alt="Surround style"><br>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/player.png" width="240" alt="Player"><br>
+      <b>Player</b><br>
+      <sub>Cover, like / dislike, lyrics, sound, seek bar and controls; what plays next is below</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/player-sound.png" width="240" alt="Sound panel in the player"><br>
+      <b>Sound panel</b><br>
+      <sub>Tap "Sound" (音效): surround on/off, headphones / car, mixing, style, equaliser</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/history.png" width="240" alt="History"><br>
+      <b>History</b><br>
+      <sub>"This phone" and "YouTube Music" pages; the mini player and the four tabs are at the bottom</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/surround.png" width="240" alt="Surround style"><br>
       <b>Surround style</b><br>
       <sub>Pick a headphone impulse-response style and drag the dots to shape the sound field: front speakers, spread, height, voice</sub>
     </td>
-    <td align="center" width="50%">
-      <img src="docs/screenshots/settings.png" width="300" alt="Settings"><br>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/settings.png" width="240" alt="Settings"><br>
       <b>Settings</b><br>
       <sub>Picture and sound alignment, ambient light (folded), YouTube Music account, diagnostics; Close is at the bottom</sub>
     </td>
+    <td></td>
   </tr>
 </table>
 
-> Screenshots of Home, the player and History will be added later.
+> Screenshots of Home and Downloads will be added later.
 
 ---
 

@@ -28,20 +28,38 @@
 
 <table>
   <tr>
-    <td align="center" width="50%">
-      <img src="docs/screenshots/surround.png" width="300" alt="環繞風格設定"><br>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/player.png" width="240" alt="播放頁"><br>
+      <b>播放頁</b><br>
+      <sub>專輯封面、讚／倒讚、歌詞、音效、進度條與播放控制；下方是接下來要播的歌</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/player-sound.png" width="240" alt="播放頁的音效面板"><br>
+      <b>音效面板</b><br>
+      <sub>點「音效」展開：環繞開關、耳機／車用、混音、風格、等化器</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/history.png" width="240" alt="歷史紀錄"><br>
+      <b>歷史紀錄</b><br>
+      <sub>「這支手機」和「YouTube Music 紀錄」兩個頁籤，底下是迷你播放列和四個分頁</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/surround.png" width="240" alt="環繞風格設定"><br>
       <b>環繞風格</b><br>
       <sub>選擇耳機脈衝響應風格，拖曳圖上的點調整音場：前方喇叭、包圍範圍、高度、人聲</sub>
     </td>
-    <td align="center" width="50%">
-      <img src="docs/screenshots/settings.png" width="300" alt="設定頁面"><br>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/settings.png" width="240" alt="設定頁面"><br>
       <b>設定</b><br>
       <sub>畫面與聲音對齊、氛圍燈（可摺疊）、YouTube Music 帳號、診斷，「關閉」在最下面</sub>
     </td>
+    <td></td>
   </tr>
 </table>
 
-> 首頁、播放頁、紀錄頁的截圖之後補上。
+> 首頁和下載頁的截圖之後補上。
 
 ---
 
