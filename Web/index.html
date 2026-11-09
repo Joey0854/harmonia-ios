@@ -885,6 +885,7 @@ function toggleProfile() {
   renderProfileChip();
   renderPlayer();
   renderEqChip();
+  renderStyleChip();
   toast(isCar() ? '已切到車用設定' : '已切到耳機設定');
 }
 function styleParams() {
@@ -911,6 +912,28 @@ function legacyStyle() {
     h: (rest.indexOf('-hh-') >= 0 || rest.indexOf('-kk-') >= 0) ? 100 : ((rest.indexOf('-h-') >= 0 || rest.indexOf('-k-') >= 0) ? 60 : 0),
     t: rest.indexOf('-t5-') >= 0 ? 50 : (rest.indexOf('-t-') >= 0 ? 100 : 0)
   };
+}
+/* How surround is made: 'hrir' (head-related responses, for headphones) or 'stage' (the song
+   split into rough parts placed on a stage in front, for the car's two speakers). Kept per
+   profile; the car starts on the stage, headphones on HRIR. */
+var STAGE_DEFAULT = { w: 60, d: 40, v: 30 };
+function stageMode() {
+  var m = lsGet('ytm_surround_mode' + psuf());
+  if (m === 'stage' || m === 'hrir') return m;
+  return isCar() ? 'stage' : 'hrir';
+}
+function stageParams() {
+  var p = null;
+  try { p = JSON.parse(lsGet('ytm_stage_params' + psuf()) || 'null'); } catch (e) { p = null; }
+  if (!p) p = STAGE_DEFAULT;
+  var num = function (v, def) { v = Math.round(+v); return isFinite(v) ? Math.max(0, Math.min(100, v)) : def; };
+  return { w: num(p.w, STAGE_DEFAULT.w), d: num(p.d, STAGE_DEFAULT.d), v: num(p.v, STAGE_DEFAULT.v) };
+}
+/* what the glue sends to the app: null when the HRIR surround is used */
+function stageSetting() {
+  if (stageMode() !== 'stage') return null;
+  var p = stageParams();
+  return { width: p.w, depth: p.d, vocal: p.v };
 }
 function irUrl(ch) {
   var p = styleParams();
@@ -1383,6 +1406,7 @@ if (window.__ytmGlue && window.__ytmGlue.page) window.__ytmGlue.page({
   irUrl: irUrl, eqGains: eqGains, normOn: normOn, normTarget: normTarget, gotLufs: gotLufs, dbg: dbg,
   headroom: function () { return HEADROOM; },
   surround: function () { return !!S.surround; },
+  stage: stageSetting,
   vid: function () { return S.vid || ''; },
   addHistory: function (items) {
     var n = HIST.addNative(items);
@@ -2504,7 +2528,82 @@ function closeQueue() {
   q.setAttribute('aria-hidden', 'true');
 }
 function renderStyleChip() {
-  $('fStyleTxt').textContent = '風格';
+  $('fStyleTxt').textContent = stageMode() === 'stage' ? '舞台' : '風格';
+}
+/* The surround panel's first row: HRIR or stage. Changing it redraws the panel. */
+function surroundModeRow(body) {
+  var sel = document.createElement('select');
+  sel.className = 'stylesel';
+  sel.setAttribute('aria-label', '環繞方式');
+  [['hrir', '耳機環繞（HRIR）'], ['stage', '舞台（車用喇叭）']].forEach(function (m) {
+    var o = document.createElement('option');
+    o.value = m[0];
+    o.textContent = m[1];
+    sel.appendChild(o);
+  });
+  sel.value = stageMode();
+  var lab = el('div', 'eql');
+  lab.appendChild(el('span', null, '環繞方式'));
+  var row = el('div', 'eqrow');
+  row.appendChild(lab);
+  row.appendChild(sel);
+  body.appendChild(row);
+  sel.addEventListener('change', function () {
+    lsSet('ytm_surround_mode' + psuf(), sel.value);
+    dbg('I', 'setting', { surroundMode: sel.value, profile: isCar() ? 'car' : 'head' });
+    renderStyleChip();
+    fxApply();
+    openStyles();
+  });
+}
+/* Stage mode: the song is split into bass, centre (vocal), left / right parts and ambience, and
+   these are placed on a stage in front. Three controls. */
+function stageControls(body) {
+  var tip = el('p', null, '把歌曲粗分成人聲／低音、左右聲部與環境聲，擺在你前方的虛擬舞台上。適合車內兩顆喇叭；用耳機也可以。');
+  tip.setAttribute('style', 'margin:0 0 12px;opacity:.8');
+  body.appendChild(tip);
+  var p = stageParams();
+  var rows = [];
+  var save = function () {
+    lsSet('ytm_stage_params' + psuf(), JSON.stringify(p));
+    fxApply();
+  };
+  [
+    { k: 'w', name: '舞台寬度（把樂器往兩側展開）' },
+    { k: 'd', name: '舞台深度（樂團往後退、多一點空間感）' },
+    { k: 'v', name: '人聲前置（主唱往前站）' }
+  ].forEach(function (d) {
+    var row = el('div', 'eqrow');
+    var l = el('div', 'eql');
+    l.appendChild(el('span', null, d.name));
+    var val = el('span', null, p[d.k] + '%');
+    l.appendChild(val);
+    row.appendChild(l);
+    var input = document.createElement('input');
+    input.type = 'range';
+    input.min = '0';
+    input.max = '100';
+    input.step = '5';
+    input.value = p[d.k];
+    input.setAttribute('aria-label', d.name);
+    input.addEventListener('input', function () {
+      p[d.k] = +input.value;
+      val.textContent = p[d.k] + '%';
+      save();
+    });
+    row.appendChild(input);
+    body.appendChild(row);
+    rows.push({ input: input, val: val, k: d.k });
+  });
+  var btns = el('div', 'sheetbtns');
+  var reset = el('button', 'btn ghost', '回到建議值');
+  reset.type = 'button';
+  reset.addEventListener('click', function () {
+    rows.forEach(function (r) { p[r.k] = STAGE_DEFAULT[r.k]; r.input.value = p[r.k]; r.val.textContent = p[r.k] + '%'; });
+    save();
+  });
+  btns.appendChild(reset);
+  body.appendChild(btns);
 }
 /* p: the values being edited; rows: the sliders (kept in step); save: stores and applies. */
 function styleScene(p, rows, save) {
@@ -2648,6 +2747,8 @@ function openStyles() {
     var warn = el('p', null, '注意：請先關閉車機、耳機或手機自己的環繞／音場／空間音訊，否則聲音會被處理兩次，容易變悶或破音。');
     warn.setAttribute('style', 'margin:0 0 12px;padding:10px 12px;border-radius:10px;background:rgba(255,190,60,.14);border:1px solid rgba(255,190,60,.45)');
     body.appendChild(warn);
+    surroundModeRow(body);
+    if (stageMode() === 'stage') { stageControls(body); return; }
     var p = styleParams();
     var rows = [];
     var save = function () {
@@ -2716,7 +2817,8 @@ function openStyles() {
     });
     enable();
     var scene = styleScene(p, rows, save);
-    body.insertBefore(scene.el, body.children[1] || null);
+    /* below the warning and the mode row */
+    body.insertBefore(scene.el, body.children[2] || null);
     body.insertBefore(el('div', 'scenetip', '拖曳圖上的點來調整：白色方塊是前方喇叭，藍點是包圍範圍，紫點是高度，橘點是人聲。'), scene.el.nextSibling);
     rows.forEach(function (r) { r.input.addEventListener('input', function () { scene.draw(); }); });
     sel.addEventListener('change', function () { setTimeout(scene.draw, 0); });

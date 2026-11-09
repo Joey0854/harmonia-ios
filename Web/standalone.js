@@ -807,6 +807,16 @@
       raw({ cmd: 'fx', key: 'off', surround: false, irL: null, irR: null, makeup: headroom });
       return;
     }
+    /* Stage mode: no impulse responses, the app splits and places the sound itself. */
+    var st = P.stage ? P.stage() : null;
+    if (st) {
+      var sk = 'stage-' + st.width + '-' + st.depth + '-' + st.vocal;
+      fxSeq++;
+      if (sent.fx === sk) return;
+      sent.fx = sk;
+      raw({ cmd: 'fx', key: sk, surround: true, mode: 'stage', stage: { width: st.width, depth: st.depth, vocal: st.vocal }, irL: null, irR: null, makeup: headroom });
+      return;
+    }
     var pathL = P.irUrl('L'), pathR = P.irUrl('R');
     var key = pathL.split('?')[1] || pathL;
     if (sent.fx === key) { fxSeq++; return; }
@@ -1204,7 +1214,7 @@
     /* a sound setting was changed (fxApply and the loudness controls) */
     sound: soundSoon,
     /* the line under the player */
-    status: function (surround) { return cur.progress || cur.lookup || (mixRun ? '轉場中 → ' + (mixRun.title || '下一首') : '') || (surround ? 'App：手機處理環繞' : 'App：環繞關閉'); },
+    status: function (surround) { return cur.progress || cur.lookup || (mixRun ? '轉場中 → ' + (mixRun.title || '下一首') : '') || (surround ? (P && P.stage && P.stage() ? 'App：舞台模式' : 'App：手機處理環繞') : 'App：環繞關閉'); },
     /* the mixing switch was moved */
     mix: sendMix,
     /* title, artist, artwork and length of a song as it was last sent to the app in a queue */

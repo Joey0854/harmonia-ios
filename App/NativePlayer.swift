@@ -642,9 +642,21 @@ final class NativePlayer: NSObject {
         if let n = message["makeup"] as? NSNumber, n.doubleValue.isFinite, n.doubleValue > 0 {
             makeup = Float(min(16, n.doubleValue))
         }
+        /* "stage" instead of impulse responses; anything else (or nothing, as from an older
+           page or an older copy on disk) is the impulse-response surround. */
+        let mode = SurroundMode(rawValue: message["mode"] as? String ?? "") ?? .hrir
+        var stage = StageParams.neutral
+        if let s = message["stage"] as? [String: Any] {
+            func amount(_ name: String) -> Float {
+                guard let n = s[name] as? NSNumber, n.doubleValue.isFinite else { return 0 }
+                return Float(min(100, max(0, n.doubleValue)))
+            }
+            stage = StageParams(width: amount("width"), depth: amount("depth"), vocal: amount("vocal"))
+        }
         return SurroundSettings(key: message["key"] as? String ?? "",
                                 surround: message["surround"] as? Bool ?? false,
-                                irLeft: wav(message["irL"]), irRight: wav(message["irR"]), makeup: makeup)
+                                irLeft: wav(message["irL"]), irRight: wav(message["irR"]), makeup: makeup,
+                                mode: mode, stage: stage)
     }
 
     private func restoreSoundSettings() {

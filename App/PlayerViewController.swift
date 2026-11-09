@@ -23,6 +23,9 @@ import WebKit
                                                         right input, null when surround is false; makeup
                                                         is a plain factor (1 = unchanged). A repeat of
                                                         the same key is ignored. Remembered over restarts.
+                                                        Optional mode: "stage" (no impulse responses;
+                                                        stage { width, depth, vocal }, each 0..100) or
+                                                        "hrir" (the default).
       eq        { gains: [5 numbers, dB] }              150 / 400 / 1500 / 5000 / 10000 Hz
       normTarget { on, target }                         loudness balancing towards `target` LUFS
       diag      {}                                      answered with a `diag` event
@@ -441,7 +444,8 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
             let right = (body["irR"] as? String)?.count ?? 0
             let key = body["key"] as? String ?? ""
             let surround = body["surround"].map { "\($0)" } ?? "-"
-            Diag.shared.log("cmd fx: key \(key), surround \(surround), irL \(left) chars, irR \(right) chars, makeup \(number(body["makeup"]))")
+            let mode = body["mode"] as? String ?? "hrir"
+            Diag.shared.log("cmd fx: key \(key), surround \(surround), mode \(mode), irL \(left) chars, irR \(right) chars, makeup \(number(body["makeup"]))")
         case "eq", "normTarget", "play", "pause", "seek", "mix":
             var rest = body
             rest["cmd"] = nil

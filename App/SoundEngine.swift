@@ -370,7 +370,7 @@ final class SoundEngine {
         }
         if new?.key == settings?.key { return }
         settings = new
-        Diag.shared.log("engine: effect \(new?.key ?? "none"), surround \(new?.surround ?? false)")
+        Diag.shared.log("engine: effect \(new?.key ?? "none"), surround \(new?.surround ?? false), mode \(new?.mode.rawValue ?? "-")")
         if current.file != nil { restart(current, at: position, cutNow: false) }
     }
 
