@@ -174,10 +174,17 @@ final class Diag {
     private static let secret = try? NSRegularExpression(
         pattern: "(?i)(cookie|set-cookie|authorization|bearer|token|access_token|refresh_token|sapisid|apisid|ssid|hsid|sid|__secure-[a-z0-9_-]+|login_info|key|password|sig)([=:]\\s*)([^\\s;&,\"']+)")
 
+    private static let bearer = try? NSRegularExpression(pattern: "(?i)(bearer)\\s+[^\\s\"']+")
+
     static func mask(_ text: String) -> String {
-        guard let re = secret else { return text }
-        let range = NSRange(text.startIndex..., in: text)
-        return re.stringByReplacingMatches(in: text, range: range, withTemplate: "$1$2…")
+        var out = text
+        if let re = bearer {
+            out = re.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "$1 …")
+        }
+        if let re = secret {
+            out = re.stringByReplacingMatches(in: out, range: NSRange(out.startIndex..., in: out), withTemplate: "$1$2…")
+        }
+        return out
     }
 
     /// The last lines of the log as one text.
