@@ -19,6 +19,11 @@ targets:
       - path: PythonRuntime
         type: folder
         buildPhase: resources
+      # The band surround's Core ML model (BandModel/HTDemucsBody.mlmodelc), made in CI by
+      # tools/band/convert.py; a folder reference, copied as it is.
+      - path: BandModel
+        type: folder
+        buildPhase: resources
     dependencies:
       # CPython for iOS. Embedded in Frameworks/, loaded by the app itself.
       - framework: vendor/Python.framework
@@ -28,8 +33,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Harmonia
-        CFBundleShortVersionString: "1.3.6"
-        CFBundleVersion: "54"
+        CFBundleShortVersionString: "1.3.7"
+        CFBundleVersion: "55"
         UILaunchScreen: {}
         UIBackgroundModes:
           - audio

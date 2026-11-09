@@ -642,8 +642,9 @@ final class NativePlayer: NSObject {
         if let n = message["makeup"] as? NSNumber, n.doubleValue.isFinite, n.doubleValue > 0 {
             makeup = Float(min(16, n.doubleValue))
         }
-        /* "stage" instead of impulse responses; anything else (or nothing, as from an older
-           page or an older copy on disk) is the impulse-response surround. */
+        /* "stage", "band" or "bandHead" instead of plain impulse responses; anything else (or
+           nothing, as from an older page or an older copy on disk) is the impulse-response
+           surround. */
         let mode = SurroundMode(rawValue: message["mode"] as? String ?? "") ?? .hrir
         var stage = StageParams.neutral
         if let s = message["stage"] as? [String: Any] {
@@ -653,10 +654,18 @@ final class NativePlayer: NSObject {
             }
             stage = StageParams(width: amount("width"), depth: amount("depth"), vocal: amount("vocal"))
         }
+        /* bandHead: one pair of responses per separated part, by name */
+        var bandIrs: [(left: Data, right: Data)] = []
+        if let parts = message["bandIr"] as? [String: Any] {
+            for name in Demucs.sources {
+                guard let pair = parts[name] as? [String: Any], let l = wav(pair["L"]), let r = wav(pair["R"]) else { break }
+                bandIrs.append((l, r))
+            }
+        }
         return SurroundSettings(key: message["key"] as? String ?? "",
                                 surround: message["surround"] as? Bool ?? false,
                                 irLeft: wav(message["irL"]), irRight: wav(message["irR"]), makeup: makeup,
-                                mode: mode, stage: stage)
+                                mode: mode, stage: stage, bandIrs: bandIrs)
     }
 
     private func restoreSoundSettings() {

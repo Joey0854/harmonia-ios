@@ -14,3 +14,5 @@ vendor/
 __pycache__/
 *.pyc
 *.bak-*
+# Made by tools/band/convert.py in CI (the HTDemucs Core ML model); too big to keep in git.
+BandModel/

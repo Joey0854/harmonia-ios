@@ -764,6 +764,23 @@ final class SoundEngine {
                 return
             }
         }
+        /* The band modes hold sound back while their network works: hand it on now, never
+           letting playback run dry (short of two seconds, the original sound goes on). */
+        while !over, let part = chain.drain(urgent: path.ahead(g) < Int64(2 * rate)) {
+            if !path.isCurrent(g) { return }
+            switch hand(part) {
+            case .stop:
+                return
+            case .done:
+                over = true
+            case .more:
+                break
+            }
+            while !over && path.ahead(g) > aheadLimit {
+                Thread.sleep(forTimeInterval: 0.05)
+                if !path.isCurrent(g) { return }
+            }
+        }
         if !over {
             if case .stop = hand(chain.finish()) { return }
         }

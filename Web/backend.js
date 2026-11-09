@@ -4691,9 +4691,11 @@ function buildStyleIr(style) {
   let first = n;
   for (const pair of res) for (const ch of pair) for (let i = 0; i < n; i++) { const a = Math.abs(ch[i]); if (a > peak) peak = a; if (a > 1e-5) { last = Math.max(last, i); if (i < first) first = i; } }
   // Drop the part of the lead-in nothing used (the same amount from all four, so they stay aligned).
-  const start = Math.max(0, Math.min(first, PRE) - 32);
-  // The page sets the playback level itself, so the files are simply scaled to use the full 16 bits.
-  const scale = 0.9 / peak;
+  // (keepLeadIn: all of it stays, so that several responses meant to be added stay aligned.)
+  const start = style.keepLeadIn ? 0 : Math.max(0, Math.min(first, PRE) - 32);
+  // The page sets the playback level itself, so the files are simply scaled to use the full 16 bits
+  // (or by a given factor, when several responses must keep their levels relative to each other).
+  const scale = style.scale || 0.9 / peak;
   const frames = Math.min(n, last + 257) - start;
   const toWav = (pair) => pcm16Wav(2, frames, (d) => {
     for (let i = 0; i < frames; i++) {
@@ -4701,7 +4703,7 @@ function buildStyleIr(style) {
       d.writeInt16LE(Math.round(Math.max(-1, Math.min(1, pair[1][start + i] * scale)) * 32767), i * 4 + 2);
     }
   });
-  return { L: toWav(res[0]), R: toWav(res[1]) };
+  return { L: toWav(res[0]), R: toWav(res[1]), scale };
 }
 
 // Base sets offered to the slider-based style editor.
@@ -4925,6 +4927,33 @@ async function ensureFx(id, q) {
 
 const styleIrCache = new Map();
 
+// "Band" surround for headphones (test build): the app separates a song into four parts and
+// sends each through its own virtual speakers: [from left input, from right input] per speaker.
+const BAND_MIX = {
+  drums: { C: [0.2, 0.2], FL: [0.4, 0], FR: [0, 0.4] },
+  bass: { C: [0.5, 0.5] },
+  other: { FL: [0.4, 0], FR: [0, 0.4], SL: [0.35, -0.15], SR: [-0.15, 0.35] },
+  vocals: { C: [0.5, 0.5] },
+};
+const bandIrCache = new Map();
+
+// All four parts for one base, with one common scale so that their levels stay as mixed.
+function getBandIrs(q) {
+  const wanted = q.get('b') || 'dh';
+  const have = (b) => fs.existsSync(path.join(APO_DIR, 'config', 'HeSuVi', 'hrir', b.hrir));
+  const base = BASES.find((b) => b.id === wanted && have(b)) || BASES.find(have);
+  if (!base) return Promise.reject(new Error('no HRIR base available'));
+  if (!bandIrCache.has(base.id)) {
+    const first = {};
+    for (const name of Object.keys(BAND_MIX)) first[name] = buildStyleIr({ hrir: base.hrir, mix: BAND_MIX[name], keepLeadIn: true });
+    const scale = Math.min(...Object.values(first).map((x) => x.scale));
+    const out = {};
+    for (const name of Object.keys(BAND_MIX)) out[name] = buildStyleIr({ hrir: base.hrir, mix: BAND_MIX[name], keepLeadIn: true, scale });
+    bandIrCache.set(base.id, out);
+  }
+  return Promise.resolve(bandIrCache.get(base.id));
+}
+
 function getStyleIr(id) {
   if (id === 'hesuvi') return getIr();
   const style = STYLES.find((x) => x.id === id);
@@ -5074,6 +5103,12 @@ async function handle(req, res) {
       const db = (v) => Math.round(200 * Math.log10(Math.max(v, 1e-6))) / 10;
       const cue = loadKemarCue();
       return send(res, 200, { freqs, synthetic: freqs.map((f) => db(heightCurve(f))), measuredNear: freqs.map((f) => db(cue.near(f))), measuredFar: freqs.map((f) => db(cue.far(f))) });
+    }
+    m = /^\/api\/ir\/band\/(drums|bass|other|vocals)\/([LR])\.wav$/.exec(p);
+    if (GET && m) {
+      let irs;
+      try { irs = await getBandIrs(url.searchParams); } catch (e) { return send(res, 404, { error: String(e.message || e) }); }
+      return send(res, 200, irs[m[1]][m[2]], 'audio/wav');
     }
     m = /^\/api\/ir\/([\w-]{1,32})\/([LR])\.wav$/.exec(p);
     if (GET && m) {

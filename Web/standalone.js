@@ -807,6 +807,41 @@
       raw({ cmd: 'fx', key: 'off', surround: false, irL: null, irR: null, makeup: headroom });
       return;
     }
+    /* Band modes (test build): the app separates the song with its model. Speakers: no
+       impulse responses. Headphones: one pair per separated part. */
+    var band = P.band ? P.band() : null;
+    if (band === 'band') {
+      fxSeq++;
+      if (sent.fx === 'band') return;
+      sent.fx = 'band';
+      raw({ cmd: 'fx', key: 'band', surround: true, mode: 'band', irL: null, irR: null, makeup: headroom });
+      return;
+    }
+    if (band === 'bandHead') {
+      var bq = P.bandIrQuery(), bkey = 'bandHead' + bq;
+      if (sent.fx === bkey) { fxSeq++; return; }
+      var bmine = ++fxSeq;
+      var parts = ['drums', 'bass', 'other', 'vocals'], urls = [];
+      parts.forEach(function (n) { urls.push('/api/ir/band/' + n + '/L.wav' + bq, '/api/ir/band/' + n + '/R.wav' + bq); });
+      Promise.all(urls.map(getIr)).then(function (r) {
+        if (bmine !== fxSeq) return;
+        sent.fx = bkey;
+        var ir = {}, e = 0;
+        parts.forEach(function (n, i) {
+          ir[n] = { L: B.b64(r[2 * i]), R: B.b64(r[2 * i + 1]) };
+          var a = wavEnergy(r[2 * i]), b = wavEnergy(r[2 * i + 1]);
+          e += (a[0] + b[0] + a[1] + b[1]) / 2 / parts.length;
+        });
+        var mk = (e > 0 ? Math.min(8, Math.max(0.25, 1 / Math.sqrt(e))) : 1) * headroom;
+        raw({ cmd: 'fx', key: bkey, surround: true, mode: 'bandHead', bandIr: ir, irL: null, irR: null, makeup: mk });
+      }, function (err) {
+        if (bmine !== fxSeq) return;
+        try { console.warn('standalone: band responses not available (' + ((err && err.message) || err) + '), playing without'); } catch (x) {}
+        sent.fx = 'off';
+        raw({ cmd: 'fx', key: 'off', surround: false, irL: null, irR: null, makeup: headroom });
+      });
+      return;
+    }
     /* Stage mode: no impulse responses, the app splits and places the sound itself. */
     var st = P.stage ? P.stage() : null;
     if (st) {
@@ -1214,7 +1249,7 @@
     /* a sound setting was changed (fxApply and the loudness controls) */
     sound: soundSoon,
     /* the line under the player */
-    status: function (surround) { return cur.progress || cur.lookup || (mixRun ? '轉場中 → ' + (mixRun.title || '下一首') : '') || (surround ? (P && P.stage && P.stage() ? 'App：舞台模式' : 'App：手機處理環繞') : 'App：環繞關閉'); },
+    status: function (surround) { return cur.progress || cur.lookup || (mixRun ? '轉場中 → ' + (mixRun.title || '下一首') : '') || (surround ? (P && P.band && P.band() ? 'App：樂團模式' : (P && P.stage && P.stage() ? 'App：舞台模式' : 'App：手機處理環繞')) : 'App：環繞關閉'); },
     /* the mixing switch was moved */
     mix: sendMix,
     /* title, artist, artwork and length of a song as it was last sent to the app in a queue */

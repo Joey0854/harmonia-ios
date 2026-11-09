@@ -920,7 +920,7 @@ function legacyStyle() {
 var STAGE_DEFAULT = { w: 60, d: 40, v: 30 };
 function stageMode() {
   var m = lsGet('ytm_surround_mode' + psuf());
-  if (m === 'stage' || m === 'hrir') return m;
+  if (m === 'stage' || m === 'hrir' || m === 'band' || m === 'bandHead') return m;
   return isCar() ? 'stage' : 'hrir';
 }
 function stageParams() {
@@ -935,6 +935,18 @@ function stageSetting() {
   if (stageMode() !== 'stage') return null;
   var p = stageParams();
   return { width: p.w, depth: p.d, vocal: p.v };
+}
+/* "Band" (test build): the app separates the song into drums, bass, other and vocals with a
+   model and places them, on the stage ('band', speakers) or each through its own virtual
+   speakers ('bandHead', headphones). What the glue sends: null, 'band' or 'bandHead'. */
+function bandSetting() {
+  var m = stageMode();
+  return m === 'band' || m === 'bandHead' ? m : null;
+}
+/* the HRIR set the headphone band uses: the style editor's base */
+function bandIrQuery() {
+  var b = styleParams().b;
+  return '?b=' + enc(b === 'hesuvi' ? 'dh' : b);
 }
 function irUrl(ch) {
   var p = styleParams();
@@ -1408,6 +1420,8 @@ if (window.__ytmGlue && window.__ytmGlue.page) window.__ytmGlue.page({
   headroom: function () { return HEADROOM; },
   surround: function () { return !!S.surround; },
   stage: stageSetting,
+  band: bandSetting,
+  bandIrQuery: bandIrQuery,
   vid: function () { return S.vid || ''; },
   addHistory: function (items) {
     var n = HIST.addNative(items);
@@ -2529,14 +2543,14 @@ function closeQueue() {
   q.setAttribute('aria-hidden', 'true');
 }
 function renderStyleChip() {
-  $('fStyleTxt').textContent = stageMode() === 'stage' ? '舞台' : '風格';
+  $('fStyleTxt').textContent = { stage: '舞台', band: '樂團', bandHead: '樂團' }[stageMode()] || '風格';
 }
 /* The surround panel's first row: HRIR or stage. Changing it redraws the panel. */
 function surroundModeRow(body) {
   var sel = document.createElement('select');
   sel.className = 'stylesel';
   sel.setAttribute('aria-label', '環繞方式');
-  [['hrir', '耳機環繞（HRIR）'], ['stage', '舞台（車用喇叭）']].forEach(function (m) {
+  [['hrir', '耳機環繞（HRIR）'], ['stage', '舞台（車用喇叭）'], ['band', '樂團（喇叭，測試）'], ['bandHead', '樂團（耳機，測試）']].forEach(function (m) {
     var o = document.createElement('option');
     o.value = m[0];
     o.textContent = m[1];
@@ -2750,6 +2764,14 @@ function openStyles() {
     body.appendChild(warn);
     surroundModeRow(body);
     if (stageMode() === 'stage') { stageControls(body); return; }
+    if (bandSetting()) {
+      var bt = el('p', null, bandSetting() === 'band'
+        ? '用模型把歌分成人聲、鼓、貝斯與其他樂器，擺在你前方的虛擬舞台上（車用喇叭）。手機算不及時會先播原音。'
+        : '用模型把歌分成人聲、鼓、貝斯與其他樂器，各自用耳機環繞的虛擬喇叭擺位（耳機）。基底沿用耳機環繞的設定。手機算不及時會先播原音。');
+      bt.setAttribute('style', 'margin:0 0 12px;opacity:.8');
+      body.appendChild(bt);
+      return;
+    }
     var p = styleParams();
     var rows = [];
     var save = function () {
@@ -3095,9 +3117,10 @@ function renderToggles() {
   $('fSurroundTxt').textContent = S.surround ? '環繞 開' : '環繞 關';
   renderAbChip();
 }
-/* One button to compare by ear: original -> HRIR surround -> stage -> original ... */
+/* One button to compare by ear: original -> HRIR surround -> stage -> band (speakers) ->
+   band (headphones) -> original ... */
 function abState() { return !S.surround ? 'off' : stageMode(); }
-var AB_NAME = { off: '原音', hrir: '耳機環繞', stage: '舞台' };
+var AB_NAME = { off: '原音', hrir: '耳機環繞', stage: '舞台', band: '樂團（喇叭）', bandHead: '樂團（耳機）' };
 function renderAbChip() {
   var b = $('fAB');
   if (!b) return;
@@ -3105,7 +3128,7 @@ function renderAbChip() {
   b.classList.toggle('on', S.surround);
 }
 function cycleAb() {
-  var next = { off: 'hrir', hrir: 'stage', stage: 'off' }[abState()];
+  var next = { off: 'hrir', hrir: 'stage', stage: 'band', band: 'bandHead', bandHead: 'off' }[abState()] || 'off';
   if (next === 'off') {
     S.surround = false;
   } else {

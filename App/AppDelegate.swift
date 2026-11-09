@@ -6,6 +6,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        /* The band surround modes: the separation model (loaded the first time it is used). */
+        SurroundChain.bandNetwork = { BandModel.shared.network() }
+        SurroundChain.log = { Diag.shared.log($0) }
         let w = UIWindow(frame: UIScreen.main.bounds)
         w.backgroundColor = .black
         w.rootViewController = PlayerViewController()
