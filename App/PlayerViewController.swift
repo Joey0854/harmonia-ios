@@ -431,6 +431,10 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
             Diag.shared.setSetting("loudness", ["on": body["on"] as? Bool ?? false, "target": target])
         case "pageInfo":
             if let profile = body["profile"] as? String { Diag.shared.setSetting("profile", String(profile.prefix(20))) }
+            if let full = body["full"] as? Bool {
+                PerfMonitor.shared.setFullPlayer(full)
+                Diag.shared.setSetting("fullPlayer", full)
+            }
         case "headroom":
             /* the automatic headroom before the limiter (on unless turned off) */
             if let on = body["on"] as? Bool {

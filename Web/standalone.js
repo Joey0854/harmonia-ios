@@ -962,6 +962,14 @@
     if (s === 'failed') return /model not in the app|does not load/.test(bandState.message || '') ? '樂團：模型載入失敗（播原音）' : '樂團暫停（模型無法執行或記憶體不足，重試中；先播原音）';
     return '';
   }
+  function sendPageInfo() {
+    if (!P) return;
+    var info = { cmd: 'pageInfo', profile: P.profile ? String(P.profile()) : '', full: P.fullOpen ? !!P.fullOpen() : false };
+    var k = JSON.stringify(info);
+    if (sent.profile === k) return;
+    sent.profile = k;
+    raw(info);
+  }
   function sendSound() {
     if (!P) return;
     try {
@@ -971,8 +979,7 @@
       if (sent.norm !== nk) { sent.norm = nk; raw(n); }
       sendFx();
       sendBandMix();
-      var prof = P.profile ? String(P.profile()) : '';
-      if (sent.profile !== prof) { sent.profile = prof; raw({ cmd: 'pageInfo', profile: prof }); }
+      sendPageInfo();
     } catch (e) { try { console.error('standalone: sound settings', e); } catch (x) {} }
   }
   function soundSoon() {
@@ -1402,6 +1409,7 @@
     },
     /* a sound setting was changed (fxApply and the loudness controls) */
     sound: soundSoon,
+    pageInfo: function () { try { sendPageInfo(); } catch (e) {} },
     bandStatus: function () { return bandStatusText(); },
     /* the line under the player */
     status: function (surround) { return glueStatus(surround); },

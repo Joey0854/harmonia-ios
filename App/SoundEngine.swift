@@ -170,6 +170,8 @@ final class SoundEngine {
 
     /* Main queue only. */
     private var settings: SurroundSettings?
+    /// The setting before a band mode was chosen (stands in while the band gets ready).
+    private var bandFallback: SurroundSettings?
     /// A surround setting that arrived during a mix; applied when the mix is over.
     private var laterSettings: SurroundSettings??
     private var wantPlay = false
@@ -403,6 +405,12 @@ final class SoundEngine {
             return
         }
         if new?.key == settings?.key { return }
+        /* switching into a band mode: the mode before stands in until the band is ready */
+        if let n = new, n.surround, n.mode == .band || n.mode == .bandHead {
+            if let old = settings, !(old.surround && (old.mode == .band || old.mode == .bandHead)) { bandFallback = old }
+        } else {
+            bandFallback = nil
+        }
         settings = new
         Diag.shared.log("engine: effect \(new?.key ?? "none"), surround \(new?.surround ?? false), mode \(new?.mode.rawValue ?? "-")")
         if current.file != nil { restart(current, at: position, cutNow: false) }
@@ -647,9 +655,10 @@ final class SoundEngine {
         path.lastPosition = position
         if cutNow { path.node.stop() }
         let settings = self.settings
+        let fallback = self.bandFallback
         let label = path.songID
         path.worker.async { [weak self] in
-            self?.run(path, g, label: label, file: file, from: position, settings: settings, role: role)
+            self?.run(path, g, label: label, file: file, from: position, settings: settings, fallback: fallback, role: role)
         }
     }
 
@@ -661,7 +670,8 @@ final class SoundEngine {
 
     /// The processing loop for one (re)start of one path. Runs on the path's worker until the
     /// song is fully scheduled or a newer (re)start has made this run pointless.
-    private func run(_ path: SoundPath, _ g: Int, label: String, file: URL, from position: Double, settings: SurroundSettings?, role: Role) {
+    private func run(_ path: SoundPath, _ g: Int, label: String, file: URL, from position: Double, settings: SurroundSettings?,
+                     fallback: SurroundSettings?, role: Role) {
         if !path.isCurrent(g) { return }
         let decoder: SongDecoder
         var piece: (left: [Float], right: [Float])?
@@ -694,7 +704,8 @@ final class SoundEngine {
             fail(path, g, "unusable sample rate \(rate)", at: position)
             return
         }
-        let chain = SurroundChain(settings: settings, sampleRate: Int(rate.rounded()), song: label, startTime: decoder.startTime)
+        let chain = SurroundChain(settings: settings, sampleRate: Int(rate.rounded()), song: label, startTime: decoder.startTime,
+                                  fallback: fallback)
         if let problem = chain.problem { Diag.shared.log("engine: \(problem)", error: true) }
         let startTime = decoder.startTime
         let stated = decoder.statedDuration

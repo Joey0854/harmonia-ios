@@ -16,7 +16,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         SurroundChain.log = { Diag.shared.log($0) }
         BandPrefetch.log = { Diag.shared.log($0) }
         PerfMonitor.shared.start()
-        BandProcessor.segmentTag = { BandModel.shared.label }
+        BandProcessor.segmentTag = { PerfMonitor.shared.segmentTag() }
         let w = UIWindow(frame: UIScreen.main.bounds)
         w.backgroundColor = .black
         w.rootViewController = PlayerViewController()

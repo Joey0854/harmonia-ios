@@ -1636,6 +1636,7 @@ if (window.__ytmGlue && window.__ytmGlue.page) window.__ytmGlue.page({
   bandIrQuery: bandIrQuery,
   bandMix: bandMixSetting,
   profile: function () { return isCar() ? 'car' : 'head'; },
+  fullOpen: function () { return lsGet('ytm_full') === '1'; },
   bandStatusChanged: function (text) { if (bandStatusEl && document.body.contains(bandStatusEl)) bandStatusEl.textContent = text || '樂團：等待播放'; },
   vid: function () { return S.vid || ''; },
   addHistory: function (items) {
@@ -2411,7 +2412,10 @@ function openFull() {
   setTimeout(titleFit, 320);
   f.setAttribute('aria-hidden', 'false');
   setTimeout(fxKick, 0);
+  pageInfoSoon();
 }
+/* tells the app whether the full player is open (its performance log notes it per segment) */
+function pageInfoSoon() { try { if (window.__ytmGlue && window.__ytmGlue.pageInfo) window.__ytmGlue.pageInfo(); } catch (e) {} }
 function closeFull() {
   var f = $('full');
   lsSet('ytm_full', '0');
@@ -2420,6 +2424,7 @@ function closeFull() {
   f.style.transform = '';
   closeQueue();
   f.setAttribute('aria-hidden', 'true');
+  pageInfoSoon();
 }
 
 /* ---------- song actions: like, comments, save, share, AirPlay ---------- */

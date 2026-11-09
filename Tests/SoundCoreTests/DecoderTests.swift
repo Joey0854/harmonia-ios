@@ -38,6 +38,8 @@ final class DecoderTests: XCTestCase {
         XCTAssertEqual(d.framesRead, all.left.count)
         /* Six seconds, give or take the encoder's padding. */
         XCTAssertEqual(Double(all.left.count), 6 * 44100, accuracy: 5000, "the whole song must come out, not just its first fragment")
+        /* The stated length is the real one (AVFoundation alone said 11.975 s for the fragmented file). */
+        XCTAssertEqual(d.statedDuration, Double(all.left.count) / 44100, accuracy: 0.1, "stated length")
         /* The right sound at the right time: loud at 1.0 - 1.4 s, silent at 4.2 - 4.6 s, loud again after. */
         XCTAssertGreaterThan(power(all.left, rate: 44100, from: 1.0, to: 1.4), 1e-3)
         XCTAssertLessThan(power(all.left, rate: 44100, from: 4.2, to: 4.6), 1e-5)

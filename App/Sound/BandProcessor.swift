@@ -98,6 +98,11 @@ public final class BandProcessor {
     private var wasReady = false
     private var everReady = false
     private var lastRun: BandStatus = .loading
+    /* What plays where the band is missing: the mode chosen before (when switching from it),
+       else the original. And the band only starts once its first two segments are there, so
+       that a switch is not followed by a moment of the stand-in. */
+    private var dry: SurroundChain?
+    private var gateOpen = false
     private var retry: BandSplitter.Job?
     private var errors = 0
     /// Network failures in a row before the band gives up for the song.
@@ -129,7 +134,7 @@ public final class BandProcessor {
     /// `queue` nil runs the network inside `process` / `drain` (tests). `log` gets one line per
     /// segment and per change between band and original; `status` the same for the page.
     public init(output: Output, network: BandNetwork, sampleRate: Int, queue: DispatchQueue?,
-                mix: BandMix = .shared, seed: BandSeed? = nil,
+                mix: BandMix = .shared, seed: BandSeed? = nil, dry: SurroundChain? = nil,
                 log: @escaping (String) -> Void = { _ in },
                 status: @escaping (BandStatus) -> Void = { _ in }) {
         self.network = network
@@ -157,7 +162,9 @@ public final class BandProcessor {
             outOf = (0..<8).map { _ in Resampler(from: Demucs.sampleRate, to: self.sampleRate) }
             log("band: song at \(self.sampleRate) Hz, resampled to \(Demucs.sampleRate) Hz for the model and back")
         }
+        self.dry = dry
         if let s = seed {
+            gateOpen = true
             splitter.seed(s.stems, segments: s.segments)
             /* separated already: the band from the very first sample, no fade-in */
             everReady = true
@@ -171,8 +178,14 @@ public final class BandProcessor {
     public func process(left: [Float], right: [Float]) -> (left: [Float], right: [Float]) {
         let n = min(left.count, right.count)
         let l = Array(left.prefix(n)), r = Array(right.prefix(n))
-        original[0].append(contentsOf: l)
-        original[1].append(contentsOf: r)
+        if let d = dry {
+            let t = d.process(left: l, right: r)
+            original[0].append(contentsOf: t.left)
+            original[1].append(contentsOf: t.right)
+        } else {
+            original[0].append(contentsOf: l)
+            original[1].append(contentsOf: r)
+        }
         received += n
         let a = resampling ? into[0].process(l) : l
         let b = resampling ? into[1].process(r) : r
@@ -190,6 +203,11 @@ public final class BandProcessor {
     public func drain(urgent: Bool) -> (left: [Float], right: [Float])? {
         if !inputEnded {
             inputEnded = true
+            if let d = dry {
+                let t = d.finish()
+                original[0].append(contentsOf: t.left)
+                original[1].append(contentsOf: t.right)
+            }
             if resampling {
                 let a = into[0].finish(), b = into[1].finish()
                 lock.lock()
@@ -475,9 +493,16 @@ public final class BandProcessor {
         }
 
         let o = originalStart
+        if !gateOpen {
+            let r = readyUpTo()
+            let two = 2 * Demucs.stride * sampleRate / Demucs.sampleRate
+            if r >= emitted + min(two, received - emitted) || (inputEnded && r >= received) {
+                gateOpen = true
+            }
+        }
         var gains = [Float](repeating: 0, count: count)
         for j in 0..<count {
-            if part.ready[j] && !broken {
+            if part.ready[j] && !broken && gateOpen {
                 amount = min(1, amount + 1 / Float(BandProcessor.fade))
             } else {
                 amount = 0
@@ -513,16 +538,18 @@ public final class BandProcessor {
             gainNow[s] = g
         }
         var dryLeft = [Float](repeating: 0, count: count), dryRight = [Float](repeating: 0, count: count)
-        for j in 0..<count {
+        let have = original[0].count
+        for j in 0..<count where o + j < have {
             dryLeft[j] = original[0][o + j] * (1 - gains[j])
             dryRight[j] = original[1][o + j] * (1 - gains[j])
         }
         originalStart += count
         emitted += count
         if originalStart > 1 << 18 {
-            original[0].removeFirst(originalStart)
-            original[1].removeFirst(originalStart)
-            originalStart = 0
+            let k = min(originalStart, original[0].count)
+            original[0].removeFirst(k)
+            original[1].removeFirst(k)
+            originalStart -= k
         }
 
         if let p = placer {

@@ -23,6 +23,25 @@ final class PerfMonitor {
     private var worstThermal = 0
     private var warnings = 0
     private var lastCPU: (time: Double, cpu: Double)?
+    private var fullPlayer: Bool?
+    private var locked = false
+
+    /// The page says whether its full player is open (pageInfo).
+    func setFullPlayer(_ open: Bool) {
+        lock.lock()
+        fullPlayer = open
+        lock.unlock()
+    }
+
+    /// For each band segment's log line: compute units, front or background, screen, page,
+    /// thermal state (any thread).
+    func segmentTag() -> String {
+        lock.lock()
+        let full = fullPlayer, isLocked = locked
+        lock.unlock()
+        let page = full.map { $0 ? "full player open" : "full player closed" } ?? "page ?"
+        return "\(BandModel.shared.label), \(isLocked ? "screen locked" : "screen unlocked"), \(page), thermal \(PerfMonitor.thermalName(ProcessInfo.processInfo.thermalState.rawValue))"
+    }
 
     func start() {
         guard timer == nil else { return }
@@ -35,6 +54,14 @@ final class PerfMonitor {
             self.lock.unlock()
             Diag.shared.log("perf: memory warning, footprint \(PerfMonitor.mb(PerfMonitor.footprint())) MB, available \(PerfMonitor.mb(PerfMonitor.available())) MB", error: true)
         }
+        let center = NotificationCenter.default
+        center.addObserver(forName: UIApplication.protectedDataWillBecomeUnavailableNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.lock.lock(); self?.locked = true; self?.lock.unlock()
+        }
+        center.addObserver(forName: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.lock.lock(); self?.locked = false; self?.lock.unlock()
+        }
+        locked = !UIApplication.shared.isProtectedDataAvailable
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.tick() }
         Diag.shared.perfProvider = { [weak self] in self?.take() ?? [:] }
     }

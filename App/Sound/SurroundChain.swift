@@ -70,8 +70,10 @@ public final class SurroundChain {
 
     /// `song` and `startTime` (where its decoder started) let a band mode start with what
     /// `BandPrefetch` separated ahead of time.
+    /// `fallback`: for the band modes, the setting that was on before (when switching from
+    /// it): it plays where the band is not separated yet, instead of the original.
     public init(settings: SurroundSettings?, sampleRate: Int, blockSize: Int = 4096,
-                song: String = "", startTime: Double = 0) {
+                song: String = "", startTime: Double = 0, fallback: SurroundSettings? = nil) {
         makeup = settings?.makeup ?? 1
         if !(settings?.surround ?? false) || !(settings?.mode == .band || settings?.mode == .bandHead) {
             SurroundChain.status(.off)
@@ -108,8 +110,15 @@ public final class SurroundChain {
             }
             if trouble == nil, let network = SurroundChain.bandNetwork?() {
                 let seed = song.isEmpty ? nil : BandPrefetch.shared.take(id: song, startTime: startTime, sampleRate: sampleRate)
+                /* the stand-in at the level the band's make-up gain will bring it to */
+                var dry: SurroundChain?
+                if let f = fallback, f.mode != .band, f.mode != .bandHead {
+                    let scaled = SurroundSettings(key: f.key, surround: f.surround, irLeft: f.irLeft, irRight: f.irRight,
+                                                  makeup: f.makeup / max(0.01, s.makeup), mode: f.mode, stage: f.stage)
+                    dry = SurroundChain(settings: scaled, sampleRate: sampleRate, blockSize: blockSize)
+                }
                 band = BandProcessor(output: output, network: network, sampleRate: sampleRate,
-                                     queue: SurroundChain.bandQueue, seed: seed, log: SurroundChain.log,
+                                     queue: SurroundChain.bandQueue, seed: seed, dry: dry, log: SurroundChain.log,
                                      status: SurroundChain.status)
             } else {
                 band = nil

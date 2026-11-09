@@ -75,7 +75,31 @@ public final class SongDecoder {
         let opened = try SongDecoder.open(url, at: start)
         reader = opened.reader
         output = opened.output
-        statedDuration = opened.duration
+        /* AVFoundation states about twice the real length for fragmented files (YouTube's
+           m4a); their fragments give the real one. */
+        statedDuration = (url.isFileURL ? SongDecoder.fragmentedLength(url) : nil) ?? opened.duration
+    }
+
+    private static let lengthLock = NSLock()
+    private static var lengths: [String: Double] = [:]
+
+    /* Worked out once per file (by path and size). */
+    private static func fragmentedLength(_ url: URL) -> Double? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let size = (attributes?[.size] as? NSNumber)?.intValue ?? 0
+        let key = url.path + "|" + String(size)
+        lengthLock.lock()
+        if let known = lengths[key] {
+            lengthLock.unlock()
+            return known > 0 ? known : nil
+        }
+        lengthLock.unlock()
+        let found = MP4Duration.fragmented(url)
+        lengthLock.lock()
+        if lengths.count > 64 { lengths.removeAll() }
+        lengths[key] = found ?? 0
+        lengthLock.unlock()
+        return found
     }
 
     deinit {
