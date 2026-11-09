@@ -378,7 +378,12 @@ final class BandTests: XCTestCase {
         var states: [BandStatus] = []
         let p = BandProcessor(output: .speakers, network: net, sampleRate: 44100, queue: nil, mix: BandMix(),
                               status: { states.append($0) })
-        let out = run(p, s)
+        /* nothing will be separated: hand on as playback would, short of sound */
+        var out = p.process(left: s.left, right: s.right)
+        while let part = p.drain(urgent: true) { out.left += part.left; out.right += part.right }
+        let rest = p.finish()
+        out.left += rest.left
+        out.right += rest.right
         XCTAssertEqual(net.calls, 0)
         XCTAssertTrue(states.contains(.paused("hot")))
         var worst: Float = 0
