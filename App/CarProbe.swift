@@ -509,7 +509,10 @@ final class CarMeasure {
             "appVersion": version,
             "probeVersion": CarProbe.version,
             "probe": CarProbe.definition,
-            "route": route,
+            /* the server takes one string (≤ 200 characters) */
+            "route": String(route.map { r -> String in
+                "\(r["portType"] ?? "") \"\(r["portName"] ?? "")\" ch \(r["channels"] ?? 0)"
+            }.joined(separator: "; ").prefix(200)),
             "createdAt": ISO8601DateFormatter().string(from: Date()),
             "positions": items
         ]
