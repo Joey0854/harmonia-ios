@@ -31,6 +31,9 @@ import WebKit
       diag      {}                                      answered with a `diag` event
       config    { pc }                                  where the PC is ("http://host:port"); remembered
       mix       { on }                                  automatic mixing between songs; remembered
+      carProbe  { action, ... }                         "measure this car" and remote car presets; see
+                                                        App/CarProbe.swift (answered with carProbe /
+                                                        carPreset events)
       mixInfo   { id, mix }                             what the PC found out about a song, when it comes
                                                         later than the song; loadSong and queue items may
                                                         carry the same object as `mix`:
@@ -225,6 +228,10 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
         }
         Downloads.shared.onEvent = { [weak self] event in self?.send(event) }
         LightMusic.shared.onEvent = { [weak self] event in self?.send(event) }
+        /* "Measure this car" and the remote car presets (App/CarProbe.swift). */
+        CarMeasure.shared.onEvent = { [weak self] event in self?.send(event) }
+        CarMeasure.shared.pauseMusic = { [weak self] in self?.player.pause(reason: "car measurement") }
+        CarMeasure.shared.start()
         /* Only does anything when the user left the music light on. */
         LightMusic.shared.restoreAtLaunch()
         loadPage()
@@ -542,6 +549,8 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
             }
         case "mix":
             player.setMix(on: body["on"] as? Bool ?? false)
+        case "carProbe":
+            CarMeasure.shared.handle(body)
         case "mixInfo":
             if let id = body["id"] as? String, let info = body["mix"] as? [String: Any] {
                 player.setMixInfo(MixAnalysis(info), of: id)

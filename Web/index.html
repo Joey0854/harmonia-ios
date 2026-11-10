@@ -881,6 +881,8 @@ function renderProfileChip() {
 }
 function toggleProfile() {
   lsSet('ytm_profile', isCar() ? '' : 'car');
+  /* a remote car preset that came while the headphone profile was on */
+  carPresetPendingUse();
   STYLE_DEFAULT = isCar() ? CAR_STYLE : HEAD_STYLE;
   fxApply();
   renderProfileChip();
@@ -1154,6 +1156,322 @@ function bandControls(body, mode) {
   });
   btns.appendChild(reset);
   body.appendChild(btns);
+}
+/* "Measure this car" (測量這台車): next to each speaker the app plays a 13-second test sound,
+   records it with the phone's own microphone, works out the levels and, when the user agrees,
+   sends everything to the user's own server (App/CarProbe.swift). The pairing text
+   ("https://<host>#<code>") is kept by the app, not here. Positions go to the server as fixed
+   codes; only "other" carries the user's own name (label). */
+var CP_POSITIONS = [['center', '中置（儀表板中間）'], ['front-left', '左前門'], ['front-right', '右前門'],
+  ['front-left-tweeter', '左前高音（A 柱／門上方）'], ['front-right-tweeter', '右前高音'], ['rear-left', '左後門'], ['rear-right', '右後門'],
+  ['rear-window-left', '後方左（C 柱或後架左）'], ['rear-window-right', '後方右（C 柱或後架右）'], ['rear-center', '後架中間']];
+var CP_CELLS = [['B1/inphase/0', '中頻 左右相同（基準）'], ['B1/inphase/+15', '中頻 偏左 15 dB'], ['B1/inphase/-15', '中頻 偏右 15 dB'],
+  ['B1/indep/0', '中頻 左右不相關'], ['B1/anti/0', '中頻 左右反相'], ['B1/anti/+15', '中頻 反相＋偏左'],
+  ['B2/inphase/0', '高頻 左右相同'], ['B2/anti/0', '高頻 左右反相'], ['LF/inphase/0', '低頻 左右相同'], ['LF/anti/0', '低頻 左右反相']];
+var CP_MAX = 16;
+var CP = { st: null, res: {}, cur: null, busy: '', secs: 0, warn: '', msg: '', pairMsg: '', editPair: false, upload: null, agree: false, body: null };
+function cpKey(name, label) { return name + '|' + (name === 'other' ? (label || '') : ''); }
+function cpName(name, label) {
+  if (name === 'other') return label || '其他';
+  for (var i = 0; i < CP_POSITIONS.length; i++) if (CP_POSITIONS[i][0] === name) return CP_POSITIONS[i][1];
+  return name;
+}
+function cpPost(m) { m.cmd = 'carProbe'; nativePost(m); }
+function cpLive() { return !!(CP.body && document.body.contains(CP.body)); }
+function openCarProbe() {
+  openPanel('測量這台車', function (body) {
+    CP.body = body;
+    CP.cur = null;
+    CP.msg = '';
+    cpRender();
+    cpPost({ action: 'status' });
+  });
+}
+function carProbeEvent(e) {
+  if (e.action === 'status') {
+    CP.st = e;
+  } else if (e.action === 'pair' || e.action === 'ping') {
+    CP.pairMsg = e.message || (e.ok ? '已配對' : '失敗');
+    if (e.action === 'pair' && e.ok) CP.editPair = false;
+  } else if (e.action === 'measure') {
+    if (e.state === 'done') {
+      CP.res[cpKey(e.name, e.label)] = e.result || {};
+      CP.busy = '';
+      dbg('I', 'carprobe-result', { name: e.name, snr: e.result && e.result.snr, retake: e.result && e.result.needsRetake ? 1 : 0 });
+    } else if (e.state === 'failed' || e.state === 'cancelled') {
+      CP.busy = '';
+      CP.msg = e.state === 'cancelled' ? '已取消' : (e.message || '量測失敗');
+    } else {
+      CP.busy = e.state;
+      if (e.state === 'preparing') { CP.warn = ''; CP.msg = ''; }
+      if (e.state === 'playing') CP.secs = +e.seconds || 13;
+      if (e.warning) CP.warn = e.warning;
+    }
+  } else if (e.action === 'upload') {
+    CP.upload = e;
+  }
+  if (cpLive()) cpRender();
+}
+function cpBtn(parent, text, fn, ghost, disabled) {
+  var b = el('button', ghost === false ? 'btn' : 'btn ghost', text);
+  b.type = 'button';
+  b.disabled = !!disabled;
+  b.addEventListener('click', fn);
+  parent.appendChild(b);
+  return b;
+}
+function cpInput(placeholder, value, label) {
+  var i = document.createElement('input');
+  i.type = 'text';
+  i.placeholder = placeholder;
+  i.value = value || '';
+  i.setAttribute('aria-label', label);
+  i.setAttribute('autocapitalize', 'off');
+  i.setAttribute('autocorrect', 'off');
+  i.setAttribute('style', 'width:100%;box-sizing:border-box;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;font:inherit;margin:4px 0 8px');
+  return i;
+}
+function cpNote(parent, text, kind) {
+  var p = el('p', null, text);
+  var s = 'margin:0 0 10px;font-size:13px;white-space:pre-wrap;';
+  if (kind === 'warn') s += 'padding:10px 12px;border-radius:10px;background:rgba(255,190,60,.14);border:1px solid rgba(255,190,60,.45);opacity:1';
+  else if (kind === 'info') s += 'padding:10px 12px;border-radius:10px;background:rgba(120,200,255,.12);border:1px solid rgba(120,200,255,.45)';
+  else s += 'opacity:.8';
+  p.setAttribute('style', s);
+  parent.appendChild(p);
+  return p;
+}
+function cpDone(name, label) {
+  var list = (CP.st && CP.st.positions) || [];
+  for (var i = 0; i < list.length; i++) if (cpKey(list[i].name, list[i].label) === cpKey(name, label)) return list[i];
+  return null;
+}
+function cpStatusText(name, label) {
+  var p = cpDone(name, label), r = CP.res[cpKey(name, label)];
+  if (!p) return '未量';
+  if (p.skipped) return '已略過';
+  if (r && r.needsRetake) return '建議重錄';
+  if (r && typeof r.snr === 'number') return '完成（訊噪比 ' + r.snr.toFixed(1) + ' dB）';
+  return '完成';
+}
+function cpResultTable(parent, r) {
+  var box = el('div');
+  box.setAttribute('style', 'margin:0 0 12px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);font-size:14px');
+  var low = {};
+  (r.lowCells || []).forEach(function (id) { low[id] = true; });
+  CP_CELLS.forEach(function (c) {
+    var row = el('div');
+    row.setAttribute('style', 'display:flex;justify-content:space-between;gap:8px;padding:3px 0');
+    row.appendChild(el('span', null, c[1]));
+    var v = r.levels && r.levels[c[0]];
+    row.appendChild(el('span', null, typeof v === 'number' ? (v > 0 ? '+' : '') + v.toFixed(1) + ' dB' + (low[c[0]] ? ' ＊' : '') : '—'));
+    box.appendChild(row);
+  });
+  var q = '訊噪比 ' + (typeof r.snr === 'number' ? r.snr.toFixed(1) + ' dB' : '量不到') + (r.clipped ? '，削波' : '') + '；輸入：' + (r.input || '?');
+  var qp = el('div', null, q);
+  qp.setAttribute('style', 'margin-top:6px;opacity:.75;font-size:12px');
+  box.appendChild(qp);
+  if ((r.lowCells || []).length) {
+    var lp = el('div', null, '＊＝離背景噪音不到 6 dB，數值不可靠');
+    lp.setAttribute('style', 'opacity:.75;font-size:12px');
+    box.appendChild(lp);
+  }
+  parent.appendChild(box);
+}
+function cpRender() {
+  var b = CP.body;
+  if (!b) return;
+  b.textContent = '';
+  var st = CP.st;
+  if (!st) { cpNote(b, '讀取中…'); return; }
+
+  /* 1. pairing */
+  if (!st.paired || CP.editPair) {
+    cpNote(b, '貼上電腦端給你的配對字串（格式：https://主機#配對碼）。只需要設定一次。');
+    var pin = cpInput('https://主機#配對碼', '', '配對字串');
+    b.appendChild(pin);
+    var prow = el('div', 'sheetbtns');
+    cpBtn(prow, '儲存配對', function () { CP.pairMsg = '儲存中…'; cpPost({ action: 'pair', text: pin.value.trim() }); cpRender(); }, false);
+    if (st.paired) cpBtn(prow, '取消', function () { CP.editPair = false; CP.pairMsg = ''; cpRender(); });
+    b.appendChild(prow);
+    if (CP.pairMsg) cpNote(b, CP.pairMsg);
+    return;
+  }
+
+  /* 2. the car's name, which also starts a new session */
+  if (!st.carName) {
+    cpNote(b, '伺服器：' + (st.server || '?'));
+    var nin = cpInput('例如 Benz C43 S205', lsGet('ytm_carprobe_car') || '', '車名');
+    b.appendChild(nin);
+    var nrow = el('div', 'sheetbtns');
+    cpBtn(nrow, '開始', function () {
+      var n = nin.value.trim().slice(0, 80);
+      if (!n) { nin.focus(); return; }
+      lsSet('ytm_carprobe_car', n);
+      CP.res = {};
+      CP.upload = null;
+      CP.agree = false;
+      cpPost({ action: 'begin', carName: n });
+    }, false);
+    cpBtn(nrow, '更改配對', function () { CP.editPair = true; CP.pairMsg = ''; cpRender(); });
+    cpBtn(nrow, '測試連線', function () { CP.pairMsg = '測試中…'; cpPost({ action: 'ping' }); cpRender(); });
+    b.appendChild(nrow);
+    if (CP.pairMsg) cpNote(b, CP.pairMsg);
+    if (st.pending) cpPendingRow(b);
+    return;
+  }
+
+  /* 3. one position */
+  if (CP.cur) {
+    var cur = CP.cur, label = cpName(cur.name, cur.label);
+    var big = el('p', null, '請把手機底部麥克風靠近〈' + label + '〉喇叭網 2–3 公分，按開始');
+    big.setAttribute('style', 'margin:0 0 12px;font-size:22px;font-weight:700;line-height:1.4');
+    b.appendChild(big);
+    cpNote(b, '音量調到平常聽歌的大小。量測約 15 秒，期間請保持安靜；音樂會先暫停。');
+    if (CP.warn) cpNote(b, CP.warn, 'warn');
+    var r = CP.res[cpKey(cur.name, cur.label)];
+    var mrow = el('div', 'sheetbtns');
+    if (CP.busy) {
+      var txt = { preparing: '準備中…', playing: '播放並錄音中…約 ' + Math.round(CP.secs + 1.5) + ' 秒', analyzing: '分析中…' }[CP.busy] || CP.busy;
+      var sp = el('p', null, txt);
+      sp.setAttribute('style', 'margin:0 0 8px;font-size:18px;font-weight:600');
+      b.appendChild(sp);
+      if (CP.busy === 'playing') cpBtn(mrow, '取消', function () { cpPost({ action: 'cancel' }); });
+    } else {
+      cpBtn(mrow, r ? '重錄' : '開始', function () {
+        cpPost({ action: 'measure', name: cur.name, label: cur.label || '' });
+      }, false);
+      cpBtn(mrow, '返回清單', function () { CP.cur = null; CP.warn = ''; CP.msg = ''; cpRender(); });
+    }
+    b.appendChild(mrow);
+    if (CP.msg) cpNote(b, CP.msg, 'warn');
+    if (r && !CP.busy) {
+      if (r.needsRetake) cpNote(b, '建議重錄：' + (r.problems || []).join('；'), 'warn');
+      cpResultTable(b, r);
+    }
+    return;
+  }
+
+  /* 4. the list */
+  var head = el('p', null, '車名：' + st.carName + '　伺服器：' + (st.server || '?'));
+  head.setAttribute('style', 'margin:0 0 10px;font-weight:600');
+  b.appendChild(head);
+  cpNote(b, '依序量每顆喇叭；沒有的位置按「略過」。量完可以重錄。');
+  var count = ((st.positions || []).length);
+  var row = function (name, lab) {
+    var box = el('div');
+    box.setAttribute('style', 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)');
+    var t = el('div');
+    t.setAttribute('style', 'flex:1;min-width:140px');
+    t.appendChild(el('div', null, cpName(name, lab)));
+    var s = el('div', null, cpStatusText(name, lab));
+    s.setAttribute('style', 'font-size:12px;opacity:.7');
+    t.appendChild(s);
+    box.appendChild(t);
+    var full = count >= CP_MAX && !cpDone(name, lab);
+    var p = cpDone(name, lab);
+    cpBtn(box, p && !p.skipped ? '重錄' : '量測', function () { CP.cur = { name: name, label: lab }; CP.warn = ''; CP.msg = ''; cpRender(); }, undefined, full || !!CP.busy);
+    if (!p) cpBtn(box, '略過', function () { cpPost({ action: 'skip', name: name, label: lab }); }, undefined, full);
+    b.appendChild(box);
+  };
+  CP_POSITIONS.forEach(function (p) { row(p[0], ''); });
+  (st.positions || []).forEach(function (p) { if (p.name === 'other') row('other', p.label); });
+  var oin = cpInput('其他位置的名稱（例如 重低音）', '', '其他位置名稱');
+  b.appendChild(oin);
+  var orow = el('div', 'sheetbtns');
+  cpBtn(orow, '新增其他位置並量測', function () {
+    var n = oin.value.trim().slice(0, 40);
+    if (!n) { oin.focus(); return; }
+    CP.cur = { name: 'other', label: n };
+    CP.warn = '';
+    CP.msg = '';
+    cpRender();
+  }, undefined, count >= CP_MAX);
+  b.appendChild(orow);
+
+  /* 5. upload, after the user agrees */
+  var measured = (st.positions || []).some(function (p) { return !p.skipped; });
+  var ub = el('div');
+  ub.setAttribute('style', 'margin:16px 0 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05)');
+  var uh = el('div', null, '全部完成');
+  uh.setAttribute('style', 'font-weight:600;margin-bottom:6px');
+  ub.appendChild(uh);
+  cpNote(ub, '會上傳錄音（可能收到車內說話聲）與量測結果到「' + (st.server || '?') + '」，不會傳到其他地方。', 'warn');
+  var lab2 = document.createElement('label');
+  lab2.setAttribute('style', 'display:flex;gap:8px;align-items:center;margin:0 0 6px;min-height:44px');
+  var cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = CP.agree;
+  lab2.appendChild(cb);
+  lab2.appendChild(document.createTextNode('我同意上傳錄音'));
+  ub.appendChild(lab2);
+  var urow = el('div', 'sheetbtns');
+  var up = cpBtn(urow, '同意並上傳', function () {
+    if (!cb.checked) return;
+    CP.upload = { state: 'sending', message: '準備上傳…' };
+    cpPost({ action: 'upload', consent: true });
+    cpRender();
+  }, false, !measured || !CP.agree);
+  cb.addEventListener('change', function () { CP.agree = cb.checked; up.disabled = !measured || !cb.checked; });
+  cpBtn(urow, '換一台車', function () { CP.res = {}; CP.upload = null; CP.agree = false; cpPost({ action: 'begin', carName: '' }); });
+  ub.appendChild(urow);
+  if (!measured) cpNote(ub, '至少要量完一個位置才能上傳。');
+  b.appendChild(ub);
+  cpPendingRow(b);
+}
+function cpPendingRow(b) {
+  var u = CP.upload, st = CP.st || {};
+  var pending = u && typeof u.pending === 'number' ? u.pending : (st.pending || 0);
+  if (u && u.message) cpNote(b, u.message, u.state === 'failed' ? 'warn' : 'info');
+  if (pending > 0 && !(u && u.state === 'sending')) {
+    var r = el('div', 'sheetbtns');
+    cpBtn(r, '重傳未上傳的資料（' + pending + ' 筆）', function () { CP.upload = { state: 'sending', message: '重傳中…' }; cpPost({ action: 'retry' }); cpRender(); });
+    b.appendChild(r);
+  }
+}
+/* A remote car preset from the server (the app checked its signature, device and version and
+   clamped it): kept as the user preset "遠端：<name>"; used at once in the car profile, otherwise
+   when the user switches to the car profile. */
+/* A build without the band modes (no separation model) sets window.__ytmNoBand = true before the
+   page runs; remote presets are then only kept. */
+function carBandSupported() { return window.__ytmNoBand !== true; }
+function carPresetStore(e) {
+  var key = '遠端：' + String(e.name || '車用預設').slice(0, 24);
+  var u = carUserPresets();
+  u[key] = carNormalize(e.car);
+  lsSet('ytm_car_presets', JSON.stringify(u));
+  if (!carBandSupported()) return { key: key, applied: false, unsupported: true };
+  if (isCar()) {
+    carSave({ preset: 'user:' + key, p: carNormalize(e.car) });
+    lsSet('ytm_car_remote_pending', '');
+    fxApply();
+    return { key: key, applied: true };
+  }
+  lsSet('ytm_car_remote_pending', key);
+  return { key: key, applied: false };
+}
+function carPresetPendingUse() {
+  var k = lsGet('ytm_car_remote_pending');
+  if (!k || !isCar() || !carBandSupported()) return;
+  var u = carUserPresets();
+  if (u[k]) carSave({ preset: 'user:' + k, p: carNormalize(u[k]) });
+  lsSet('ytm_car_remote_pending', '');
+}
+function carPresetGot(e) {
+  if (!e || !e.car || typeof e.car !== 'object') return;
+  var r = carPresetStore(e);
+  nativePost({ cmd: 'carProbe', action: 'presetAck', version: e.version });
+  dbg('I', 'car-remote-preset', { version: e.version, applied: r.applied ? 1 : 0, unsupported: r.unsupported ? 1 : 0 });
+  var head = r.unsupported ? '已收到遠端車用預設「' + r.key + '」，需要支援車用樂團的版本才會生效'
+    : (r.applied ? '已套用遠端車用預設「' : '收到遠端車用預設「') + r.key + '」' + (r.applied ? '' : '，切到車用設定時會自動套用');
+  if ($('sheet').hidden) {
+    openPanel('遠端車用預設', function (body) {
+      body.appendChild(el('p', null, head));
+      if (e.note) cpNote(body, String(e.note), 'info');
+    });
+  } else {
+    toast(head + (e.note ? '：' + String(e.note).slice(0, 60) : ''));
+  }
 }
 /* "Car band" (bandCar): the four separated parts placed for a car whose Bose system has
    Centerpoint on: what is the same on both sides goes to the centre, level differences to the
@@ -2047,6 +2365,10 @@ window.__ytmNativeEvent = function (e) {
     dlNativeList(e.items);
   } else if (e.type === 'advanced') {
     nativeAdvanced(e.id, +e.t || 0);
+  } else if (e.type === 'carProbe') {
+    carProbeEvent(e);
+  } else if (e.type === 'carPreset') {
+    carPresetGot(e);
   }
 };
 
@@ -3317,6 +3639,17 @@ function openStyles() {
     var warn = el('p', null, '注意：請先關閉車機、耳機或手機自己的環繞／音場／空間音訊，否則聲音會被處理兩次，容易變悶或破音。');
     warn.setAttribute('style', 'margin:0 0 12px;padding:10px 12px;border-radius:10px;background:rgba(255,190,60,.14);border:1px solid rgba(255,190,60,.45)');
     body.appendChild(warn);
+    /* "measure this car": inside the app only (it needs the phone's microphone); shown in every
+       mode, so that it is there in a build without the band modes too */
+    if (inApp()) {
+      var mrow = el('div', 'sheetbtns');
+      mrow.setAttribute('style', 'margin:0 0 12px');
+      var mb = el('button', 'btn ghost', '測量這台車');
+      mb.type = 'button';
+      mb.addEventListener('click', openCarProbe);
+      mrow.appendChild(mb);
+      body.appendChild(mrow);
+    }
     surroundModeRow(body);
     if (stageMode() === 'stage') { stageControls(body); return; }
     if (bandSetting() === 'bandCar') {
@@ -4246,6 +4579,8 @@ function bindUI() {
   $('fMix').addEventListener('click', toggleMix);
   renderMixChip();
   renderProfileChip();
+  /* a remote car preset the app fetched before the page was up */
+  if (inApp()) nativePost({ cmd: 'carProbe', action: 'presetPending' });
   $('fEq').addEventListener('click', openEq);
   renderEqChip();
   renderStyleChip();
