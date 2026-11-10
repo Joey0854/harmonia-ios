@@ -678,7 +678,7 @@ final class NativePlayer: NSObject {
     }
 
     /// The car band mode's settings from the page (missing values: v2b's). Tracks by name:
-    /// pan / send in dB, rear true or false; amb: on, db, rt60, pre (ms), lo, hi (Hz), hf
+    /// pan / send in dB, rear true or false, width 0 ... 2; amb: on, db, rt60, pre (ms), lo, hi (Hz), hf
     /// (damping factor), lowFront, split (Hz); early: on, db, min, max (ms); xover (Hz).
     static func carBand(from car: [String: Any]) -> CarBandParams {
         let base = CarBandParams.v2b
@@ -691,7 +691,7 @@ final class NativePlayer: NSObject {
             let t = trackIn[name] as? [String: Any] ?? [:]
             let d = base.tracks[i]
             return CarBandTrack(panDb: number(t["pan"], d.panDb), sendDb: number(t["send"], d.sendDb),
-                                rear: t["rear"] as? Bool ?? d.rear)
+                                rear: t["rear"] as? Bool ?? d.rear, width: number(t["width"], d.width))
         }
         let amb = car["amb"] as? [String: Any] ?? [:]
         let early = car["early"] as? [String: Any] ?? [:]

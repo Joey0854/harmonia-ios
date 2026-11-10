@@ -87,6 +87,11 @@ public final class BandProcessor {
     /* The caller's side. */
     private let placer: StagePlacer?
     private let car: CarBandMixer?
+    /* the car mixer's output is `latency` behind its input: this many of its first output
+       samples (from before the first input) are dropped, and `finish` gets the rest out with
+       `flush`, so output sample n is input sample n here as before (it comes out `latency`
+       samples later, well inside `lookahead`) */
+    private var carSkip = 0
     private var convolvers: [TrueStereoConvolver]
     private var fading: [TrueStereoConvolver]?
     private var fadeLeft = 0
@@ -192,7 +197,9 @@ public final class BandProcessor {
             headphones = true
         case .car:
             placer = nil
-            car = CarBandMixer(sampleRate: sampleRate, params: .v2b)
+            let mixer = CarBandMixer(sampleRate: sampleRate, params: .v2b)
+            car = mixer
+            carSkip = mixer.latency
             convolvers = []
             headphones = false
         }
@@ -320,6 +327,11 @@ public final class BandProcessor {
         keep()
         cacheWriter?.close()
         var out = emit(upTo: received)
+        if let c = car {
+            let rest = carAligned(c.flush())
+            out.left += rest.left
+            out.right += rest.right
+        }
         fading = nil
         if !convolvers.isEmpty {
             var l = [Float](), r = [Float]()
@@ -662,7 +674,7 @@ public final class BandProcessor {
         }
 
         if let c = car {
-            return c.process(stems: stems, standIn: (dryLeft, dryRight))
+            return carAligned(c.process(stems: stems, standIn: (dryLeft, dryRight)))
         }
         if let p = placer {
             var sources: [[[Float]]] = (0..<4).map { [stems[$0 * 2], stems[$0 * 2 + 1]] }
@@ -695,6 +707,15 @@ public final class BandProcessor {
         direct[0].removeFirst(m)
         direct[1].removeFirst(m)
         return (l, r)
+    }
+
+    /* The car mixer's output with its first `latency` samples (from before the first input
+       sample) dropped, so that output sample n is input sample n again. */
+    private func carAligned(_ out: (left: [Float], right: [Float])) -> (left: [Float], right: [Float]) {
+        guard carSkip > 0 else { return out }
+        let k = min(carSkip, out.left.count, out.right.count)
+        carSkip -= k
+        return (Array(out.left.dropFirst(k)), Array(out.right.dropFirst(k)))
     }
 
     private func sum(_ set: [TrueStereoConvolver], _ stems: [[Float]]) -> ([Float], [Float]) {
