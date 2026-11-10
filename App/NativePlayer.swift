@@ -379,6 +379,7 @@ final class NativePlayer: NSObject {
             try AVAudioSession.sharedInstance().setActive(true)
             sessionActive = true
             Diag.shared.log("audio session: activated (\(reason))")
+            logAudioRoute("session activated")
         } catch {
             Diag.shared.log("audio session activate (\(reason)): \(SongDecoder.describe(error))", error: true)
         }
@@ -1139,9 +1140,29 @@ final class NativePlayer: NSObject {
         if wantPlay { play(reason: "media services reset") }
     }
 
+    /// What the current output can take, for finding out whether a car's CarPlay accepts more than two
+    /// channels (iOS 17.3+ reports multichannel layouts such as 5.1 or Atmos 5.1.4 for a capable head unit;
+    /// the list is only filled while the session is active and routed to car audio). Log only.
+    func logAudioRoute(_ why: String) {
+        let s = AVAudioSession.sharedInstance()
+        let outs = s.currentRoute.outputs.map { p in
+            "\(p.portType.rawValue) \"\(p.portName)\" ch \(p.channels?.count ?? -1)"
+        }.joined(separator: "; ")
+        var line = "audio route (\(why)): [\(outs)] out ch \(s.outputNumberOfChannels), max \(s.maximumOutputNumberOfChannels)"
+        if #available(iOS 17.2, *) {
+            let tags = s.supportedOutputChannelLayouts.map { l -> String in
+                let t = l.layoutTag
+                return String(format: "0x%08X/%dch", t, Int(t & 0xFFFF))
+            }
+            line += ", layouts [\(tags.joined(separator: ", "))], rendering \(s.renderingMode.rawValue)"
+        }
+        Diag.shared.log(line)
+    }
+
     @objc private func handleRouteChange(_ note: Notification) {
         guard let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: raw) else { return }
+        DispatchQueue.main.async { [weak self] in self?.logAudioRoute("route change, reason \(raw)") }
         /* Headphones taken off or disconnected: do not carry on through the phone speaker. */
         if reason == .oldDeviceUnavailable {
             DispatchQueue.main.async { [weak self] in
