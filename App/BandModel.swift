@@ -109,6 +109,26 @@ final class BandModel: BandNetwork {
         released = had
         lock.unlock()
         if had { Diag.shared.log("band: memory warning, model let go; it is loaded again for the next segment", error: true) }
+        easeMemory("a memory warning")
+    }
+
+    /// The phone is short of memory (a memory warning, or iOS ending the page's process): the
+    /// GPU's buffers for each segment come on top of the app's own memory and, once memory is
+    /// short, every segment on the GPU makes iOS end the page's process again (1.3.12 log: 26
+    /// times, each within a second of a GPU segment). From now on until the app is started
+    /// again, segments run on the CPU only (fast enough: about 2× real time). Any thread.
+    func easeMemory(_ why: String) {
+        lock.lock()
+        let was = override
+        override = .cpuOnly
+        if units != nil && units != .cpuOnly {
+            model = nil
+            units = nil
+            inSpec = nil
+            inWave = nil
+        }
+        lock.unlock()
+        if was != .cpuOnly { Diag.shared.log("band: memory short (\(why)); next segments on the CPU only until the app starts again", error: true) }
     }
 
     private var override: MLComputeUnits?

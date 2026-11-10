@@ -90,6 +90,7 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
     private let player = NativePlayer()
     /* the page was loaded again after its process ended; the last band status sent to it */
     private var pageReloaded = false
+    private var reloadScriptAdded = false
     private var lastBandEvent: [String: Any]?
     private var lastBandState: String { return lastBandEvent?["state"] as? String ?? "none" }
     /// Only for relative addresses in `load`/`dl` and as the optional debug-log target; the
@@ -288,10 +289,15 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         Diag.shared.log("page: the web view's process was ended by the system; the page is loaded again (app footprint \(PerfMonitor.mb(PerfMonitor.footprint())) MB, available \(PerfMonitor.mb(PerfMonitor.available())) MB, band \(lastBandState), model \(BandModel.shared.label))", error: true)
         pageReloaded = true
+        /* the band's GPU segments are what pushes iOS to end the page again: CPU from now on */
+        BandModel.shared.easeMemory("the page's process was ended")
         /* The page is told it is a reload, so that it can open the player again and follow the
-           music that is still playing. */
-        let tell = WKUserScript(source: "window.__ytmReloaded = true;", injectionTime: .atDocumentStart, forMainFrameOnly: true)
-        webView.configuration.userContentController.addUserScript(tell)
+           music that is still playing (added once: it stays for every later load). */
+        if !reloadScriptAdded {
+            reloadScriptAdded = true
+            let tell = WKUserScript(source: "window.__ytmReloaded = true;", injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            webView.configuration.userContentController.addUserScript(tell)
+        }
         loadPage()
     }
 
