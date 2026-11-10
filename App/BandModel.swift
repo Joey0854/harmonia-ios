@@ -137,7 +137,10 @@ final class BandModel: BandNetwork {
         if inBackground { return .cpuOnly }
         lock.lock()
         defer { lock.unlock() }
-        return override ?? .cpuAndGPU
+        /* CPU by default (1.3.15): on device a segment takes about 1.04 s on the CPU and 1.03 s with the
+           GPU, but the GPU run lifts the app's footprint from about 300 MB to over 1 GB and iOS then ends the
+           page's process (1.3.12-1.3.14 logs). The GPU is kept only as the fallback after a CPU stall. */
+        return override ?? .cpuOnly
     }
 
     /* Loads the model for `wanted` unless it is already loaded so (band queue, or the first load). */
