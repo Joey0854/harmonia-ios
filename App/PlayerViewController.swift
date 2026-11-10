@@ -432,9 +432,10 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
                     String(format: "%@ pan %.1f width %.1f send %@%@", Demucs.sources[i], t.panDb, t.width,
                            t.sendDb <= CarBandParams.sendOff ? "off" : String(format: "%.1f", t.sendDb), t.rear ? " rear" : " front")
                 }.joined(separator: ", ")
-                carText += String(format: "; reverb %@ %.1f dB RT60 %.2f s pre %.0f ms %.0f-%.0f Hz hf %.2f low %@ %.0f Hz; early %@ %.1f dB %.0f-%.0f ms; xover %.0f Hz",
+                carText += String(format: "; reverb %@ %.1f dB RT60 %.2f s pre %.0f ms %.0f-%.0f Hz hf %.2f low %@ %.0f Hz reverbStyle %@ sendGate %.2f dryGate %@; early %@ %.1f dB %.0f-%.0f ms; xover %.0f Hz",
                                   c.ambienceOn ? "on" : "off", c.ambienceDb, c.rt60, c.predelayMs, c.lowHz, c.highHz, c.hfDamping,
-                                  c.lowReverbFront ? "front" : "cut", c.lowSplitHz, c.earlyOn ? "on" : "off", c.earlyDb,
+                                  c.lowReverbFront ? "front" : "cut", c.lowSplitHz, c.reverbStyle.rawValue, c.sendGate,
+                                  c.dryGate ? "on" : "off", c.earlyOn ? "on" : "off", c.earlyDb,
                                   c.earlyMinMs, c.earlyMaxMs, c.crossoverHz)
             }
             Diag.shared.log("band: mixer " + text + (mix.irs != nil ? ", new responses" : "") + carText)

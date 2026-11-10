@@ -1164,23 +1164,31 @@ var CAR_SEND_OFF = -40;
 /* 1.3.12: only the main controls are shown; the rest stays at the preset's values (next build) */
 var CAR_ADVANCED = false;
 var CAR_PARTS = [['vocals', '人聲'], ['drums', '鼓'], ['bass', '貝斯'], ['other', '其他樂器']];
+/* the rear reverb's left / right relation (amb.style; CarReverbStyle in the app) */
+var CAR_STYLES = [['decorrelated', '不相關（預設，像真實音樂廳）'], ['half', '各半'], ['anti', '反相（後窗最多）']];
 /* width: how far the part is spread out above the crossover (0: one point, 1: each frequency where it is in the song, 2: wider) */
 function carTrack(pan, send, rear, width) { return { gain: 0, pan: pan, send: send, rear: rear, width: width || 0, solo: false, mute: false }; }
 var CAR_PRESETS = {
   v2b: { name: 'v2b（預設）', p: {
     tracks: { vocals: carTrack(0, -10, true), drums: carTrack(-2, CAR_SEND_OFF, true), bass: carTrack(0, CAR_SEND_OFF, true), other: carTrack(6, 0, true, 1) },
     piano: { pan: -6, send: 0, rear: true, width: 0 },
-    amb: { on: true, db: -15, rt60: 1.4, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250 },
+    amb: { on: true, db: -15, rt60: 1.4, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250, style: 'decorrelated', gate: 1, dryGate: false },
     early: { on: false, db: -10, min: 15, max: 30 }, xover: 150 } },
   v3: { name: 'v3 全前方（對照）', p: {
     tracks: { vocals: carTrack(0, CAR_SEND_OFF, false), drums: carTrack(-2, CAR_SEND_OFF, false), bass: carTrack(0, CAR_SEND_OFF, false), other: carTrack(4, 0, false, 1) },
     piano: { pan: -4, send: 0, rear: false, width: 0 },
-    amb: { on: true, db: -16, rt60: 1.2, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250 },
+    amb: { on: true, db: -16, rt60: 1.2, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250, style: 'decorrelated', gate: 1, dryGate: false },
     early: { on: false, db: -10, min: 15, max: 30 }, xover: 150 } },
   hall: { name: '音樂廳', p: {
     tracks: { vocals: carTrack(0, -6, true), drums: carTrack(-2, CAR_SEND_OFF, true), bass: carTrack(0, CAR_SEND_OFF, true), other: carTrack(4, 0, true, 1) },
     piano: { pan: -4, send: 0, rear: true, width: 0 },
-    amb: { on: true, db: -12, rt60: 1.8, pre: 20, lo: 250, hi: 4000, hf: 1, lowFront: true, split: 250 },
+    amb: { on: true, db: -12, rt60: 1.8, pre: 20, lo: 250, hi: 4000, hf: 1, lowFront: true, split: 250, style: 'decorrelated', gate: 1, dryGate: false },
+    early: { on: true, db: -10, min: 15, max: 30 }, xover: 150 } },
+  /* CarBandParams.plainStereo: the concert hall, stereo reverb 3 dB lower (no rear speakers share it) */
+  plain: { name: '一般立體聲車（無環繞）', desc: '車機沒有環繞功能時用；殘響為立體聲，不會有後方包圍', p: {
+    tracks: { vocals: carTrack(0, -6, true), drums: carTrack(-2, CAR_SEND_OFF, true), bass: carTrack(0, CAR_SEND_OFF, true), other: carTrack(4, 0, true, 1) },
+    piano: { pan: -4, send: 0, rear: true, width: 0 },
+    amb: { on: true, db: -15, rt60: 1.8, pre: 20, lo: 250, hi: 4000, hf: 1, lowFront: true, split: 250, style: 'decorrelated', gate: 1, dryGate: false },
     early: { on: true, db: -10, min: 15, max: 30 }, xover: 150 } }
 };
 function carClone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -1201,7 +1209,9 @@ function carNormalize(p) {
   var a = p.amb || {}, da = d.amb;
   out.amb = { on: bool(a.on, da.on), db: num(a.db, da.db, -30, -3), rt60: num(a.rt60, da.rt60, 0.3, 3), pre: num(a.pre, da.pre, 12, 80),
     lo: num(a.lo, da.lo, 120, 1000), hi: num(a.hi, da.hi, 1500, 10000), hf: num(a.hf, da.hf, 0.25, 2), lowFront: bool(a.lowFront, da.lowFront),
-    split: num(a.split, da.split, 80, 500) };
+    split: num(a.split, da.split, 80, 500),
+    style: CAR_STYLES.some(function (x) { return x[0] === a.style; }) ? a.style : da.style,
+    gate: num(a.gate, da.gate, 0, 1), dryGate: bool(a.dryGate, da.dryGate) };
   var e = p.early || {}, de = d.early;
   out.early = { on: bool(e.on, de.on), db: num(e.db, de.db, -30, -3), min: num(e.min, de.min, 5, 60), max: num(e.max, de.max, 5, 80) };
   if (out.early.max < out.early.min) out.early.max = out.early.min;
@@ -1240,7 +1250,7 @@ function carControls(body) {
   var cpn = el('p', null, '需在車機開啟 Centerpoint');
   cpn.setAttribute('style', 'margin:0 0 12px;padding:10px 12px;border-radius:10px;background:rgba(120,200,255,.12);border:1px solid rgba(120,200,255,.45);font-weight:600');
   body.appendChild(cpn);
-  var hint = el('p', null, '人聲左右完全相同（進中置）；左右偏移讓樂器進對應的門板；送到後座的殘響在 250 Hz–4 kHz 反相（進後窗），低頻一律左右相同。調整約 4 到 5 秒內聽得到。');
+  var hint = el('p', null, '人聲左右完全相同（進中置）；左右偏移讓樂器進對應的門板；送到後座的殘響在 250 Hz–4 kHz 依「殘響類型」左右不相關或反相（反相最多進後窗），低頻一律左右相同。調整約 4 到 5 秒內聽得到。');
   hint.setAttribute('style', 'margin:0 0 12px;opacity:.8;font-size:13px');
   body.appendChild(hint);
   var controls = [];
@@ -1295,6 +1305,30 @@ function carControls(body) {
   var spread = function (v) { return +v === 0 ? '單點' : (+v).toFixed(1); };
   var hz = function (v) { return Math.round(v) + ' Hz'; };
   var ms = function (v) { return Math.round(v) + ' ms'; };
+  /* reverb style, bleed removal before the reverb, and the same for the dry sound */
+  var ambExtras = function (box) {
+    var row = el('div', 'eqrow');
+    var l = el('div', 'eql');
+    l.appendChild(el('span', null, '殘響類型'));
+    row.appendChild(l);
+    var ss = document.createElement('select');
+    ss.className = 'stylesel';
+    ss.setAttribute('aria-label', '殘響類型');
+    CAR_STYLES.forEach(function (x) { var o = document.createElement('option'); o.value = x[0]; o.textContent = x[1]; ss.appendChild(o); });
+    ss.value = p.amb.style;
+    ss.addEventListener('change', function () { p.amb.style = ss.value; save(); });
+    controls.push(function () { ss.value = p.amb.style; });
+    row.appendChild(ss);
+    box.appendChild(row);
+    slider(box, '殘響前先去漏音（0＝關，1＝最強）', function () { return p.amb.gate; }, function (v) { p.amb.gate = v; }, 0, 1, 0.05,
+      function (v) { return +v === 0 ? '關' : (+v).toFixed(2); });
+    var grow = el('div', 'sheetbtns');
+    toggle(grow, '乾聲也去漏音', function () { return p.amb.dryGate; }, function (v) { p.amb.dryGate = v; });
+    box.appendChild(grow);
+    var gh = el('p', null, '去漏音：每一軌只留下它在各頻率最強的部分再送進殘響，別軌漏進來的聲音不會被殘響拉長。乾聲也去漏音時強度相同；四軌乾聲相加就不再等於原曲。');
+    gh.setAttribute('style', 'margin:6px 0 0;opacity:.7;font-size:12px');
+    box.appendChild(gh);
+  };
 
   /* presets */
   var pbox = section('預設集');
@@ -1304,7 +1338,7 @@ function carControls(body) {
   var fill = function () {
     sel.innerHTML = '';
     var add = function (v, t) { var o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); };
-    ['v2b', 'v3', 'hall'].forEach(function (k) { add(k, CAR_PRESETS[k].name); });
+    ['v2b', 'v3', 'hall', 'plain'].forEach(function (k) { add(k, CAR_PRESETS[k].name); });
     var u = carUserPresets();
     Object.keys(u).sort().forEach(function (k) { add('user:' + k, '自訂：' + k); });
     sel.value = st.preset;
@@ -1312,6 +1346,17 @@ function carControls(body) {
   };
   fill();
   pbox.appendChild(sel);
+  /* the built-in preset's one-line description, if it has one */
+  var pdesc = el('p', null, '');
+  pdesc.setAttribute('style', 'margin:6px 0 0;opacity:.8;font-size:13px');
+  var showDesc = function () {
+    var d = CAR_PRESETS[st.preset] && CAR_PRESETS[st.preset].desc;
+    pdesc.textContent = d || '';
+    pdesc.style.display = d ? '' : 'none';
+  };
+  showDesc();
+  controls.push(showDesc);
+  pbox.appendChild(pdesc);
   var use = function (key) {
     var src = key.indexOf('user:') === 0 ? carUserPresets()[key.slice(5)] : (CAR_PRESETS[key] && CAR_PRESETS[key].p);
     if (!src) return;
@@ -1383,7 +1428,7 @@ function carControls(body) {
     var trow = el('div', 'sheetbtns');
     toggle(trow, '殘響送到後座', function () { return t().rear; }, function (v) { t().rear = v; });
     box.appendChild(trow);
-    var rh = el('p', null, '開：反相送到後窗；關：左右相同、跟著擺位留在前方。');
+    var rh = el('p', null, '開：送到後座（左右關係見「殘響類型」）；關：左右相同、跟著擺位留在前方。');
     rh.setAttribute('style', 'margin:6px 0 0;opacity:.7;font-size:12px');
     box.appendChild(rh);
   });
@@ -1399,6 +1444,7 @@ function carControls(body) {
   if (!CAR_ADVANCED) {
     var sb = section('包圍層');
     slider(sb, '殘響總量（相對乾聲）', function () { return p.amb.db; }, function (v) { p.amb.db = v; }, -30, -3, 0.5, db);
+    ambExtras(sb);
     return;
   }
   /* early reflections */
@@ -1425,6 +1471,7 @@ function carControls(body) {
   toggle(lrow, '低頻殘響留在前方', function () { return p.amb.lowFront; }, function (v) { p.amb.lowFront = v; });
   ab.appendChild(lrow);
   slider(ab, '低頻殘響分頻點（以下左右相同）', function () { return p.amb.split; }, function (v) { p.amb.split = v; }, 80, 500, 10, hz);
+  ambExtras(ab);
 
   var xb = section('低頻置中');
   slider(xb, '分頻點（以下各軌左右相同）', function () { return p.xover; }, function (v) { p.xover = v; }, 60, 300, 10, hz);

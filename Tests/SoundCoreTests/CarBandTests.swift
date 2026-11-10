@@ -285,6 +285,238 @@ final class CarBandTests: XCTestCase {
         XCTAssertLessThan(out.map { abs($0) }.max() ?? 0, 2)
     }
 
+    // MARK: - bleed removal (sendGate / dryGate) and reverb style
+
+    private static let vocalsIndex = Demucs.sources.firstIndex(of: "vocals")!
+
+    /// All four parts playing (stereo noise, each its own), in pieces of 1024 (a divisor of the
+    /// gate's 4096-sample delay, so the level followers see the same blocks one delay later).
+    private func runAll(_ mixer: CarBandMixer, stems: [[Float]], piece: Int = 1024) -> (left: [Float], right: [Float]) {
+        var outL: [Float] = [], outR: [Float] = []
+        let total = stems[0].count
+        var done = 0
+        while done < total {
+            let n = min(piece, total - done)
+            let part = stems.map { Array($0[done..<done + n]) }
+            let zero = [Float](repeating: 0, count: n)
+            let out = mixer.process(stems: part, standIn: (zero, zero))
+            XCTAssertEqual(out.left.count, n)
+            outL += out.left
+            outR += out.right
+            done += n
+        }
+        return (outL, outR)
+    }
+
+    private func bandNoise(_ n: Int, seed: UInt32) -> [[Float]] {
+        var a = TestRandom(seed: seed)
+        var stems = [[Float]](repeating: [Float](repeating: 0, count: n), count: 8)
+        for c in 0..<8 {
+            let g: Float = 0.05 + 0.03 * Float(c)
+            for j in 0..<n { stems[c][j] = g * a.next() }
+        }
+        return stems
+    }
+
+    private func legacy(_ p: CarBandParams) -> LegacyCarBandParams {
+        return LegacyCarBandParams(tracks: p.tracks.map { LegacyCarBandTrack(panDb: $0.panDb, sendDb: $0.sendDb, rear: $0.rear, width: $0.width) },
+                                   ambienceOn: p.ambienceOn, ambienceDb: p.ambienceDb, rt60: p.rt60, predelayMs: p.predelayMs,
+                                   lowHz: p.lowHz, highHz: p.highHz, crossoverHz: p.crossoverHz, earlyOn: p.earlyOn,
+                                   earlyDb: p.earlyDb, earlyMinMs: p.earlyMinMs, earlyMaxMs: p.earlyMaxMs, hfDamping: p.hfDamping,
+                                   lowReverbFront: p.lowReverbFront, lowSplitHz: p.lowSplitHz)
+    }
+
+    /// (a) sendGate 0 with the anti style: the same as 1.3.16 (`LegacyCarBandMixer`, a verbatim
+    /// copy), only the gate's delay later: under -60 dB.
+    func testNeutralGateAndAntiAreTheOldBehaviour() {
+        let n = 4 * 44100
+        let stems = bandNoise(n, seed: 21)
+        for (name, preset) in [("v2b", CarBandParams.v2b), ("concert hall", CarBandParams.concertHall)] {
+            var p = preset
+            p.reverbStyle = .anti
+            p.sendGate = 0
+            p.dryGate = false
+            let new = CarBandMixer(sampleRate: 44100, params: p)
+            let old = LegacyCarBandMixer(sampleRate: 44100, params: legacy(p))
+            let a = runAll(new, stems: stems)
+            var b: (left: [Float], right: [Float]) = ([], [])
+            var done = 0
+            while done < n {
+                let m = min(1024, n - done)
+                let part = stems.map { Array($0[done..<done + m]) }
+                let zero = [Float](repeating: 0, count: m)
+                let out = old.process(stems: part, standIn: (zero, zero))
+                b.left += out.left
+                b.right += out.right
+                done += m
+            }
+            let shift = new.latency - old.latency
+            XCTAssertEqual(shift, 4096, name)
+            var err = 0.0, energy = 0.0
+            for j in 0..<(n - shift) {
+                let el = Double(a.left[j + shift] - b.left[j]), er = Double(a.right[j + shift] - b.right[j])
+                err += el * el + er * er
+                energy += Double(b.left[j] * b.left[j] + b.right[j] * b.right[j])
+            }
+            XCTAssertGreaterThan(energy, 1, name)
+            let db = 10 * log10(max(err, 1e-30) / energy)
+            XCTAssertLessThan(db, -60, "\(name): differs from 1.3.16 by \(db) dB")
+        }
+    }
+
+    /// "Other" only (stereo noise), in the centre at width 0, its reverb to the rear; the
+    /// reverb alone (with it on minus with it off: the dry path is the same in both).
+    private func rearReverb(_ style: CarReverbStyle, seconds: Int = 5) -> (left: [Float], right: [Float]) {
+        let n = seconds * 44100
+        let x = noiseStereo(n)
+        var p = dryParams(width: 0)
+        p.ambienceOn = true
+        p.reverbStyle = style
+        p.sendGate = 0
+        let on = runOther(p, left: x.left, right: x.right)
+        p.ambienceOn = false
+        let off = runOther(p, left: x.left, right: x.right)
+        return (zip(on.left, off.left).map { $0 - $1 }, zip(on.right, off.right).map { $0 - $1 })
+    }
+
+    /// 300 Hz - 3.5 kHz (second-order high-pass and low-pass).
+    private func midBand(_ x: [Float]) -> [Double] {
+        func section(highpass: Bool, f: Double) -> (Double) -> Double {
+            let w = 2 * Double.pi * f / 44100
+            let c = cos(w), alpha = sin(w) / (2 * 0.70710678), a0 = 1 + alpha
+            let b0 = (highpass ? (1 + c) : (1 - c)) / 2 / a0, b1 = (highpass ? -(1 + c) : (1 - c)) / a0
+            let a1 = -2 * c / a0, a2 = (1 - alpha) / a0
+            var z1 = 0.0, z2 = 0.0
+            return { v in
+                let y = b0 * v + z1
+                z1 = b1 * v - a1 * y + z2
+                z2 = b0 * v - a2 * y
+                return y
+            }
+        }
+        let hp = section(highpass: true, f: 300), lp = section(highpass: false, f: 3500)
+        return x.map { lp(hp(Double($0))) }
+    }
+
+    /// (b) The rear reverb's mid-band left / right correlation per style, and (all three) the
+    /// same reverb energy within 0.5 dB.
+    func testReverbStyleCorrelationAndEnergy() {
+        var energies: [CarReverbStyle: Double] = [:]
+        for style in CarReverbStyle.allCases {
+            let w = rearReverb(style)
+            let l = midBand(w.left), r = midBand(w.right)
+            var sl = 0.0, sr = 0.0, slr = 0.0, e = 0.0
+            for j in (2 * 44100)..<l.count {
+                sl += l[j] * l[j]
+                sr += r[j] * r[j]
+                slr += l[j] * r[j]
+                e += Double(w.left[j] * w.left[j] + w.right[j] * w.right[j])
+            }
+            XCTAssertGreaterThan(e, 1e-3, "\(style): no reverb")
+            let corr = slr / (sl * sr).squareRoot()
+            switch style {
+            case .decorrelated: XCTAssertLessThan(abs(corr), 0.2, "decorrelated: r = \(corr)")
+            case .anti: XCTAssertLessThan(corr, -0.95, "anti: r = \(corr)")
+            case .half:
+                XCTAssertLessThan(corr, -0.5, "half: r = \(corr)")
+                XCTAssertGreaterThan(corr, -0.85, "half: r = \(corr)")
+            }
+            energies[style] = e
+        }
+        let values = energies.values.map { 10 * log10($0) }
+        XCTAssertLessThan((values.max() ?? 0) - (values.min() ?? 0), 0.5, "reverb energy per style: \(energies)")
+    }
+
+    /// (c) "Other" plays 1 kHz with 3 kHz bleeding in 20 dB down, the vocals 3 kHz; only "other"
+    /// sends (to the rear, anti, so left - right is its reverb alone). With sendGate 1 the 3 kHz
+    /// in that reverb (against the 1 kHz) is at least 10 dB lower than with sendGate 0.
+    func testSendGateRemovesBleedFromTheReverb() {
+        let n = 5 * 44100
+        var stems = [[Float]](repeating: [Float](repeating: 0, count: n), count: 8)
+        let o = CarBandTests.other, v = CarBandTests.vocalsIndex
+        for j in 0..<n {
+            let t = Float(j) / 44100
+            let s1 = 0.2 * sin(2 * Float.pi * 1000 * t), s3 = 0.2 * sin(2 * Float.pi * 3000 * t)
+            stems[o * 2][j] = s1 + 0.1 * s3
+            stems[o * 2 + 1][j] = s1 + 0.1 * s3
+            stems[v * 2][j] = s3
+            stems[v * 2 + 1][j] = s3
+        }
+        func bleed(_ gate: Float) -> Double {
+            var p = dryParams(width: 0)
+            p.ambienceOn = true
+            p.reverbStyle = .anti
+            p.sendGate = gate
+            for t in 0..<4 { p.tracks[t].sendDb = CarBandParams.sendOff; p.tracks[t].rear = true }
+            p.tracks[o].sendDb = 0
+            let out = runAll(CarBandMixer(sampleRate: 44100, params: p), stems: stems)
+            let side = zip(out.left, out.right).map { $0 - $1 }
+            let from = 3 * 44100
+            let a1 = tone(side, 1000, from: from, count: 44100), a3 = tone(side, 3000, from: from, count: 44100)
+            let m1 = (a1.re * a1.re + a1.im * a1.im).squareRoot(), m3 = (a3.re * a3.re + a3.im * a3.im).squareRoot()
+            XCTAssertGreaterThan(m1, 1e-4, "no reverb at 1 kHz")
+            return 20 * log10(max(m3, 1e-12) / m1)
+        }
+        let open = bleed(0), gated = bleed(1)
+        XCTAssertLessThanOrEqual(gated, open - 10, "3 kHz in the reverb: \(open) dB without the gate, \(gated) dB with it")
+    }
+
+    /// (d) With dryGate off the dry sound does not depend on sendGate (sample for sample, the
+    /// gate running: ambience on, no part sending); with dryGate on it does.
+    func testDryUntouchedUnlessDryGate() {
+        let n = 3 * 44100
+        let stems = bandNoise(n, seed: 33)
+        func run(gate: Float, dry: Bool) -> (left: [Float], right: [Float]) {
+            var p = CarBandParams.v2b
+            p.ambienceOn = true
+            p.earlyOn = false
+            for t in 0..<4 { p.tracks[t].sendDb = CarBandParams.sendOff }
+            p.sendGate = gate
+            p.dryGate = dry
+            return runAll(CarBandMixer(sampleRate: 44100, params: p), stems: stems, piece: 777)
+        }
+        let a = run(gate: 0, dry: false), b = run(gate: 1, dry: false), c = run(gate: 1, dry: true)
+        var differ = 0
+        for j in 0..<n where a.left[j] != b.left[j] || a.right[j] != b.right[j] { differ += 1 }
+        XCTAssertEqual(differ, 0, "\(differ) samples of the dry sound changed with sendGate")
+        var d = 0.0, e = 0.0
+        for j in 0..<n {
+            d += Double((a.left[j] - c.left[j]) * (a.left[j] - c.left[j]))
+            e += Double(a.left[j] * a.left[j])
+        }
+        XCTAssertGreaterThan(d, e * 1e-3, "dryGate on should change the dry sound")
+    }
+
+    /// (e) With dryGate on (the dry parts through the gate) an impulse still comes out at
+    /// input + `latency`, at width 0 and width 1.
+    func testDryGateKeepsTimeAlignment() {
+        let n = 44100
+        var l = [Float](repeating: 0, count: n), r = l
+        l[20000] = 1
+        r[20000] = 0.5
+        for width in [Float(0), 1] {
+            var p = dryParams(width: width)
+            p.sendGate = 1
+            p.dryGate = true
+            let out = runOther(p, left: l, right: r)
+            var best = 0
+            for j in 0..<n where abs(out.left[j]) > abs(out.left[best]) { best = j }
+            XCTAssertLessThanOrEqual(abs(best - (20000 + out.latency)), 2, "width \(width): peak at \(best), latency \(out.latency)")
+        }
+    }
+
+    /// The plain-stereo preset: the concert hall with a decorrelated reverb 3 dB lower.
+    func testPlainStereoPreset() {
+        let p = CarBandParams.plainStereo, h = CarBandParams.concertHall
+        XCTAssertEqual(p.reverbStyle, .decorrelated)
+        XCTAssertEqual(p.ambienceDb, h.ambienceDb - 3)
+        XCTAssertEqual(p.sendGate, 1)
+        XCTAssertFalse(p.dryGate)
+        XCTAssertTrue(p.earlyOn)
+        XCTAssertEqual(p.tracks, h.tracks)
+        XCTAssertEqual(p, p.clamped())
+    }
+
     /// In the band processor the mixer's delay is taken back out: with the network failing,
     /// what comes out is the original, sample for sample, and nothing is lost.
     func testCarProcessorStaysAligned() {

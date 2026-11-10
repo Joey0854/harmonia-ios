@@ -10,8 +10,9 @@ public struct CarBandTrack: Equatable {
     public var panDb: Float
     /// Reverb send in dB; at or below `CarBandParams.sendOff` nothing is sent.
     public var sendDb: Float
-    /// True: the part's reverb goes to the rear bus (left +w, right -w, which the car's
-    /// Centerpoint sends to the rear-window speakers). False: the front bus, the same on both
+    /// True: the part's reverb goes to the rear bus (mid-band left and right decorrelated or in
+    /// opposite phase, see `CarReverbStyle`, which the car's Centerpoint sends towards the rear).
+    /// False: the front bus, the same on both
     /// sides apart from the part's own pan, so it stays in front.
     public var rear: Bool
     /// How far the part is spread out above the crossover (0 ... 2). 0: made mono and placed at
@@ -30,6 +31,30 @@ public struct CarBandTrack: Equatable {
 
     /// The send as a factor (0 when off).
     public var sendGain: Float { return sendDb <= CarBandParams.sendOff ? 0 : pow(10, sendDb / 20) }
+}
+
+/// How the rear reverb bus comes out on the two sides. w1 and w2 are the bus through two
+/// responses with the same statistics and different noise (seeds 11 and 12), uncorrelated
+/// with each other.
+public enum CarReverbStyle: String, Equatable, CaseIterable {
+    /// Left w1, right w2 (left / right uncorrelated, as in a real hall).
+    case decorrelated
+    /// Half of each: left (a + b)·w1, right −a·w1 + b·w2, a = b = √0.5, then scaled by √(2/3) so
+    /// the bus has the same energy as in the other two (left / right correlation about −0.7).
+    case half
+    /// Left +w1, right −w1 (the behaviour before 1.3.17: the most in the rear windows).
+    case anti
+
+    /// (left from w1, left from w2, right from w1, right from w2).
+    var mix: SIMD4<Float> {
+        switch self {
+        case .decorrelated: return SIMD4<Float>(1, 0, 0, 1)
+        case .anti: return SIMD4<Float>(1, 0, -1, 0)
+        case .half:
+            let a = Float(0.5).squareRoot(), b = a, s = Float(2.0 / 3.0).squareRoot()
+            return SIMD4<Float>((a + b) * s, 0, -a * s, b * s)
+        }
+    }
 }
 
 /// The car band mode's settings (a Bose system with Centerpoint on: what is the same on both
@@ -68,11 +93,22 @@ public struct CarBandParams: Equatable {
     /// part above still goes to its bus (the rear one in opposite phase). False: removed.
     public var lowReverbFront: Bool
     public var lowSplitHz: Float
+    /// How the rear bus comes out on the two sides (the front bus always has one response, the
+    /// same on both sides apart from the part's pan; the low part with `lowReverbFront` too).
+    public var reverbStyle: CarReverbStyle
+    /// Bleed removal before the reverb and the early reflections (0 ... 1): each part's own
+    /// short-time spectrum times (|S_i|² / Σ_j |S_j|²)^sendGate over the four parts, per side.
+    /// 0: off. The dry sound is not touched unless `dryGate`.
+    public var sendGate: Float
+    /// True: the dry sound takes the gated parts as well (same strength). The four dry parts
+    /// then no longer add up to the song exactly.
+    public var dryGate: Bool
 
     public init(tracks: [CarBandTrack], ambienceOn: Bool = true, ambienceDb: Float = -15, rt60: Float = 1.4,
                 predelayMs: Float = 12, lowHz: Float = 250, highHz: Float = 4000, crossoverHz: Float = 150,
                 earlyOn: Bool = false, earlyDb: Float = -10, earlyMinMs: Float = 15, earlyMaxMs: Float = 30,
-                hfDamping: Float = 1, lowReverbFront: Bool = false, lowSplitHz: Float = 250) {
+                hfDamping: Float = 1, lowReverbFront: Bool = false, lowSplitHz: Float = 250,
+                reverbStyle: CarReverbStyle = .decorrelated, sendGate: Float = 1, dryGate: Bool = false) {
         self.tracks = tracks
         self.ambienceOn = ambienceOn
         self.ambienceDb = ambienceDb
@@ -88,6 +124,9 @@ public struct CarBandParams: Equatable {
         self.hfDamping = hfDamping
         self.lowReverbFront = lowReverbFront
         self.lowSplitHz = lowSplitHz
+        self.reverbStyle = reverbStyle
+        self.sendGate = sendGate
+        self.dryGate = dryGate
     }
 
     /// The one chosen by ear in the car (make.py v2b): vocals dry in the centre with a little
@@ -125,6 +164,18 @@ public struct CarBandParams: Equatable {
     ], ambienceDb: -12, rt60: 1.8, predelayMs: 20,
        earlyOn: true, earlyDb: -10, earlyMinMs: 15, earlyMaxMs: 30, hfDamping: 1, lowReverbFront: true, lowSplitHz: 250)
 
+    /// "Plain stereo car" (no Centerpoint or other upmixing: the speakers only follow left and
+    /// right): the concert hall with the reverb decorrelated (a stereo reverb, nothing meant for
+    /// rear speakers) and 3 dB less of it, since all of it comes out of the doors.
+    public static let plainStereo: CarBandParams = {
+        var p = CarBandParams.concertHall
+        p.reverbStyle = .decorrelated
+        p.ambienceDb = CarBandParams.concertHall.ambienceDb - 3
+        p.sendGate = 1
+        p.dryGate = false
+        return p
+    }()
+
     /// Within the ranges the processing supports.
     public func clamped() -> CarBandParams {
         func c(_ v: Float, _ lo: Float, _ hi: Float) -> Float { return v.isFinite ? min(hi, max(lo, v)) : lo }
@@ -138,7 +189,8 @@ public struct CarBandParams: Equatable {
                              rt60: c(rt60, 0.3, 3), predelayMs: c(predelayMs, 12, 80),
                              lowHz: lo, highHz: c(highHz, max(1500, lo * 2), 10000), crossoverHz: c(crossoverHz, 60, 300),
                              earlyOn: earlyOn, earlyDb: c(earlyDb, -30, -3), earlyMinMs: e0, earlyMaxMs: c(earlyMaxMs, e0, 80),
-                             hfDamping: c(hfDamping, 0.25, 2), lowReverbFront: lowReverbFront, lowSplitHz: c(lowSplitHz, 80, 500))
+                             hfDamping: c(hfDamping, 0.25, 2), lowReverbFront: lowReverbFront, lowSplitHz: c(lowSplitHz, 80, 500),
+                             reverbStyle: reverbStyle, sendGate: c(sendGate, 0, 1), dryGate: dryGate)
     }
 }
 
@@ -590,13 +642,213 @@ final class CarSpreader {
     }
 }
 
+/// Bleed removal across the four parts (`CarBandParams.sendGate`, car_band/hall_gate.py `gate`
+/// in real time): every part's left and right short-time spectrum S_i times
+/// (|S_i|² / Σ_j |S_j|²)^a, the sum over the four parts of the same side, then back by weighted
+/// overlap-add.
+///
+/// The same transform as `CarSpreader` (Hann, `size` points, hop `size / 4`, both sides of a
+/// part in one complex transform), but each frame is made as soon as it is in (no averaging
+/// over neighbours), so output sample n belongs to input sample n − `latency` with `latency` =
+/// `size`: the frame ending at input sample T is added to the overlap sum aligned with its
+/// first sample T − size + 1, and the sum's first hop (input samples T − size + 1 ...
+/// T − size + hop, complete: every frame that covers them is in) goes out over the next hop,
+/// at T + 1 ... T + hop. With a = 0 every factor is 1 and the output is the input `size`
+/// samples later (to float rounding: the squared windows add up to 1.5 everywhere).
+///
+/// Nothing is allocated after `init`. Any number of samples in, the same number out.
+/// Not thread-safe.
+final class CarGate {
+    static let channels = 8
+    let size: Int
+    let hop: Int
+    let latency: Int
+    private let half: Int
+    private let log2n: vDSP_Length
+    private let setup: FFTSetup
+    private let window: UnsafeMutablePointer<Float>
+    /* per channel (part, then left / right): the last `size` input samples, the newest hop being
+       filled at the end; the overlap sum aligned with the newest frame; the finished hop */
+    private let history: UnsafeMutablePointer<Float>
+    private let sum: UnsafeMutablePointer<Float>
+    private let ready: UnsafeMutablePointer<Float>
+    /* one complex transform per part (left real, right imaginary) */
+    private let re: UnsafeMutablePointer<Float>
+    private let im: UnsafeMutablePointer<Float>
+    /* powers of the newest frame: [channel][bin] */
+    private let power: UnsafeMutablePointer<Float>
+    private var position = 0
+    /* the exponent in use and where it glides to (per hop, about 20 ms) */
+    private(set) var strength: Float = 1
+    private var strengthTarget: Float = 1
+    private let glide: Float
+
+    init(sampleRate: Int) {
+        let n = CarSpreader.size(sampleRate: sampleRate)
+        size = n
+        hop = n / 4
+        latency = n
+        half = n / 2
+        var log = 0
+        while (1 << log) < n { log += 1 }
+        log2n = vDSP_Length(log)
+        setup = vDSP_create_fftsetup(vDSP_Length(log), FFTRadix(kFFTRadix2))!
+        glide = Float(1 - exp(-Double(n / 4) / (0.02 * Double(max(8000, sampleRate)))))
+        func zeros(_ count: Int) -> UnsafeMutablePointer<Float> {
+            let p = UnsafeMutablePointer<Float>.allocate(capacity: count)
+            p.initialize(repeating: 0, count: count)
+            return p
+        }
+        let w = zeros(n)
+        for i in 0..<n { w[i] = Float(0.5 - 0.5 * cos(2 * Double.pi * Double(i) / Double(n))) }
+        window = w
+        history = zeros(CarGate.channels * n)
+        sum = zeros(CarGate.channels * n)
+        ready = zeros(CarGate.channels * (n / 4))
+        re = zeros(CarGate.channels / 2 * n)
+        im = zeros(CarGate.channels / 2 * n)
+        power = zeros(CarGate.channels * (n / 2 + 1))
+    }
+
+    deinit {
+        vDSP_destroy_fftsetup(setup)
+        for p in [window, history, sum, ready, re, im, power] { p.deallocate() }
+    }
+
+    /// Back to silence, the exponent taken at once.
+    func reset(strength a: Float) {
+        vDSP_vclr(history, 1, vDSP_Length(CarGate.channels * size))
+        vDSP_vclr(sum, 1, vDSP_Length(CarGate.channels * size))
+        vDSP_vclr(ready, 1, vDSP_Length(CarGate.channels * hop))
+        position = 0
+        strength = a
+        strengthTarget = a
+    }
+
+    /// Where the exponent glides to.
+    func target(strength a: Float) { strengthTarget = a }
+
+    /// `stems`: 8 channels (at least `count` samples each). Channel c of the output goes to
+    /// `output + c * stride`, `count` samples.
+    func process(_ stems: [[Float]], count: Int, into output: UnsafeMutablePointer<Float>, stride: Int) {
+        guard stems.count >= CarGate.channels else { return }
+        let start = size - hop
+        var j = 0
+        while j < count {
+            let run = min(count - j, hop - position)
+            for c in 0..<CarGate.channels {
+                let h = history + c * size + start + position
+                let r = ready + c * hop + position
+                let o = output + c * stride + j
+                let from = j
+                stems[c].withUnsafeBufferPointer { s in
+                    for i in 0..<run {
+                        o[i] = r[i]
+                        h[i] = s[from + i]
+                    }
+                }
+            }
+            position += run
+            j += run
+            if position == hop {
+                step()
+                position = 0
+            }
+        }
+    }
+
+    /* One hop: the newest frame in, gated, added to the sum; the sum's first hop out. */
+    private func step() {
+        let bins = half + 1
+        let parts = CarGate.channels / 2
+        for t in 0..<parts {
+            let hl = history + (2 * t) * size, hr = history + (2 * t + 1) * size
+            let tr = re + t * size, ti = im + t * size
+            for i in 0..<size {
+                tr[i] = hl[i] * window[i]
+                ti[i] = hr[i] * window[i]
+            }
+            transform(tr, ti, inverse: false)
+            let pl = power + (2 * t) * bins, pr = power + (2 * t + 1) * bins
+            for k in 0..<bins {
+                let mirror = k == 0 ? 0 : size - k
+                let a = tr[k], b = ti[k], c = tr[mirror], d = ti[mirror]
+                let lr = 0.5 * (a + c), li = 0.5 * (b - d)
+                let rr = 0.5 * (b + d), ri = 0.5 * (c - a)
+                pl[k] = lr * lr + li * li
+                pr[k] = rr * rr + ri * ri
+            }
+        }
+        strength += (strengthTarget - strength) * glide
+        if abs(strengthTarget - strength) < 1e-4 { strength = strengthTarget }
+        let a = strength
+        let tiny: Float = 1e-30
+        @inline(__always) func factor(_ p: Float, _ total: Float) -> Float {
+            if a <= 0 || total <= tiny { return 1 }
+            let x = p / total
+            return a == 1 ? x : powf(x, a)
+        }
+        for k in 0..<bins {
+            var totalL: Float = 0, totalR: Float = 0
+            for t in 0..<parts {
+                totalL += power[(2 * t) * bins + k]
+                totalR += power[(2 * t + 1) * bins + k]
+            }
+            let mirror = k == 0 ? 0 : size - k
+            for t in 0..<parts {
+                let gl = factor(power[(2 * t) * bins + k], totalL)
+                let gr = factor(power[(2 * t + 1) * bins + k], totalR)
+                let tr = re + t * size, ti = im + t * size
+                /* bin k and its mirror are read here only (k runs to half), so in place is safe */
+                let a0 = tr[k], b0 = ti[k], c0 = tr[mirror], d0 = ti[mirror]
+                let lr = 0.5 * (a0 + c0) * gl, li = 0.5 * (b0 - d0) * gl
+                let rr = 0.5 * (b0 + d0) * gr, ri = 0.5 * (c0 - a0) * gr
+                /* left + i right; the other half of the spectrum from the conjugates */
+                tr[k] = lr - ri
+                ti[k] = li + rr
+                if k > 0 && k < half {
+                    tr[size - k] = lr + ri
+                    ti[size - k] = rr - li
+                }
+            }
+        }
+        let scale = 1 / (Float(size) * 1.5)
+        let keep = size - hop
+        for t in 0..<parts {
+            let tr = re + t * size, ti = im + t * size
+            transform(tr, ti, inverse: true)
+            let sl = sum + (2 * t) * size, sr = sum + (2 * t + 1) * size
+            for i in 0..<size {
+                let g = window[i] * scale
+                sl[i] += tr[i] * g
+                sr[i] += ti[i] * g
+            }
+        }
+        for c in 0..<CarGate.channels {
+            let s = sum + c * size, h = history + c * size, r = ready + c * hop
+            for i in 0..<hop { r[i] = s[i] }
+            for i in 0..<keep {
+                s[i] = s[hop + i]
+                h[i] = h[hop + i]
+            }
+            for i in keep..<size { s[i] = 0 }
+        }
+    }
+
+    private func transform(_ r: UnsafeMutablePointer<Float>, _ i: UnsafeMutablePointer<Float>, inverse: Bool) {
+        var split = DSPSplitComplex(realp: r, imagp: i)
+        let direction = FFTDirection(inverse ? kFFTDirection_Inverse : kFFTDirection_Forward)
+        vDSP_fft_zip(setup, &split, 1, log2n, direction)
+    }
+}
+
 /// The car band mode's mixer, after separation (make.py v2b in real time):
 ///
 /// - every part is first made mono, (L + R) / 2; below `crossoverHz` (Linkwitz-Riley, 24
 ///   dB/oct) it is the same on both sides, above it panned by the part's level difference;
 /// - each part sends to one of two reverb buses: front (panned like the part, so a centred
-///   part's reverb is the same on both sides) or rear (one mono signal w, out as left +w and
-///   right -w); both buses go through the same reverb: exponentially decaying noise, RT60 and
+///   part's reverb is the same on both sides) or rear (one mono signal w, out on the two sides
+///   as `reverbStyle` says, see below); both buses go through the same reverb: exponentially decaying noise, RT60 and
 ///   pre-delay as set, convolved without delay (`CarConvolver`);
 /// - the reverb is band-limited: high-pass 24 dB/oct at `lowHz` as in v2b, plus a guard
 ///   (high-pass 48 dB/oct at 1.2 × `lowHz`) so that what is left below `lowHz` is more than
@@ -617,11 +869,22 @@ final class CarSpreader {
 ///   Its reverb send and the early reflections still take the mono sound. Going between 0 and
 ///   above 0 cross-fades (about 20 ms). Parts at width 0 take the mono path as before.
 ///
-/// Output sample n belongs to input sample n − `latency` (the spreader's delay; everything
-/// else is held back by the same amount, so the parts stay together, also when no part is
-/// spread). `BandProcessor` drops the first `latency` output samples and gets the rest
-/// with `flush` at the end. Any number of samples in, the same number out.
-/// Not thread-safe.
+/// - the rear bus comes out as `reverbStyle` says: w1 (the response above) and w2 (the same
+///   kind of response, another seed) mixed per side; the front bus and the low part always
+///   take w1 alone, the same on both sides. Changing the style glides (about 20 ms).
+///
+/// - bleed removal (`sendGate` above 0): before all of the above, the eight stem channels go
+///   through `CarGate` (latency `size`); the sends and the early reflections take the gated
+///   parts, the dry sound the parts held back by the same `size` samples in a delay line (or,
+///   with `dryGate`, the gated parts as well). Both enter the rest of the mixer at the same
+///   moment, so they stay together. While no gate is wanted the gate does not run and both
+///   take the delayed parts; switching cross-fades (about 20 ms, after the gate has filled).
+///
+/// Output sample n belongs to input sample n − `latency` = the gate's `size` (the delay line
+/// in front, always there) + the spreader's `size + hop` (everything after the front is held
+/// back by that, so the parts stay together, also when no part is spread). `BandProcessor`
+/// drops the first `latency` output samples and gets the rest with `flush` at the end. Any
+/// number of samples in, the same number out. Not thread-safe.
 public final class CarBandMixer {
     public let sampleRate: Int
     public private(set) var params: CarBandParams
@@ -634,6 +897,13 @@ public final class CarBandMixer {
     private var now: [[Float]]
     private var reverb: CarConvolver?
     private var fading: CarConvolver?
+    /* the rear bus through the second response (w2), and its old one while cross-fading */
+    private var reverb2: CarConvolver?
+    private var fading2: CarConvolver?
+    private var rear2: [[Float]] = [[]]
+    private var rear2Tail: [[Float]] = [[]]
+    /* [left from w1, left from w2, right from w1, right from w2], gliding to the style's */
+    private var styleMix: SIMD4<Float>
     private var fadeLeft = 0
     private static let fadeLength = 4096
     private var builtFor: (rt60: Float, predelay: Float, damping: Float)?
@@ -657,7 +927,8 @@ public final class CarBandMixer {
     private var spreadTail: [Int] = [0, 0, 0, 0]
     /* Linkwitz-Riley high-pass at the crossover on the spread sum, left and right */
     private var spreadHigh: [[CarBiquad]] = []
-    /* everything else held back by `latency` */
+    /* everything after the front held back by the spreader's latency */
+    private let coreLatency: Int
     private var delayL: [Float]
     private var delayR: [Float]
     private var delayAt = 0
@@ -665,22 +936,83 @@ public final class CarBandMixer {
     private var wetPower = 0.0
     private var started = false
     private var wetGain: Float = 0
+    /* the front: the gate, a delay line of the gate's latency for the 8 stem channels and the
+       stand-in (10 channels), and per-call buffers [channel][capacity] (grown only when a
+       larger block than ever before comes in) */
+    private let gate: CarGate
+    private let frontLatency: Int
+    private let frontDelay: UnsafeMutablePointer<Float>
+    private var frontAt = 0
+    private var capacity = 0
+    private var delayed: UnsafeMutablePointer<Float>
+    private var gated: UnsafeMutablePointer<Float>
+    private var sendStems: UnsafeMutablePointer<Float>
+    private var dryStems: UnsafeMutablePointer<Float>
+    private var gateRunning = false
+    /* samples the gate has run since its reset; how much of the sends (and, times dryAmount,
+       of the dry sound) is taken from the gate (glides 0 ... 1) */
+    private var gateFilled = 0
+    private var gateAmount: Float = 0
+    private var dryAmount: Float = 0
 
     public init(sampleRate: Int, params: CarBandParams = .v2b) {
         self.sampleRate = max(8000, sampleRate)
         self.params = params.clamped()
         let delay = CarSpreader.latency(sampleRate: max(8000, sampleRate))
-        latency = delay
+        coreLatency = delay
+        gate = CarGate(sampleRate: max(8000, sampleRate))
+        frontLatency = gate.latency
+        latency = gate.latency + delay
+        frontDelay = UnsafeMutablePointer<Float>.allocate(capacity: 10 * gate.latency)
+        frontDelay.initialize(repeating: 0, count: 10 * gate.latency)
+        delayed = UnsafeMutablePointer<Float>.allocate(capacity: 1)
+        gated = UnsafeMutablePointer<Float>.allocate(capacity: 1)
+        sendStems = UnsafeMutablePointer<Float>.allocate(capacity: 1)
+        dryStems = UnsafeMutablePointer<Float>.allocate(capacity: 1)
         delayL = [Float](repeating: 0, count: delay)
         delayR = [Float](repeating: 0, count: delay)
         lowpass = []
         highpass = []
         band = []
         now = []
+        styleMix = params.clamped().reverbStyle.mix
         design()
         now = (0..<4).map { targets(track: $0) }
         spreadAmount = (0..<4).map { self.params.tracks[$0].width > 0 ? 1 : 0 }
+        dryAmount = self.params.dryGate ? 1 : 0
+        /* before the first sample there is only silence, so a gate started now is filled */
+        let p = self.params
+        if p.sendGate > 0 && (p.dryGate || p.ambienceOn || p.earlyOn) {
+            gate.reset(strength: p.sendGate)
+            gateRunning = true
+            gateFilled = 1 << 30
+            gateAmount = 1
+        }
         buildReverb()
+        grow(CarBandMixer.blockSize * 16)
+    }
+
+    deinit {
+        frontDelay.deallocate()
+        for p in [delayed, gated, sendStems, dryStems] { p.deallocate() }
+    }
+
+    /* the per-call buffers for blocks of up to `count` samples */
+    private func grow(_ count: Int) {
+        guard count > capacity else { return }
+        for p in [delayed, gated, sendStems, dryStems] { p.deallocate() }
+        func zeros(_ n: Int) -> UnsafeMutablePointer<Float> {
+            let p = UnsafeMutablePointer<Float>.allocate(capacity: n)
+            p.initialize(repeating: 0, count: n)
+            return p
+        }
+        delayed = zeros(10 * count)
+        gated = zeros(8 * count)
+        sendStems = zeros(8 * count)
+        dryStems = zeros(8 * count)
+        capacity = count
+        rear2[0].reserveCapacity(count)
+        rear2Tail[0].reserveCapacity(count)
     }
 
     /// New settings, from the next sample on (levels glide; a new reverb length or pre-delay
@@ -692,6 +1024,7 @@ public final class CarBandMixer {
         design()
         if let b = builtFor, (b.rt60 != p.rt60 || b.predelay != p.predelayMs || b.damping != p.hfDamping) {
             fading = reverb
+            fading2 = reverb2
             fadeLeft = CarBandMixer.fadeLength
             buildReverb()
         }
@@ -732,6 +1065,9 @@ public final class CarBandMixer {
         let ir = CarBandMixer.response(rt60: params.rt60, predelayMs: params.predelayMs, sampleRate: sampleRate,
                                        hfDamping: params.hfDamping)
         reverb = CarConvolver(response: ir, channels: 3, blockSize: CarBandMixer.blockSize)
+        let ir2 = CarBandMixer.response(rt60: params.rt60, predelayMs: params.predelayMs, sampleRate: sampleRate,
+                                        hfDamping: params.hfDamping, seed: 12)
+        reverb2 = CarConvolver(response: ir2, channels: 1, blockSize: CarBandMixer.blockSize)
         builtFor = (params.rt60, params.predelayMs, params.hfDamping)
     }
 
@@ -753,10 +1089,11 @@ public final class CarBandMixer {
         let made = CarBiquad.butterworth(CarBiquad.q4, highpass: true, frequency: lo, sampleRate: sr)
             + CarBiquad.butterworth(CarBiquad.q8, highpass: true, frequency: 1.2 * lo, sampleRate: sr)
             + CarBiquad.butterworth(CarBiquad.q2, highpass: false, frequency: hi, sampleRate: sr)
-        if band.count != 3 {
-            band = (0..<3).map { _ in made }
+        /* the three reverb channels and the rear bus through the second response */
+        if band.count != 4 {
+            band = (0..<4).map { _ in made }
         } else {
-            for c in 0..<3 {
+            for c in 0..<4 {
                 for k in 0..<made.count {
                     var b = made[k]
                     b.z1 = band[c][k].z1
@@ -796,6 +1133,8 @@ public final class CarBandMixer {
         var n = stems.count >= 8 ? stems.prefix(8).map { $0.count }.min() ?? 0 : 0
         n = min(n, standIn.left.count, standIn.right.count)
         if n == 0 { return ([], []) }
+        front(stems, standIn, n)
+        let cap = capacity
         var dryL = [Float](repeating: 0, count: n), dryR = [Float](repeating: 0, count: n)
         var buses: [[Float]] = [[Float](repeating: 0, count: n), [Float](repeating: 0, count: n), [Float](repeating: 0, count: n)]
         var earlyIn = [Float](repeating: 0, count: n)
@@ -808,7 +1147,10 @@ public final class CarBandMixer {
             var g = now[t]
             if target[2] > 0 || target[3] > 0 || target[4] > 0 || g[2] > 1e-6 || g[3] > 1e-6 || g[4] > 1e-6 { sending = true }
             var lp0 = lowpass[t][0], lp1 = lowpass[t][1], hp0 = highpass[t][0], hp1 = highpass[t][1]
-            let left = stems[t * 2], right = stems[t * 2 + 1]
+            /* the dry sound from the (delayed or gated) dry stems, the sends and the early
+               reflections from the send stems (the same values while no gate is used) */
+            let left = dryStems + (t * 2) * cap, right = dryStems + (t * 2 + 1) * cap
+            let sendLeft = sendStems + (t * 2) * cap, sendRight = sendStems + (t * 2 + 1) * cap
             let width = params.tracks[t].width
             let aim: Float = width > 0 ? 1 : 0
             var a = spreadAmount[t]
@@ -832,10 +1174,11 @@ public final class CarBandMixer {
                 let hi = (1 - a) * Float(hp1.step(hp0.step(md)))
                 dryL[j] += lo + g[0] * hi
                 dryR[j] += lo + g[1] * hi
-                buses[0][j] += m * g[2]
-                buses[1][j] += m * g[3]
-                buses[2][j] += m * g[4]
-                earlyIn[j] += m
+                let ms = (sendLeft[j] + sendRight[j]) * 0.5
+                buses[0][j] += ms * g[2]
+                buses[1][j] += ms * g[3]
+                buses[2][j] += ms * g[4]
+                earlyIn[j] += ms
                 if spreading {
                     inL[j] = left[j] * a
                     inR[j] = right[j] * a
@@ -940,15 +1283,23 @@ public final class CarBandMixer {
         if wetOn, let r = reverb {
             var wet = buses
             r.process(&wet)
+            /* the rear bus through the second response (w2), in a buffer kept between calls */
+            rear2[0].removeAll(keepingCapacity: true)
+            rear2[0].append(contentsOf: buses[2][0..<n])
+            reverb2?.process(&rear2)
             if let old = fading {
                 var tail = buses
                 old.process(&tail)
+                rear2Tail[0].removeAll(keepingCapacity: true)
+                rear2Tail[0].append(contentsOf: buses[2][0..<n])
+                fading2?.process(&rear2Tail)
                 for j in 0..<n {
                     let w = fadeLeft > 0 ? 1 - Float(fadeLeft) / Float(CarBandMixer.fadeLength) : 1
                     for c in 0..<3 { wet[c][j] = wet[c][j] * w + tail[c][j] * (1 - w) }
+                    rear2[0][j] = rear2[0][j] * w + rear2Tail[0][j] * (1 - w)
                     if fadeLeft > 0 { fadeLeft -= 1 }
                 }
-                if fadeLeft == 0 { fading = nil }
+                if fadeLeft == 0 { fading = nil; fading2 = nil }
             }
             /* the part below lowSplitHz, kept the same on both sides (in front) */
             var low: [[Float]]? = nil
@@ -978,15 +1329,33 @@ public final class CarBandMixer {
                 }
                 band[c] = f
             }
-            /* left = front left + rear + low, right = front right - rear + low */
+            var f2 = band[3]
+            rear2[0].withUnsafeMutableBufferPointer { b in
+                for j in 0..<n {
+                    var v = Double(b[j])
+                    for s in 0..<f2.count { v = f2[s].step(v) }
+                    b[j] = Float(v)
+                }
+            }
+            band[3] = f2
+            /* left = front left + rear left + low, right = front right + rear right + low, the
+               rear sides mixed from w1 and w2 as the style says (anti: +w1 / -w1) */
             var wl = [Float](repeating: 0, count: n), wr = [Float](repeating: 0, count: n)
+            let aimMix = params.reverbStyle.mix
+            var mix = styleMix
             for j in 0..<n {
-                let rear = wet[2][j]
+                if mix != aimMix {
+                    mix += (aimMix - mix) * k
+                    for q in 0..<4 where abs(aimMix[q] - mix[q]) < 1e-5 { mix[q] = aimMix[q] }
+                }
+                let w1 = wet[2][j], w2 = rear2[0][j]
+                let rearL = mix[0] * w1 + mix[1] * w2, rearR = mix[2] * w1 + mix[3] * w2
                 var common: Float = 0
                 if let lw = low { common = 0.5 * (lw[0][j] + lw[1][j]) + lw[2][j] }
-                wl[j] = wet[0][j] + rear + common
-                wr[j] = wet[1][j] - rear + common
+                wl[j] = wet[0][j] + rearL + common
+                wr[j] = wet[1][j] + rearR + common
             }
+            styleMix = mix
             var wetEnergy = 0.0
             for j in 0..<n { wetEnergy += Double(wl[j] * wl[j] + wr[j] * wr[j]) }
             wetEnergy /= Double(2 * n)
@@ -1007,15 +1376,18 @@ public final class CarBandMixer {
         }
 
 
-        started = true
+        /* the level followers start with the first block that has sound in it (the first
+           `frontLatency` samples out of the front are silence) */
+        if dryEnergy > 0 { started = true }
         /* No loudness matching or limiting here: the engine's loudness balance and limiter
            come after (float throughout, so nothing clips before them). */
+        let standL = delayed + 8 * cap, standR = delayed + 9 * cap
         for j in 0..<n {
-            outL[j] += standIn.left[j]
-            outR[j] += standIn.right[j]
+            outL[j] += standL[j]
+            outR[j] += standR[j]
         }
-        /* held back by `latency`, to line up with the spread parts */
-        let length = latency
+        /* held back by the spreader's latency, to line up with the spread parts */
+        let length = coreLatency
         var at = delayAt
         delayL.withUnsafeMutableBufferPointer { dl in
             delayR.withUnsafeMutableBufferPointer { dr in
@@ -1038,6 +1410,71 @@ public final class CarBandMixer {
             }
         }
         return (outL, outR)
+    }
+
+    /* The front: the stems and the stand-in through the delay line (`delayed`), the stems
+       through the gate when it is wanted (`gated`), and from these the send and dry stems. */
+    private func front(_ stems: [[Float]], _ standIn: (left: [Float], right: [Float]), _ n: Int) {
+        grow(n)
+        let cap = capacity, length = frontLatency
+        var at = frontAt
+        for c in 0..<10 {
+            let source: [Float] = c < 8 ? stems[c] : (c == 8 ? standIn.left : standIn.right)
+            let ring = frontDelay + c * length
+            let out = delayed + c * cap
+            at = frontAt
+            source.withUnsafeBufferPointer { s in
+                for j in 0..<n {
+                    out[j] = ring[at]
+                    ring[at] = s[j]
+                    at += 1
+                    if at == length { at = 0 }
+                }
+            }
+        }
+        frontAt = at
+        let p = params
+        let wanted = p.sendGate > 0 && (p.dryGate || p.ambienceOn || p.earlyOn)
+        if wanted && !gateRunning {
+            gate.reset(strength: p.sendGate)
+            gateRunning = true
+            gateFilled = 0
+        }
+        let dryAim: Float = p.dryGate ? 1 : 0
+        if !gateRunning {
+            for c in 0..<8 {
+                memcpy(sendStems + c * cap, delayed + c * cap, n * MemoryLayout<Float>.size)
+                memcpy(dryStems + c * cap, delayed + c * cap, n * MemoryLayout<Float>.size)
+            }
+            dryAmount = dryAim
+            return
+        }
+        /* cross-fade to the gate only once it has filled (its output from before is incomplete) */
+        let aim: Float = wanted && gateFilled >= gate.latency + gate.size ? 1 : 0
+        gate.target(strength: p.sendGate)
+        gate.process(stems, count: n, into: gated, stride: cap)
+        gateFilled = min(gateFilled + n, 1 << 30)
+        let k = Float(1 - exp(-1 / (0.02 * Double(sampleRate))))
+        var ga = gateAmount, da = dryAmount
+        for j in 0..<n {
+            if ga != aim {
+                ga += (aim - ga) * k
+                if aim == 0 && ga < 1e-4 { ga = 0 } else if aim == 1 && ga > 1 - 1e-5 { ga = 1 }
+            }
+            if da != dryAim {
+                da += (dryAim - da) * k
+                if dryAim == 0 && da < 1e-4 { da = 0 } else if dryAim == 1 && da > 1 - 1e-5 { da = 1 }
+            }
+            for c in 0..<8 {
+                let d = delayed[c * cap + j], g = gated[c * cap + j]
+                let s = d + ga * (g - d)
+                sendStems[c * cap + j] = s
+                dryStems[c * cap + j] = d + da * (s - d)
+            }
+        }
+        gateAmount = ga
+        dryAmount = da
+        if !wanted && ga == 0 { gateRunning = false }
     }
 
     /// The last `latency` samples (silence in): what is still inside after the last `process`.

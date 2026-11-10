@@ -679,7 +679,8 @@ final class NativePlayer: NSObject {
 
     /// The car band mode's settings from the page (missing values: v2b's). Tracks by name:
     /// pan / send in dB, rear true or false, width 0 ... 2; amb: on, db, rt60, pre (ms), lo, hi (Hz), hf
-    /// (damping factor), lowFront, split (Hz); early: on, db, min, max (ms); xover (Hz).
+    /// (damping factor), lowFront, split (Hz), style ("decorrelated" / "half" / "anti"), gate (0 ... 1),
+    /// dryGate; early: on, db, min, max (ms); xover (Hz).
     static func carBand(from car: [String: Any]) -> CarBandParams {
         let base = CarBandParams.v2b
         func number(_ v: Any?, _ def: Float) -> Float {
@@ -702,7 +703,9 @@ final class NativePlayer: NSObject {
                              earlyOn: early["on"] as? Bool ?? base.earlyOn, earlyDb: number(early["db"], base.earlyDb),
                              earlyMinMs: number(early["min"], base.earlyMinMs), earlyMaxMs: number(early["max"], base.earlyMaxMs),
                              hfDamping: number(amb["hf"], base.hfDamping), lowReverbFront: amb["lowFront"] as? Bool ?? base.lowReverbFront,
-                             lowSplitHz: number(amb["split"], base.lowSplitHz)).clamped()
+                             lowSplitHz: number(amb["split"], base.lowSplitHz),
+                             reverbStyle: (amb["style"] as? String).flatMap { CarReverbStyle(rawValue: $0) } ?? base.reverbStyle,
+                             sendGate: number(amb["gate"], base.sendGate), dryGate: amb["dryGate"] as? Bool ?? base.dryGate).clamped()
     }
 
     /// Reads a page `fx` command (also the copy kept on disk).
