@@ -238,7 +238,14 @@ public final class BandProcessor {
             amount = 1
         }
         applyMix(crossfade: false)
-        status(.loading)
+        /* Parts read from the disk cache are ready at once and no segment may run for a long while:
+           report "running" (0 s per segment = from the cache) instead of leaving the page on "loading". */
+        if gateOpen {
+            lock.lock(); lastRun = .running(seconds: 0, realtime: 0); lock.unlock()
+            status(.running(seconds: 0, realtime: 0))
+        } else {
+            status(.loading)
+        }
     }
 
     public func process(left: [Float], right: [Float]) -> (left: [Float], right: [Float]) {

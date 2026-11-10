@@ -980,6 +980,7 @@
     if (!(P && P.band && P.band()) || !bandState) return '';
     var s = bandState.state;
     if (s === 'loading') return '樂團：分軌中…';
+    if (s === 'running' && !(+bandState.seconds)) return '樂團中（從快取）';
     if (s === 'running') return '樂團中（每段 ' + (+bandState.seconds || 0).toFixed(1) + ' 秒，' + (+bandState.realtime || 0).toFixed(1) + '× 即時）';
     if (s === 'late') return '樂團：來不及，暫時播原音';
     if (s === 'paused') return '樂團：手機過熱，暫停分軌（先播耳機環繞）';
