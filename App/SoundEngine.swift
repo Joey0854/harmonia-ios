@@ -406,8 +406,8 @@ final class SoundEngine {
         }
         if new?.key == settings?.key { return }
         /* switching into a band mode: the mode before stands in until the band is ready */
-        if let n = new, n.surround, n.mode == .band || n.mode == .bandHead {
-            if let old = settings, !(old.surround && (old.mode == .band || old.mode == .bandHead)) { bandFallback = old }
+        if let n = new, n.surround, n.mode.isBand {
+            if let old = settings, !(old.surround && old.mode.isBand) { bandFallback = old }
         } else {
             bandFallback = nil
         }
@@ -477,7 +477,7 @@ final class SoundEngine {
     /// Band modes: separate the start of the next song ahead of time (for a mix from
     /// `position`; without one from its start). Nothing in other modes.
     func prefetchBand(id: String, file: URL, from position: Double, seconds: Double) {
-        guard let s = settings, s.surround, s.mode == .band || s.mode == .bandHead,
+        guard let s = settings, s.surround, s.mode.isBand,
               let network = SurroundChain.bandNetwork?() else {
             BandPrefetch.shared.cancel("not in a band mode")
             return

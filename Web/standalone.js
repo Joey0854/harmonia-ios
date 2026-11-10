@@ -856,18 +856,19 @@
     /* Both band modes carry the user's headphone surround along: it plays where the band is
        not ready (the phone too hot, the model failing), never the bare original. */
     var hpL = P.irUrl('L'), hpR = P.irUrl('R'), hpKey = (hpL.split('?')[1] || hpL);
-    if (band === 'band') {
-      var sk2 = 'band|' + hpKey;
+    /* speakers and the car: the app places the parts itself, no responses for them */
+    if (band === 'band' || band === 'bandCar') {
+      var sk2 = band + '|' + hpKey;
       if (sent.fx === sk2) { fxSeq++; return; }
       var smine = ++fxSeq;
       Promise.all([getIr(hpL), getIr(hpR)]).then(function (h) {
         if (smine !== fxSeq) return;
         sent.fx = sk2;
-        raw({ cmd: 'fx', key: 'band', surround: true, mode: 'band', irL: B.b64(h[0]), irR: B.b64(h[1]), hrirMakeup: makeupFor(h[0], h[1], headroom), makeup: headroom });
+        raw({ cmd: 'fx', key: band, surround: true, mode: band, irL: B.b64(h[0]), irR: B.b64(h[1]), hrirMakeup: makeupFor(h[0], h[1], headroom), makeup: headroom });
       }, function () {
         if (smine !== fxSeq) return;
         sent.fx = sk2;
-        raw({ cmd: 'fx', key: 'band', surround: true, mode: 'band', irL: null, irR: null, makeup: headroom });
+        raw({ cmd: 'fx', key: band, surround: true, mode: band, irL: null, irR: null, makeup: headroom });
       });
       return;
     }
@@ -942,8 +943,13 @@
       var p = bm.parts[n];
       parts[n] = { gain: p.gain / 100, solo: !!p.solo, mute: !!p.mute, az: p.az, depth: p.depth, width: p.width };
     });
-    var key = bm.mode + JSON.stringify(parts) + '|' + (bm.low || 0) + '|' + (bm.mode === 'bandHead' ? P.bandIrQuery() : '');
+    var key = bm.mode + JSON.stringify(parts) + '|' + (bm.low || 0) + '|' + (bm.mode === 'bandHead' ? P.bandIrQuery() : '') + (bm.car ? JSON.stringify(bm.car) : '');
     if (sent.mix === key) return;
+    if (bm.mode === 'bandCar') {
+      sent.mix = key;
+      raw({ cmd: 'bandMix', mode: bm.mode, parts: parts, car: bm.car });
+      return;
+    }
     if (bm.mode !== 'bandHead') {
       sent.mix = key;
       raw({ cmd: 'bandMix', mode: bm.mode, parts: parts });

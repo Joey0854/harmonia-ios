@@ -920,7 +920,7 @@ function legacyStyle() {
 var STAGE_DEFAULT = { w: 60, d: 40, v: 30 };
 function stageMode() {
   var m = lsGet('ytm_surround_mode' + psuf());
-  if (m === 'stage' || m === 'hrir' || m === 'band' || m === 'bandHead') return m;
+  if (m === 'stage' || m === 'hrir' || m === 'band' || m === 'bandHead' || m === 'bandCar') return m;
   return isCar() ? 'stage' : 'hrir';
 }
 function stageParams() {
@@ -941,7 +941,7 @@ function stageSetting() {
    speakers ('bandHead', headphones). What the glue sends: null, 'band' or 'bandHead'. */
 function bandSetting() {
   var m = stageMode();
-  return m === 'band' || m === 'bandHead' ? m : null;
+  return m === 'band' || m === 'bandHead' || m === 'bandCar' ? m : null;
 }
 /* The band mixer, per mode and profile: per part volume (0-150 %), solo, mute and position
    (azimuth -90..90, depth 0..100, width 0..200 %). Parts in the app's order. */
@@ -967,6 +967,7 @@ function bandMixSave(mode, p) { lsSet('ytm_band_mix_' + mode + psuf(), JSON.stri
 function bandLow() { var v = Math.round(+lsGet('ytm_band_low' + psuf())); return isFinite(v) ? Math.max(-60, Math.min(30, v)) : 0; }
 function bandMixSetting() {
   var m = bandSetting();
+  if (m === 'bandCar') return carMixSetting();
   return m ? { mode: m, parts: bandMixParams(m), low: m === 'bandHead' ? bandLow() : 0 } : null;
 }
 /* The mixer rows in the surround panel. Volume, solo and mute act at once (within about 4 s:
@@ -1153,6 +1154,275 @@ function bandControls(body, mode) {
   });
   btns.appendChild(reset);
   body.appendChild(btns);
+}
+/* "Car band" (bandCar): the four separated parts placed for a car whose Bose system has
+   Centerpoint on: what is the same on both sides goes to the centre, level differences to the
+   doors, mid-band opposite-phase sound to the rear windows. Settings per profile; presets
+   built in (v2b, v3, concert hall) and the user's own (kept for all profiles). Values: dB, s,
+   ms, Hz. A send of -40 dB is off. */
+var CAR_SEND_OFF = -40;
+/* 1.3.12: only the main controls are shown; the rest stays at the preset's values (next build) */
+var CAR_ADVANCED = false;
+var CAR_PARTS = [['vocals', '人聲'], ['drums', '鼓'], ['bass', '貝斯'], ['other', '其他樂器']];
+function carTrack(pan, send, rear) { return { gain: 0, pan: pan, send: send, rear: rear, solo: false, mute: false }; }
+var CAR_PRESETS = {
+  v2b: { name: 'v2b（預設）', p: {
+    tracks: { vocals: carTrack(0, -10, true), drums: carTrack(-2, CAR_SEND_OFF, true), bass: carTrack(0, CAR_SEND_OFF, true), other: carTrack(6, 0, true) },
+    piano: { pan: -6, send: 0, rear: true },
+    amb: { on: true, db: -15, rt60: 1.4, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250 },
+    early: { on: false, db: -10, min: 15, max: 30 }, xover: 150 } },
+  v3: { name: 'v3 全前方（對照）', p: {
+    tracks: { vocals: carTrack(0, CAR_SEND_OFF, false), drums: carTrack(-2, CAR_SEND_OFF, false), bass: carTrack(0, CAR_SEND_OFF, false), other: carTrack(4, 0, false) },
+    piano: { pan: -4, send: 0, rear: false },
+    amb: { on: true, db: -16, rt60: 1.2, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250 },
+    early: { on: false, db: -10, min: 15, max: 30 }, xover: 150 } },
+  hall: { name: '音樂廳', p: {
+    tracks: { vocals: carTrack(0, -6, true), drums: carTrack(-2, CAR_SEND_OFF, true), bass: carTrack(0, CAR_SEND_OFF, true), other: carTrack(4, 0, true) },
+    piano: { pan: -4, send: 0, rear: true },
+    amb: { on: true, db: -12, rt60: 1.8, pre: 20, lo: 250, hi: 4000, hf: 1, lowFront: true, split: 250 },
+    early: { on: true, db: -10, min: 15, max: 30 }, xover: 150 } }
+};
+function carClone(o) { return JSON.parse(JSON.stringify(o)); }
+/* fills in and clamps a stored setting against v2b */
+function carNormalize(p) {
+  var d = CAR_PRESETS.v2b.p, out = carClone(d);
+  p = p || {};
+  var num = function (v, def, lo, hi) { v = +v; return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def; };
+  var bool = function (v, def) { return typeof v === 'boolean' ? v : def; };
+  CAR_PARTS.forEach(function (cp) {
+    var n = cp[0], s = (p.tracks && p.tracks[n]) || {}, t = d.tracks[n];
+    out.tracks[n] = { gain: num(s.gain, t.gain, -30, 3), pan: num(s.pan, t.pan, -12, 12), send: num(s.send, t.send, CAR_SEND_OFF, 6),
+      rear: bool(s.rear, t.rear), solo: !!s.solo, mute: !!s.mute };
+  });
+  var pi = p.piano || {};
+  out.piano = { pan: num(pi.pan, d.piano.pan, -12, 12), send: num(pi.send, d.piano.send, CAR_SEND_OFF, 6), rear: bool(pi.rear, d.piano.rear) };
+  var a = p.amb || {}, da = d.amb;
+  out.amb = { on: bool(a.on, da.on), db: num(a.db, da.db, -30, -3), rt60: num(a.rt60, da.rt60, 0.3, 3), pre: num(a.pre, da.pre, 12, 80),
+    lo: num(a.lo, da.lo, 120, 1000), hi: num(a.hi, da.hi, 1500, 10000), hf: num(a.hf, da.hf, 0.25, 2), lowFront: bool(a.lowFront, da.lowFront),
+    split: num(a.split, da.split, 80, 500) };
+  var e = p.early || {}, de = d.early;
+  out.early = { on: bool(e.on, de.on), db: num(e.db, de.db, -30, -3), min: num(e.min, de.min, 5, 60), max: num(e.max, de.max, 5, 80) };
+  if (out.early.max < out.early.min) out.early.max = out.early.min;
+  out.xover = num(p.xover, d.xover, 60, 300);
+  return out;
+}
+function carUserPresets() {
+  var o = null;
+  try { o = JSON.parse(lsGet('ytm_car_presets') || 'null'); } catch (e) { o = null; }
+  return o && typeof o === 'object' ? o : {};
+}
+function carState() {
+  var s = null;
+  try { s = JSON.parse(lsGet('ytm_car_band' + psuf()) || 'null'); } catch (e) { s = null; }
+  if (!s || !s.p) return { preset: 'v2b', p: carNormalize(CAR_PRESETS.v2b.p) };
+  return { preset: s.preset || 'v2b', p: carNormalize(s.p) };
+}
+function carSave(st) { lsSet('ytm_car_band' + psuf(), JSON.stringify(st)); }
+/* what goes to the app: volumes, solo and mute as for the other band modes, the rest as `car` */
+function carMixSetting() {
+  var p = carState().p, parts = {}, tracks = {};
+  CAR_PARTS.forEach(function (cp) {
+    var t = p.tracks[cp[0]];
+    parts[cp[0]] = { gain: Math.round(1000 * Math.pow(10, t.gain / 20)) / 10, solo: t.solo, mute: t.mute, az: 0, depth: 0, width: 100 };
+    tracks[cp[0]] = { pan: t.pan, send: t.send, rear: t.rear };
+  });
+  return { mode: 'bandCar', parts: parts, low: 0,
+    car: { tracks: tracks, amb: p.amb, early: p.early, xover: p.xover } };
+}
+function carControls(body) {
+  var st = carState(), p = st.p;
+  var status = el('p', null, (window.__ytmGlue && window.__ytmGlue.bandStatus && window.__ytmGlue.bandStatus()) || '樂團：等待播放');
+  status.setAttribute('style', 'margin:0 0 12px;font-weight:600');
+  body.appendChild(status);
+  bandStatusEl = status;
+  var cpn = el('p', null, '需在車機開啟 Centerpoint');
+  cpn.setAttribute('style', 'margin:0 0 12px;padding:10px 12px;border-radius:10px;background:rgba(120,200,255,.12);border:1px solid rgba(120,200,255,.45);font-weight:600');
+  body.appendChild(cpn);
+  var hint = el('p', null, '人聲左右完全相同（進中置）；左右偏移讓樂器進對應的門板；送到後座的殘響在 250 Hz–4 kHz 反相（進後窗），低頻一律左右相同。調整約 4 到 5 秒內聽得到。');
+  hint.setAttribute('style', 'margin:0 0 12px;opacity:.8;font-size:13px');
+  body.appendChild(hint);
+  var controls = [];
+  var save = function () { carSave(st); fxApply(); };
+  var refresh = function () { controls.forEach(function (f) { f(); }); };
+  var section = function (title) {
+    var box = el('div');
+    box.setAttribute('style', 'margin:0 0 14px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05)');
+    if (title) {
+      var h = el('div', null, title);
+      h.setAttribute('style', 'font-weight:600;margin-bottom:6px');
+      box.appendChild(h);
+    }
+    body.appendChild(box);
+    return box;
+  };
+  /* get / set reach into the current `p` (choosing a preset replaces it) */
+  var slider = function (box, label, get, set, min, max, step, fmt, disabled) {
+    var row = el('div', 'eqrow');
+    var l = el('div', 'eql');
+    l.appendChild(el('span', null, label));
+    var val = el('span', null, fmt(get()));
+    l.appendChild(val);
+    row.appendChild(l);
+    var input = document.createElement('input');
+    input.type = 'range';
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = get();
+    input.disabled = !!disabled;
+    input.setAttribute('aria-label', label);
+    input.addEventListener('input', function () { set(+input.value); val.textContent = fmt(get()); save(); });
+    row.appendChild(input);
+    box.appendChild(row);
+    controls.push(function () { input.value = get(); val.textContent = fmt(get()); });
+  };
+  var toggle = function (parent, text, get, set, disabled) {
+    var b = el('button', 'btn ghost', text);
+    b.type = 'button';
+    b.disabled = !!disabled;
+    var paint = function () { var on = !!get(); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.style.opacity = on ? '1' : '.45'; b.style.fontWeight = on ? '700' : '400'; };
+    paint();
+    b.addEventListener('click', function () { set(!get()); paint(); save(); });
+    controls.push(paint);
+    parent.appendChild(b);
+    return b;
+  };
+  var db = function (v) { return (v > 0 ? '+' : '') + (+v).toFixed(1) + ' dB'; };
+  var send = function (v) { return v <= CAR_SEND_OFF ? '關' : db(v); };
+  var pan = function (v) { return +v === 0 ? '置中' : (v < 0 ? '左 ' : '右 ') + Math.abs(v).toFixed(1) + ' dB'; };
+  var hz = function (v) { return Math.round(v) + ' Hz'; };
+  var ms = function (v) { return Math.round(v) + ' ms'; };
+
+  /* presets */
+  var pbox = section('預設集');
+  var sel = document.createElement('select');
+  sel.className = 'stylesel';
+  sel.setAttribute('aria-label', '車用樂團預設集');
+  var fill = function () {
+    sel.innerHTML = '';
+    var add = function (v, t) { var o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); };
+    ['v2b', 'v3', 'hall'].forEach(function (k) { add(k, CAR_PRESETS[k].name); });
+    var u = carUserPresets();
+    Object.keys(u).sort().forEach(function (k) { add('user:' + k, '自訂：' + k); });
+    sel.value = st.preset;
+    if (sel.value !== st.preset) sel.selectedIndex = 0;
+  };
+  fill();
+  pbox.appendChild(sel);
+  var use = function (key) {
+    var src = key.indexOf('user:') === 0 ? carUserPresets()[key.slice(5)] : (CAR_PRESETS[key] && CAR_PRESETS[key].p);
+    if (!src) return;
+    st.preset = key;
+    st.p = p = carNormalize(src);
+    refresh();
+    save();
+  };
+  sel.addEventListener('change', function () { use(sel.value); });
+  var nrow = el('div', 'sheetbtns');
+  var name = document.createElement('input');
+  name.type = 'text';
+  name.placeholder = '自訂預設名稱';
+  name.setAttribute('aria-label', '自訂預設名稱');
+  name.setAttribute('style', 'flex:1;min-width:120px;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit');
+  nrow.appendChild(name);
+  var saveAs = el('button', 'btn ghost', '另存');
+  saveAs.type = 'button';
+  saveAs.addEventListener('click', function () {
+    var n = (name.value || '').trim().slice(0, 30);
+    if (!n) { name.focus(); return; }
+    var u = carUserPresets();
+    u[n] = carClone(p);
+    lsSet('ytm_car_presets', JSON.stringify(u));
+    st.preset = 'user:' + n;
+    save();
+    fill();
+    name.value = '';
+  });
+  nrow.appendChild(saveAs);
+  var del = el('button', 'btn ghost', '刪除此自訂');
+  del.type = 'button';
+  del.addEventListener('click', function () {
+    if (st.preset.indexOf('user:') !== 0) return;
+    var u = carUserPresets();
+    delete u[st.preset.slice(5)];
+    lsSet('ytm_car_presets', JSON.stringify(u));
+    use('v2b');
+    fill();
+  });
+  nrow.appendChild(del);
+  var reset = el('button', 'btn ghost', '還原預設（v2b）');
+  reset.type = 'button';
+  reset.addEventListener('click', function () { use('v2b'); fill(); });
+  nrow.appendChild(reset);
+  if (!CAR_ADVANCED) { nrow.removeChild(name); nrow.removeChild(saveAs); nrow.removeChild(del); }
+  pbox.appendChild(nrow);
+  var phint = el('p', null, CAR_ADVANCED ? '選預設會換掉目前的值；調整後想留下來就輸入名稱按「另存」。' : '選預設會換掉目前的值；目前的調整會自動記住（下一版可另存成自訂預設）。');
+  phint.setAttribute('style', 'margin:8px 0 0;opacity:.7;font-size:12px');
+  pbox.appendChild(phint);
+
+  /* the parts */
+  CAR_PARTS.forEach(function (cp2) {
+    var n = cp2[0];
+    var t = function () { return p.tracks[n]; };
+    var box = section();
+    var head = el('div');
+    head.setAttribute('style', 'display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap');
+    var nm = el('span', null, cp2[1]);
+    nm.setAttribute('style', 'flex:1;font-weight:600');
+    head.appendChild(nm);
+    toggle(head, '獨奏 S', function () { return t().solo; }, function (v) { t().solo = v; });
+    toggle(head, '靜音 M', function () { return t().mute; }, function (v) { t().mute = v; });
+    box.appendChild(head);
+    slider(box, '音量', function () { return t().gain; }, function (v) { t().gain = v; }, -30, 3, 0.5, db);
+    slider(box, '左右偏移（分頻點以上；− 左 / + 右）', function () { return t().pan; }, function (v) { t().pan = v; }, -12, 12, 0.5, pan);
+    slider(box, '殘響送出量（最左＝關）', function () { return t().send; }, function (v) { t().send = v; }, CAR_SEND_OFF, 6, 0.5, send);
+    var trow = el('div', 'sheetbtns');
+    toggle(trow, '殘響送到後座', function () { return t().rear; }, function (v) { t().rear = v; });
+    box.appendChild(trow);
+    var rh = el('p', null, '開：反相送到後窗；關：左右相同、跟著擺位留在前方。');
+    rh.setAttribute('style', 'margin:6px 0 0;opacity:.7;font-size:12px');
+    box.appendChild(rh);
+  });
+  /* piano: kept in the presets for a model with five parts */
+  var pb = section('鋼琴（需要 5 軌模型）');
+  var pn = el('p', null, '目前手機上的分軌模型只有 4 軌，鋼琴包含在「其他樂器」裡；這組值先保留在預設中，換成 5 軌模型後才會作用。');
+  pn.setAttribute('style', 'margin:0 0 6px;opacity:.7;font-size:12px');
+  pb.appendChild(pn);
+  slider(pb, '左右偏移', function () { return p.piano.pan; }, function (v) { p.piano.pan = v; }, -12, 12, 0.5, pan, true);
+  slider(pb, '殘響送出量', function () { return p.piano.send; }, function (v) { p.piano.send = v; }, CAR_SEND_OFF, 6, 0.5, send, true);
+
+  if (!CAR_ADVANCED) {
+    var sb = section('包圍層');
+    slider(sb, '殘響總量（相對乾聲）', function () { return p.amb.db; }, function (v) { p.amb.db = v; }, -30, -3, 0.5, db);
+    return;
+  }
+  /* early reflections */
+  var eb = section('早期反射（左右兩側門板）');
+  var erow = el('div', 'sheetbtns');
+  toggle(erow, '早期反射', function () { return p.early.on; }, function (v) { p.early.on = v; });
+  eb.appendChild(erow);
+  slider(eb, '量（相對乾聲）', function () { return p.early.db; }, function (v) { p.early.db = v; }, -30, -3, 0.5, db);
+  slider(eb, '延遲下限', function () { return p.early.min; }, function (v) { p.early.min = v; if (p.early.max < v) p.early.max = v; refresh(); }, 5, 60, 1, ms);
+  slider(eb, '延遲上限', function () { return p.early.max; }, function (v) { p.early.max = Math.max(v, p.early.min); refresh(); }, 5, 80, 1, ms);
+
+  /* reverb */
+  var ab = section('殘響（包圍層）');
+  var arow = el('div', 'sheetbtns');
+  toggle(arow, '殘響', function () { return p.amb.on; }, function (v) { p.amb.on = v; });
+  ab.appendChild(arow);
+  slider(ab, '總量（相對乾聲）', function () { return p.amb.db; }, function (v) { p.amb.db = v; }, -30, -3, 0.5, db);
+  slider(ab, 'RT60', function () { return p.amb.rt60; }, function (v) { p.amb.rt60 = v; }, 0.3, 3, 0.1, function (v) { return (+v).toFixed(1) + ' s'; });
+  slider(ab, '預延遲', function () { return p.amb.pre; }, function (v) { p.amb.pre = v; }, 12, 80, 1, ms);
+  slider(ab, '高頻阻尼（1.0＝原型：3 kHz 以上衰減快一倍；越小越暗）', function () { return p.amb.hf; }, function (v) { p.amb.hf = v; }, 0.25, 2, 0.05, function (v) { return (+v).toFixed(2); });
+  slider(ab, '頻段下限', function () { return p.amb.lo; }, function (v) { p.amb.lo = v; }, 120, 1000, 10, hz);
+  slider(ab, '頻段上限', function () { return p.amb.hi; }, function (v) { p.amb.hi = v; }, 1500, 10000, 100, hz);
+  var lrow = el('div', 'sheetbtns');
+  toggle(lrow, '低頻殘響留在前方', function () { return p.amb.lowFront; }, function (v) { p.amb.lowFront = v; });
+  ab.appendChild(lrow);
+  slider(ab, '低頻殘響分頻點（以下左右相同）', function () { return p.amb.split; }, function (v) { p.amb.split = v; }, 80, 500, 10, hz);
+
+  var xb = section('低頻置中');
+  slider(xb, '分頻點（以下各軌左右相同）', function () { return p.xover; }, function (v) { p.xover = v; }, 60, 300, 10, hz);
 }
 /* the HRIR set the headphone band uses: the style editor's base */
 function bandIrQuery() {
@@ -2776,14 +3046,14 @@ function closeQueue() {
   q.setAttribute('aria-hidden', 'true');
 }
 function renderStyleChip() {
-  $('fStyleTxt').textContent = { stage: '舞台', band: '樂團', bandHead: '樂團' }[stageMode()] || '風格';
+  $('fStyleTxt').textContent = { stage: '舞台', band: '樂團', bandHead: '樂團', bandCar: '車用樂團' }[stageMode()] || '風格';
 }
 /* The surround panel's first row: HRIR or stage. Changing it redraws the panel. */
 function surroundModeRow(body) {
   var sel = document.createElement('select');
   sel.className = 'stylesel';
   sel.setAttribute('aria-label', '環繞方式');
-  [['hrir', '耳機環繞（HRIR）'], ['stage', '舞台（車用喇叭）'], ['band', '樂團（喇叭，測試）'], ['bandHead', '樂團（耳機，測試）']].forEach(function (m) {
+  [['hrir', '耳機環繞（HRIR）'], ['stage', '舞台（車用喇叭）'], ['band', '樂團（喇叭，測試）'], ['bandHead', '耳機樂團'], ['bandCar', '車用樂團（Centerpoint）']].forEach(function (m) {
     var o = document.createElement('option');
     o.value = m[0];
     o.textContent = m[1];
@@ -2997,6 +3267,13 @@ function openStyles() {
     body.appendChild(warn);
     surroundModeRow(body);
     if (stageMode() === 'stage') { stageControls(body); return; }
+    if (bandSetting() === 'bandCar') {
+      var ct = el('p', null, '用模型把歌分成人聲、鼓、貝斯與其他樂器，照車上 Bose 音響的上混規則擺位：人聲進中置、樂器進門板、殘響進後窗。手機算不及時會先播耳機環繞的替代音。');
+      ct.setAttribute('style', 'margin:0 0 12px;opacity:.8');
+      body.appendChild(ct);
+      carControls(body);
+      return;
+    }
     if (bandSetting()) {
       var bt = el('p', null, bandSetting() === 'band'
         ? '用模型把歌分成人聲、鼓、貝斯與其他樂器，擺在你前方的虛擬舞台上（車用喇叭）。手機算不及時會先播原音。'
@@ -3354,7 +3631,7 @@ function renderToggles() {
 /* One button to compare by ear: original -> HRIR surround -> stage -> band (speakers) ->
    band (headphones) -> original ... */
 function abState() { return !S.surround ? 'off' : stageMode(); }
-var AB_NAME = { off: '原音', hrir: '耳機環繞', stage: '舞台', band: '樂團（喇叭）', bandHead: '樂團（耳機）' };
+var AB_NAME = { off: '原音', hrir: '耳機環繞', stage: '舞台', band: '樂團（喇叭）', bandHead: '樂團（耳機）', bandCar: '車用樂團' };
 function renderAbChip() {
   var b = $('fAB');
   if (!b) return;
@@ -3362,7 +3639,7 @@ function renderAbChip() {
   b.classList.toggle('on', S.surround);
 }
 function cycleAb() {
-  var next = { off: 'hrir', hrir: 'stage', stage: 'band', band: 'bandHead', bandHead: 'off' }[abState()] || 'off';
+  var next = { off: 'hrir', hrir: 'stage', stage: 'band', band: 'bandCar', bandCar: 'bandHead', bandHead: 'off' }[abState()] || 'off';
   if (next === 'off') {
     S.surround = false;
   } else {

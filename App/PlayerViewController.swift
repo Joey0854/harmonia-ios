@@ -420,7 +420,18 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
                 let pct = Int((p.gain * 100).rounded())
                 return "\(Demucs.sources[i]) \(pct)%" + (p.solo ? " S" : "") + (p.mute ? " M" : "")
             }.joined(separator: ", ")
-            Diag.shared.log("band: mixer " + text + (mix.irs != nil ? ", new responses" : ""))
+            var carText = ""
+            if let c = mix.car {
+                carText = ", car: " + c.tracks.enumerated().map { i, t in
+                    String(format: "%@ pan %.1f send %@%@", Demucs.sources[i], t.panDb,
+                           t.sendDb <= CarBandParams.sendOff ? "off" : String(format: "%.1f", t.sendDb), t.rear ? " rear" : " front")
+                }.joined(separator: ", ")
+                carText += String(format: "; reverb %@ %.1f dB RT60 %.2f s pre %.0f ms %.0f-%.0f Hz hf %.2f low %@ %.0f Hz; early %@ %.1f dB %.0f-%.0f ms; xover %.0f Hz",
+                                  c.ambienceOn ? "on" : "off", c.ambienceDb, c.rt60, c.predelayMs, c.lowHz, c.highHz, c.hfDamping,
+                                  c.lowReverbFront ? "front" : "cut", c.lowSplitHz, c.earlyOn ? "on" : "off", c.earlyDb,
+                                  c.earlyMinMs, c.earlyMaxMs, c.crossoverHz)
+            }
+            Diag.shared.log("band: mixer " + text + (mix.irs != nil ? ", new responses" : "") + carText)
         case "fx":
             player.setEffect(NativePlayer.effect(from: body), message: body)
             Diag.shared.setSetting("mode", (body["surround"] as? Bool ?? false) ? (body["mode"] as? String ?? "hrir") : "off")

@@ -27,11 +27,14 @@ public struct BandMixSettings {
     public var parts: [BandPart]
     /// For `bandHead`: one pair of impulse responses (WAV) per part for these positions, or nil.
     public var irs: [(left: Data, right: Data)]?
+    /// For `bandCar`: what the car mode does with the parts (nil for the other modes).
+    public var car: CarBandParams?
 
-    public init(headphones: Bool, parts: [BandPart], irs: [(left: Data, right: Data)]? = nil) {
+    public init(headphones: Bool, parts: [BandPart], irs: [(left: Data, right: Data)]? = nil, car: CarBandParams? = nil) {
         self.headphones = headphones
         self.parts = parts
         self.irs = irs
+        self.car = car
     }
 
     /// What each part is multiplied by: muted parts and, when any part is soloed, all the

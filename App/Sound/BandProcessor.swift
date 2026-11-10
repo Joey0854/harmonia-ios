@@ -25,6 +25,8 @@ public final class BandProcessor {
         /// One pair of impulse responses (as for `TrueStereoConvolver`) per part, in
         /// `Demucs.sources` order.
         case headphones([(left: [[Float]], right: [[Float]])])
+        /// For a car with Bose Centerpoint (`CarBandMixer`).
+        case car
     }
 
     /// Input held back before output (at 44.1 kHz): one segment and two steps (19.5 s), so
@@ -84,6 +86,7 @@ public final class BandProcessor {
 
     /* The caller's side. */
     private let placer: StagePlacer?
+    private let car: CarBandMixer?
     private var convolvers: [TrueStereoConvolver]
     private var fading: [TrueStereoConvolver]?
     private var fadeLeft = 0
@@ -179,12 +182,19 @@ public final class BandProcessor {
             /* the fifth source is the original sound, standing in where the band is missing */
             p.positions = BandProcessor.positions + [.neutral]
             placer = p
+            car = nil
             convolvers = []
             headphones = false
         case .headphones(let irs):
             placer = nil
+            car = nil
             convolvers = irs.prefix(4).map { TrueStereoConvolver(irLeft: $0.left, irRight: $0.right) }
             headphones = true
+        case .car:
+            placer = nil
+            car = CarBandMixer(sampleRate: sampleRate, params: .v2b)
+            convolvers = []
+            headphones = false
         }
         resampling = self.sampleRate != Demucs.sampleRate
         if resampling {
@@ -525,8 +535,9 @@ public final class BandProcessor {
         let now = mix.current()
         guard now.version != mixVersion else { return }
         mixVersion = now.version
-        guard let s = now.settings, s.headphones == headphones else { return }
+        guard let s = now.settings, s.headphones == headphones, (s.car != nil) == (car != nil) else { return }
         gainTarget = s.effectiveGains
+        if let c = car, let p = s.car { c.set(p) }
         if !crossfade { gainNow = gainTarget }
         if let p = placer {
             p.positions = (0..<4).map { i in
@@ -650,6 +661,9 @@ public final class BandProcessor {
             originalStart -= k
         }
 
+        if let c = car {
+            return c.process(stems: stems, standIn: (dryLeft, dryRight))
+        }
         if let p = placer {
             var sources: [[[Float]]] = (0..<4).map { [stems[$0 * 2], stems[$0 * 2 + 1]] }
             sources.append([dryLeft, dryRight])

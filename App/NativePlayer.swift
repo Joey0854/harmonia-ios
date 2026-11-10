@@ -669,7 +669,39 @@ final class NativePlayer: NSObject {
             }
             if list.count == 4 { irs = list }
         }
-        return BandMixSettings(headphones: message["mode"] as? String == "bandHead", parts: parts, irs: irs)
+        var car: CarBandParams?
+        if message["mode"] as? String == "bandCar" {
+            car = NativePlayer.carBand(from: message["car"] as? [String: Any] ?? [:])
+        }
+        return BandMixSettings(headphones: message["mode"] as? String == "bandHead", parts: parts, irs: irs, car: car)
+    }
+
+    /// The car band mode's settings from the page (missing values: v2b's). Tracks by name:
+    /// pan / send in dB, rear true or false; amb: on, db, rt60, pre (ms), lo, hi (Hz), hf
+    /// (damping factor), lowFront, split (Hz); early: on, db, min, max (ms); xover (Hz).
+    static func carBand(from car: [String: Any]) -> CarBandParams {
+        let base = CarBandParams.v2b
+        func number(_ v: Any?, _ def: Float) -> Float {
+            guard let n = v as? NSNumber, n.doubleValue.isFinite else { return def }
+            return Float(n.doubleValue)
+        }
+        let trackIn = car["tracks"] as? [String: Any] ?? [:]
+        let tracks: [CarBandTrack] = Demucs.sources.enumerated().map { i, name in
+            let t = trackIn[name] as? [String: Any] ?? [:]
+            let d = base.tracks[i]
+            return CarBandTrack(panDb: number(t["pan"], d.panDb), sendDb: number(t["send"], d.sendDb),
+                                rear: t["rear"] as? Bool ?? d.rear)
+        }
+        let amb = car["amb"] as? [String: Any] ?? [:]
+        let early = car["early"] as? [String: Any] ?? [:]
+        return CarBandParams(tracks: tracks, ambienceOn: amb["on"] as? Bool ?? base.ambienceOn,
+                             ambienceDb: number(amb["db"], base.ambienceDb), rt60: number(amb["rt60"], base.rt60),
+                             predelayMs: number(amb["pre"], base.predelayMs), lowHz: number(amb["lo"], base.lowHz),
+                             highHz: number(amb["hi"], base.highHz), crossoverHz: number(car["xover"], base.crossoverHz),
+                             earlyOn: early["on"] as? Bool ?? base.earlyOn, earlyDb: number(early["db"], base.earlyDb),
+                             earlyMinMs: number(early["min"], base.earlyMinMs), earlyMaxMs: number(early["max"], base.earlyMaxMs),
+                             hfDamping: number(amb["hf"], base.hfDamping), lowReverbFront: amb["lowFront"] as? Bool ?? base.lowReverbFront,
+                             lowSplitHz: number(amb["split"], base.lowSplitHz)).clamped()
     }
 
     /// Reads a page `fx` command (also the copy kept on disk).
@@ -682,7 +714,7 @@ final class NativePlayer: NSObject {
         if let n = message["makeup"] as? NSNumber, n.doubleValue.isFinite, n.doubleValue > 0 {
             makeup = Float(min(16, n.doubleValue))
         }
-        /* "stage", "band" or "bandHead" instead of plain impulse responses; anything else (or
+        /* "stage", "band", "bandHead" or "bandCar" instead of plain impulse responses; anything else (or
            nothing, as from an older page or an older copy on disk) is the impulse-response
            surround. */
         let mode = SurroundMode(rawValue: message["mode"] as? String ?? "") ?? .hrir

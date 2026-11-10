@@ -11,6 +11,13 @@ public enum SurroundMode: String {
     case band
     /// The same four parts, each through its own head-related responses (for headphones).
     case bandHead
+    /// The same four parts placed for a car whose sound system sends what is the same on both
+    /// sides to the centre and opposite-phase sound to the rear (Bose Centerpoint, see
+    /// `CarBandMixer`).
+    case bandCar
+
+    /// One of the modes that separate the song with the network.
+    public var isBand: Bool { return self == .band || self == .bandHead || self == .bandCar }
 }
 
 /// The sound setting the page chose: surround on or off, how it is made (`mode`), the two
@@ -79,7 +86,7 @@ public final class SurroundChain {
     public init(settings: SurroundSettings?, sampleRate: Int, blockSize: Int = 4096,
                 song: String = "", startTime: Double = 0, fallback: SurroundSettings? = nil) {
         makeup = settings?.makeup ?? 1
-        if !(settings?.surround ?? false) || !(settings?.mode == .band || settings?.mode == .bandHead) {
+        if !(settings?.surround ?? false) || !(settings?.mode.isBand ?? false) {
             SurroundChain.status(.off)
         }
         guard let s = settings, s.surround else {
@@ -97,9 +104,9 @@ public final class SurroundChain {
             return
         }
         stage = nil
-        if s.mode == .band || s.mode == .bandHead {
+        if s.mode.isBand {
             convolver = nil
-            var output = BandProcessor.Output.speakers
+            var output = s.mode == .bandCar ? BandProcessor.Output.car : BandProcessor.Output.speakers
             var trouble: String?
             if s.mode == .bandHead {
                 do {
@@ -116,7 +123,7 @@ public final class SurroundChain {
                 let seed = song.isEmpty ? nil : BandPrefetch.shared.take(id: song, startTime: startTime, sampleRate: sampleRate)
                 /* the stand-in at the level the band's make-up gain will bring it to */
                 var dry: SurroundChain?
-                if let f = fallback, f.surround, f.mode != .band, f.mode != .bandHead {
+                if let f = fallback, f.surround, !f.mode.isBand {
                     /* the mode chosen before */
                     let scaled = SurroundSettings(key: f.key, surround: f.surround, irLeft: f.irLeft, irRight: f.irRight,
                                                   makeup: f.makeup / max(0.01, s.makeup), mode: f.mode, stage: f.stage)
