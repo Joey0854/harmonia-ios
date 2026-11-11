@@ -10,16 +10,24 @@ import UIKit
  Page -> app:  { cmd: "carProbe", action, ... }
    status                              answered with a status event
    pair      { text }                  "https://<host>#<code>": the server is what comes before
-                                       the #, without a trailing slash; kept in UserDefaults
-   unpair
+                                       the #, without a trailing slash; kept in UserDefaults.
+                                       This personal pairing comes before the public one (Info.plist
+                                       CarProbePublic, same format, put there by CI; may be absent)
+   unpair                              removes the personal pairing (the public one stays)
    ping                                GET <server>/carprobe/ping, to test the pairing
-   begin     { carName }               a new measuring session (drops the unsent one)
+   begin     { carName, surround? }    a new measuring session (drops the unsent one); surround:
+                                       "on" | "off" | "unknown", the head unit's own surround while
+                                       measuring (kept with the session and uploaded)
    measure   { name, label? }          play the probe, record, analyse (about 15 s); name is one
                                        of positionCodes (center, front-left, ... other), label only
                                        for "other" (the user's own name for it)
    skip      { name, label? }
    cancel                              stops a measurement under way
-   upload    { consent: true }         saves the session as a file in Documents/CarProbe/pending,
+   classify                            reads the session on the phone (CarProbeClassifier),
+                                       answered with a classify event
+   catalog                             the car list (signed; bundled Web/car_catalog.json, the cached
+                                       one or GET <server>/carprobe/catalog), answered with a catalog event
+   upload    { consent: true, carName? }  saves the session as a file in Documents/CarProbe/pending,
                                        then sends it; without consent nothing is done
    retry                               sends every saved file again
    presetCheck                         asks the server for a preset now
@@ -27,10 +35,16 @@ import UIKit
    presetAck { version }               the page has stored this preset version
 
  App -> page:
-   { type: "carProbe", action: "status", paired, server, carName, pending, positions: [{ name, skipped, done }] }
+   { type: "carProbe", action: "status", paired, pairKind: "personal" | "public" | "", publicBuiltIn, server,
+     carName, surround, pending, positions: [{ name, skipped, done }], phoneModel, iosVersion }
+   { type: "carProbe", action: "classify", kind, typeName, reasons, preset (sanitized) | null, presetKey,
+     measured, recordings, uploadInfo: { phoneModel, iosVersion, route, codeKind, server } }
+   { type: "carProbe", action: "catalog", version (0: none), source: "bundle" | "cache" | "server" | "",
+     cars: [{ id, make, model, system, kind, calibrated, preset | null }] }
    { type: "carProbe", action: "pair" | "ping", ok, message }
    { type: "carProbe", action: "measure", name, state: "preparing" | "playing" | "analyzing" | "done" |
-     "failed" | "cancelled", seconds?, warning?, message?, result? }
+     "failed" | "cancelled" | "level", seconds?, warning?, message?, result?, db? }
+       level: about twice a second while playing, db = the microphone's RMS in dBFS
        result: { levels: { cellId: dB }, snr?, snrByCell, clipped, input, problems: [..], needsRetake, lowCells }
    { type: "carProbe", action: "upload", state: "sending" | "done" | "failed" | "retrying", message, pending }
    { type: "carPreset", version, name, note, car }   a newer preset from the server (signature, device,
@@ -58,6 +72,10 @@ final class CarMeasure {
     private static let maxPositions = 16
     private static let maxAudioBytes = 1_500_000
     private static let maxBodyBytes = 10_000_000
+    /* the server's tighter limits for the public pairing code */
+    private static let publicMaxPositions = 12
+    private static let publicMaxAudioBytes = 1_000_000
+    private static let publicMaxBodyBytes = 4_000_000
 
     /// the position codes the server knows; "other" carries the user's own label
     static let positionCodes: Set<String> = ["center", "front-left", "front-right", "front-left-tweeter",
@@ -74,6 +92,10 @@ final class CarMeasure {
     }
 
     private var carName = ""
+    /// the head unit's own surround while measuring: "on" | "off" | "unknown"
+    private var surround = "unknown"
+    private var levelTimer: Timer?
+    private var lastCatalogFetch = Date.distantPast
     private var positions: [Position] = []
     private var route: [[String: Any]] = []
     private var run: Recorder?
@@ -100,11 +122,32 @@ final class CarMeasure {
         return (url, code)
     }
 
-    private var pairing: (server: URL, code: String)? {
+    /// The pairing in use: the user's own (personal) first, else the public one built in by CI.
+    private var pairing: (server: URL, code: String, kind: String)? {
         let d = UserDefaults.standard
-        guard let s = d.string(forKey: CarMeasure.serverKey), let url = URL(string: s),
-              let code = d.string(forKey: CarMeasure.codeKey), !code.isEmpty else { return nil }
-        return (url, code)
+        if let s = d.string(forKey: CarMeasure.serverKey), let url = URL(string: s),
+           let code = d.string(forKey: CarMeasure.codeKey), !code.isEmpty { return (url, code, "personal") }
+        if let p = CarMeasure.publicPairing { return (p.server, p.code, "public") }
+        return nil
+    }
+
+    /// Info.plist CarProbePublic ("https://<host>#<code>"); absent in builds without the secret.
+    static var publicPairing: (server: URL, code: String)? {
+        guard let text = Bundle.main.object(forInfoDictionaryKey: "CarProbePublic") as? String, !text.isEmpty else { return nil }
+        return parsePairing(text)
+    }
+
+    private var isPublic: Bool { return pairing?.kind == "public" }
+
+    /// e.g. "iPhone15,2"
+    static var phoneModel: String {
+        var u = utsname()
+        uname(&u)
+        let machine = withUnsafeBytes(of: &u.machine) { raw -> String in
+            let bytes = raw.prefix { $0 != 0 }
+            return String(decoding: bytes, as: UTF8.self)
+        }
+        return machine.isEmpty ? UIDevice.current.model : String(machine.prefix(40))
     }
 
     private var deviceId: String {
@@ -177,6 +220,8 @@ final class CarMeasure {
             ping()
         case "begin":
             carName = String((body["carName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
+            let sr = body["surround"] as? String ?? "unknown"
+            surround = ["on", "off"].contains(sr) ? sr : "unknown"
             clearSession()
             Diag.shared.log("carprobe: new session for \"\(carName)\"")
             sendStatus()
@@ -190,11 +235,18 @@ final class CarMeasure {
             sendStatus()
         case "cancel":
             cancel()
+        case "classify":
+            sendClassification()
+        case "catalog":
+            sendCatalog()
+            fetchCatalog()
         case "upload":
             guard body["consent"] as? Bool == true else {
                 emit(["action": "upload", "state": "failed", "message": "需要先同意上傳", "pending": pendingFiles().count])
                 return
             }
+            let name = (body["carName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty { carName = String(name.prefix(200)) }
             upload()
         case "retry":
             sendPending(attempt: 0)
@@ -239,8 +291,10 @@ final class CarMeasure {
     }
 
     private func sendStatus() {
-        emit(["action": "status", "paired": pairing != nil, "server": pairing?.server.host ?? "",
-              "carName": carName, "pending": pendingFiles().count, "measuring": run != nil,
+        emit(["action": "status", "paired": pairing != nil, "pairKind": pairing?.kind ?? "",
+              "publicBuiltIn": CarMeasure.publicPairing != nil, "server": pairing?.server.host ?? "",
+              "carName": carName, "surround": surround, "pending": pendingFiles().count, "measuring": run != nil,
+              "phoneModel": CarMeasure.phoneModel, "iosVersion": UIDevice.current.systemVersion,
               "positions": positions.map { ["name": $0.name, "label": $0.label, "skipped": $0.skipped, "done": !$0.skipped] as [String: Any] }])
     }
 
@@ -286,8 +340,9 @@ final class CarMeasure {
             emit(["action": "measure", "name": name, "state": "failed", "message": "已經在量測了"])
             return
         }
-        guard positions.count < CarMeasure.maxPositions || positions.contains(where: { $0.name == name && $0.label == label }) else {
-            emit(["action": "measure", "name": name, "state": "failed", "message": "最多 \(CarMeasure.maxPositions) 個位置"])
+        let most = isPublic ? CarMeasure.publicMaxPositions : CarMeasure.maxPositions
+        guard positions.count < most || positions.contains(where: { $0.name == name && $0.label == label }) else {
+            emit(["action": "measure", "name": name, "state": "failed", "message": "最多 \(most) 個位置"])
             return
         }
         emit(["action": "measure", "name": name, "state": "preparing"])
@@ -370,9 +425,19 @@ final class CarMeasure {
         var playing: [String: Any] = ["action": "measure", "name": name, "state": "playing", "seconds": (CarProbe.duration * 10).rounded() / 10]
         if !warning.isEmpty { playing["warning"] = warning }
         emit(playing)
+        startLevelTimer(name: name, token: token)
         DispatchQueue.main.asyncAfter(deadline: .now() + CarProbe.duration + Recorder.extra) { [weak self] in
             guard let self = self, self.runToken == token, let rec = self.run else { return }
             self.finish(name: name, label: label, recorder: rec, input: inputText, inputWarning: warning)
+        }
+    }
+
+    /// Tells the page how loud the microphone hears the probe, about twice a second.
+    private func startLevelTimer(name: String, token: Int) {
+        levelTimer?.invalidate()
+        levelTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] t in
+            guard let self = self, self.runToken == token, let rec = self.run else { t.invalidate(); return }
+            if let db = rec.levelDb() { self.emit(["action": "measure", "name": name, "state": "level", "db": (db * 10).rounded() / 10]) }
         }
     }
 
@@ -389,6 +454,7 @@ final class CarMeasure {
 
     private func cancel() {
         guard let rec = run else { return }
+        levelTimer?.invalidate()
         _ = rec.stop()
         run = nil
         runToken += 1
@@ -398,6 +464,7 @@ final class CarMeasure {
     }
 
     private func finish(name: String, label: String, recorder: Recorder, input: String, inputWarning: String) {
+        levelTimer?.invalidate()
         let samples = recorder.stop()
         let rate = recorder.rate
         run = nil
@@ -488,23 +555,32 @@ final class CarMeasure {
     // MARK: uploading
 
     private func payload() -> Data? {
-        let list = positions.prefix(CarMeasure.maxPositions)
+        let pub = isPublic
+        let list = positions.prefix(pub ? CarMeasure.publicMaxPositions : CarMeasure.maxPositions)
+        let audioLimit = pub ? CarMeasure.publicMaxAudioBytes : CarMeasure.maxAudioBytes
         guard list.contains(where: { !$0.skipped }) else { return nil }
         let info = Bundle.main.infoDictionary ?? [:]
         let version = "\(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["CFBundleVersion"] as? String ?? "?"))"
         var items: [[String: Any]] = []
         for p in list {
+            var quality = p.quality
+            /* the server keeps only known top-level fields; inside quality it is kept */
+            quality["headUnitSurround"] = surround
             var item: [String: Any] = ["name": p.name, "skipped": p.skipped,
-                                       "levels": p.levels.filter { $0.value.isFinite }, "quality": p.quality]
+                                       "levels": p.levels.filter { $0.value.isFinite }, "quality": quality]
             if p.name == "other" { item["label"] = String(p.label.prefix(200)) }
-            if let a = p.audio, let data = try? Data(contentsOf: a), data.count <= CarMeasure.maxAudioBytes {
+            if let a = p.audio, let data = try? Data(contentsOf: a), data.count <= audioLimit {
                 item["audio_b64"] = data.base64EncodedString()
             }
             items.append(item)
         }
         let body: [String: Any] = [
             "device": deviceId,
-            "deviceName": String("\(UIDevice.current.name) (\(UIDevice.current.model) iOS \(UIDevice.current.systemVersion))".prefix(200)),
+            /* public uploads carry no device name (it can be the owner's name); model and iOS only */
+            "deviceName": String((pub ? "\(CarMeasure.phoneModel) (iOS \(UIDevice.current.systemVersion))"
+                                  : "\(UIDevice.current.name) (\(UIDevice.current.model) iOS \(UIDevice.current.systemVersion))").prefix(200)),
+            "codeKind": pub ? "public" : "personal",
+            "headUnitSurround": surround,
             "carName": String(carName.prefix(200)),
             "appVersion": version,
             "probeVersion": CarProbe.version,
@@ -529,7 +605,7 @@ final class CarMeasure {
             emit(["action": "upload", "state": "failed", "message": "還沒有量到任何位置", "pending": pendingFiles().count])
             return
         }
-        guard data.count <= CarMeasure.maxBodyBytes else {
+        guard data.count <= (isPublic ? CarMeasure.publicMaxBodyBytes : CarMeasure.maxBodyBytes) else {
             Diag.shared.log("carprobe: upload is \(data.count) bytes, over the limit", error: true)
             emit(["action": "upload", "state": "failed", "message": "資料太大（\(data.count / 1_000_000) MB）", "pending": pendingFiles().count])
             return
@@ -616,6 +692,86 @@ final class CarMeasure {
         }.resume()
     }
 
+    // MARK: reading the measurement on the phone
+
+    /// The session's positions in the upload format, read by CarProbeClassifier (the same rules
+    /// as the PC's carprobe_analyze.py); the preset is whitelisted and clamped like a remote one.
+    private func sendClassification() {
+        let list = positions.map { p -> CarProbePosition in
+            CarProbePosition(json: ["name": p.name, "skipped": p.skipped, "levels": p.levels, "quality": p.quality])
+        }
+        let r = CarProbeClassifier.classify(list)
+        var preset: Any = NSNull()
+        if let raw = r.preset, case .success(let clean) = CarPresetVerifier.sanitize(raw) { preset = clean }
+        let routeText = String(route.map { "\($0["portType"] ?? "") \"\($0["portName"] ?? "")\"" }.joined(separator: "; ").prefix(200))
+        Diag.shared.log("carprobe: classified on the phone as \(r.kind.rawValue): \(r.reasons.joined(separator: " / ").prefix(300))")
+        emit(["action": "classify", "kind": r.kind.rawValue, "typeName": r.typeName, "reasons": r.reasons,
+              "preset": preset, "presetKey": r.presetKey.map { $0 as Any } ?? NSNull(),
+              "measured": positions.filter { !$0.skipped }.count,
+              "recordings": positions.filter { $0.audio != nil }.count,
+              "uploadInfo": ["phoneModel": CarMeasure.phoneModel, "iosVersion": UIDevice.current.systemVersion,
+                             "route": routeText, "codeKind": pairing?.kind ?? "", "server": pairing?.server.host ?? ""] as [String: Any]])
+    }
+
+    // MARK: the car list
+
+    private static var catalogCacheFile: URL { return folder.appendingPathComponent("catalog.json") }
+    private static var bundledCatalogFile: URL? {
+        return Bundle.main.resourceURL?.appendingPathComponent("Web", isDirectory: true).appendingPathComponent("car_catalog.json")
+    }
+
+    /// The newest catalog that verifies: bundled or cached (nil: none, the page then offers only
+    /// the generic built-in preset).
+    private func currentCatalog() -> (catalog: CarCatalog, source: String)? {
+        var data: [Data] = []
+        var source: [String] = []
+        if let u = CarMeasure.bundledCatalogFile, let d = try? Data(contentsOf: u) { data.append(d); source.append("bundle") }
+        if let d = try? Data(contentsOf: CarMeasure.catalogCacheFile) { data.append(d); source.append("cache") }
+        guard let best = CarCatalogVerifier.newest(data) else {
+            if !data.isEmpty { Diag.shared.log("carprobe: no car catalog verifies (\(source.joined(separator: ", ")))", error: true) }
+            return nil
+        }
+        return (best.catalog, source[best.index])
+    }
+
+    private func sendCatalog(source: String? = nil) {
+        let c = currentCatalog()
+        emit(["action": "catalog", "version": c?.catalog.version ?? 0, "source": source ?? c?.source ?? "",
+              "cars": (c?.catalog.cars ?? []).map { $0.json }])
+    }
+
+    /// GET <server>/carprobe/catalog; a newer one that verifies is cached and sent to the page.
+    private func fetchCatalog() {
+        guard pairing != nil, run == nil, Date().timeIntervalSince(lastCatalogFetch) > 600,
+              let req = request("carprobe/catalog") else { return }
+        lastCatalogFetch = Date()
+        URLSession.shared.dataTask(with: req) { [weak self] body, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard status == 200, let body = body else {
+                    Diag.shared.log("carprobe: catalog: \(error.map { $0.localizedDescription } ?? "http \(status)")", error: status != 0 && status != 404)
+                    return
+                }
+                switch CarCatalogVerifier.verify(body) {
+                case .failure(let problem):
+                    Diag.shared.log("carprobe: catalog from the server refused: \(problem)", error: true)
+                case .success(let c):
+                    let have = self.currentCatalog()?.catalog.version ?? 0
+                    guard c.version > have else { return }
+                    do {
+                        try FileManager.default.createDirectory(at: CarMeasure.folder, withIntermediateDirectories: true)
+                        try body.write(to: CarMeasure.catalogCacheFile, options: .atomic)
+                    } catch {
+                        Diag.shared.log("carprobe: caching the catalog failed: \(error.localizedDescription)", error: true)
+                    }
+                    Diag.shared.log("carprobe: catalog version \(c.version) (\(c.cars.count) cars) from the server")
+                    self.sendCatalog(source: "server")
+                }
+            }
+        }.resume()
+    }
+
     // MARK: remote presets
 
     private func checkPreset(why: String, force: Bool = false) {
@@ -671,6 +827,7 @@ private final class Recorder {
     private let lock = NSLock()
     private var samples: [Float] = []
     private var limit = 0
+    private var lastDb: Double?
     private(set) var rate: Double = 0
 
     struct Failure: LocalizedError {
@@ -689,9 +846,12 @@ private final class Recorder {
         input.installTap(onBus: 0, bufferSize: 4096, format: inFormat) { [weak self] buffer, _ in
             guard let self = self, let ch = buffer.floatChannelData else { return }
             let n = Int(buffer.frameLength)
+            var e = 0.0
+            for k in 0..<n { e += Double(ch[0][k]) * Double(ch[0][k]) }
             self.lock.lock()
             let room = max(0, self.limit - self.samples.count)
             if room > 0 { self.samples.append(contentsOf: UnsafeBufferPointer(start: ch[0], count: min(n, room))) }
+            if n > 0 { self.lastDb = 10 * log10(e / Double(n) + 1e-20) }
             self.lock.unlock()
         }
         var outRate = engine.outputNode.outputFormat(forBus: 0).sampleRate
@@ -712,6 +872,13 @@ private final class Recorder {
         node.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
         node.play()
         Diag.shared.log("carprobe: recording at \(Int(rate)) Hz (\(inFormat.channelCount) ch), playing at \(Int(outRate)) Hz")
+    }
+
+    /// RMS of the last microphone buffer, dBFS
+    func levelDb() -> Double? {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastDb
     }
 
     func stop() -> [Float] {

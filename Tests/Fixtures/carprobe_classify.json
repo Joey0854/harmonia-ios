@@ -1,0 +1,4956 @@
+{
+ "source": "carprobe_analyze.py classify() + CAR_PARAMS",
+ "thresholds": {
+  "SNR_MIN": 10.0,
+  "NO_UPMIX_MAX": 3.0,
+  "PAN_MIN": 6.0,
+  "CENTER_DROP": 3.0,
+  "REAR_RISE": 6.0,
+  "REAR_SAME": 3.0,
+  "REAR_SPLIT": 6.0
+ },
+ "types": {
+  "plain": "一般立體聲車（無上混）",
+  "bose": "Bose 型上混（中置＋門板＋後方包圍）",
+  "rearSplit": "新類型：後方分左右，需人工",
+  "manual": "無法自動判斷，需人工"
+ },
+ "cases": [
+  {
+   "name": "bose: Mazda 3 like",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "bose: rear doors when no rear windows",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後門／右後門）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "plain: no upmixer",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.2,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.3,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "plain",
+   "typeName": "一般立體聲車（無上混）",
+   "reasons": [
+    "所有位置的中頻反相與同相相差都小於 3 dB（最大 1.0 dB）",
+    "門板跟著左右擺位（4 個門板，自己那一側大至少 6 dB）"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -15
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "plain: absolute dBFS levels",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -41.37,
+       "B1/inphase/+15": -41.37,
+       "B1/inphase/-15": -41.37,
+       "B1/indep/0": -41.37,
+       "B1/anti/0": -41.87,
+       "B1/anti/+15": -41.37,
+       "B2/inphase/0": -41.37,
+       "B2/anti/0": -41.37,
+       "LF/inphase/0": -41.37,
+       "LF/anti/0": -41.37
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -41.37,
+       "B1/inphase/+15": -35.37,
+       "B1/inphase/-15": -47.37,
+       "B1/indep/0": -41.37,
+       "B1/anti/0": -40.37,
+       "B1/anti/+15": -41.37,
+       "B2/inphase/0": -41.37,
+       "B2/anti/0": -41.37,
+       "LF/inphase/0": -41.37,
+       "LF/anti/0": -41.37
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -41.37,
+       "B1/inphase/+15": -47.37,
+       "B1/inphase/-15": -35.37,
+       "B1/indep/0": -41.37,
+       "B1/anti/0": -41.87,
+       "B1/anti/+15": -41.37,
+       "B2/inphase/0": -41.37,
+       "B2/anti/0": -41.37,
+       "LF/inphase/0": -41.37,
+       "LF/anti/0": -41.37
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -41.37,
+       "B1/inphase/+15": -35.37,
+       "B1/inphase/-15": -47.37,
+       "B1/indep/0": -41.37,
+       "B1/anti/0": -41.169999999999995,
+       "B1/anti/+15": -41.37,
+       "B2/inphase/0": -41.37,
+       "B2/anti/0": -41.37,
+       "LF/inphase/0": -41.37,
+       "LF/anti/0": -41.37
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -41.37,
+       "B1/inphase/+15": -47.37,
+       "B1/inphase/-15": -35.37,
+       "B1/indep/0": -41.37,
+       "B1/anti/0": -41.669999999999995,
+       "B1/anti/+15": -41.37,
+       "B2/inphase/0": -41.37,
+       "B2/anti/0": -41.37,
+       "LF/inphase/0": -41.37,
+       "LF/anti/0": -41.37
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "plain",
+   "typeName": "一般立體聲車（無上混）",
+   "reasons": [
+    "所有位置的中頻反相與同相相差都小於 3 dB（最大 1.0 dB）",
+    "門板跟著左右擺位（4 個門板，自己那一側大至少 6 dB）"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -15
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "rearSplit: rear left louder for anti left",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 10.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 2.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "rearSplit",
+   "typeName": "新類型：後方分左右，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +8.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "manual: rear does not rise, centre drops",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 2.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +2.0／+1.0 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -8.0 dB",
+    "後方反相沒有比同相高至少 6 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "manual: no positions",
+   "meta": {
+    "positions": []
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "沒有任何可辨認的位置（位置名稱需用 POSITIONS 裡的名字）"
+   ],
+   "preset": null
+  },
+  {
+   "name": "manual: only unknown positions",
+   "meta": {
+    "positions": [
+     {
+      "name": "front-left-tweeter",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "other",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "沒有任何可辨認的位置（位置名稱需用 POSITIONS 裡的名字）"
+   ],
+   "preset": null
+  },
+  {
+   "name": "manual: everything skipped",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": true,
+      "levels": {},
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": true,
+      "levels": {},
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "沒有任何可辨認的位置（位置名稱需用 POSITIONS 裡的名字）"
+   ],
+   "preset": null
+  },
+  {
+   "name": "manual: no rear positions",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 5.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 5.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "缺少後方左右兩個位置的中頻反相數值（或訊噪比不足）"
+   ],
+   "preset": null
+  },
+  {
+   "name": "manual: centre missing",
+   "meta": {
+    "positions": [
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "缺少中置數值（或訊噪比不足）"
+   ],
+   "preset": null
+  },
+  {
+   "name": "manual: rear anti+15 missing",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "中置反相比同相 -8.0 dB",
+    "缺少後方「反相偏左」數值（或訊噪比不足）"
+   ],
+   "preset": null
+  },
+  {
+   "name": "low SNR: rear window anti cell untrusted -> rear doors",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0,
+       "snrByCell": {
+        "B1/anti/0": 5.0
+       }
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後門／右後門）反相比同相 +1.0／+0.5 dB",
+    "「反相偏左」時後方左減後方右 = +0.0 dB",
+    "中置反相比同相 -8.0 dB",
+    "後方反相沒有比同相高至少 6 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "low SNR: whole centre below 10 dB (reference untrusted)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 8.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "缺少中置數值（或訊噪比不足）"
+   ],
+   "preset": null
+  },
+  {
+   "name": "low SNR: snrByCell overrides a low snr",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 4.0,
+       "snrByCell": {
+        "B1/inphase/0": 25.0,
+        "B1/anti/0": 25.0
+       }
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "no quality at all (trusted)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {}
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {}
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {}
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {}
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {}
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {}
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {}
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "borderline SNR exactly 10 dB (trusted)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 10.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "borderline NO_UPMIX below (2.99)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.495,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 2.99,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.2,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.3,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "plain",
+   "typeName": "一般立體聲車（無上混）",
+   "reasons": [
+    "所有位置的中頻反相與同相相差都小於 3 dB（最大 3.0 dB）",
+    "門板跟著左右擺位（4 個門板，自己那一側大至少 6 dB）"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -15
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "borderline NO_UPMIX at (3.0)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 3.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.2,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.3,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後門／右後門）反相比同相 +0.2／-0.3 dB",
+    "「反相偏左」時後方左減後方右 = +0.0 dB",
+    "中置反相比同相 -1.5 dB",
+    "後方反相沒有比同相高至少 6 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "borderline NO_UPMIX negative at (-3.0)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -3.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.2,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.3,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後門／右後門）反相比同相 +0.2／-0.3 dB",
+    "「反相偏左」時後方左減後方右 = +0.0 dB",
+    "中置反相比同相 +1.5 dB",
+    "後方反相沒有比同相高至少 6 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "borderline PAN_MIN at (6.0)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 3.0,
+       "B1/inphase/-15": -3.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -3.0,
+       "B1/inphase/-15": 3.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 3.0,
+       "B1/inphase/-15": -3.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.2,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -3.0,
+       "B1/inphase/-15": 3.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.3,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "plain",
+   "typeName": "一般立體聲車（無上混）",
+   "reasons": [
+    "所有位置的中頻反相與同相相差都小於 3 dB（最大 1.0 dB）",
+    "門板跟著左右擺位（4 個門板，自己那一側大至少 6 dB）"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -15
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "borderline PAN_MIN below (5.99)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 3.0,
+       "B1/inphase/-15": -2.99,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -2.99,
+       "B1/inphase/-15": 3.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 3.0,
+       "B1/inphase/-15": -2.99,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.2,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -2.99,
+       "B1/inphase/-15": 3.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.3,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後門／右後門）反相比同相 +0.2／-0.3 dB",
+    "「反相偏左」時後方左減後方右 = +0.0 dB",
+    "中置反相比同相 -0.5 dB",
+    "後方反相沒有比同相高至少 6 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "borderline REAR_RISE at (6.0)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 6.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 6.0,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +6.0／+6.0 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "borderline REAR_RISE below (5.99)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 6.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 5.99,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +6.0／+6.0 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -8.0 dB",
+    "後方反相沒有比同相高至少 6 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "borderline REAR_SPLIT at (6.0)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 7.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 1.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "rearSplit",
+   "typeName": "新類型：後方分左右，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +6.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "borderline REAR_SPLIT below (5.99)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 6.99,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 1.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +6.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "borderline CENTER_DROP at (-3.0)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -3.0,
+       "B1/anti/+15": -4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -3.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "borderline CENTER_DROP above (-2.99)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -2.99,
+       "B1/anti/+15": -3.99,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -3.0 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "borderline REAR_SAME below (2.99)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 3.99,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 1.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +3.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "borderline REAR_SAME at (3.0)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 1.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +3.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "borderline REAR_SAME negative side (-2.99)",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 1.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.99,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = -3.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  },
+  {
+   "name": "not plain: no door has the pan cells",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.2,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -0.3,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後門／右後門）反相比同相 +0.2／-0.3 dB",
+    "「反相偏左」時後方左減後方右 = +0.0 dB",
+    "中置反相比同相 -0.5 dB",
+    "後方反相沒有比同相高至少 6 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "duplicate position: the later one wins",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -8.0,
+       "B1/anti/+15": -9.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": -18.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": -1.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 6.0,
+       "B1/inphase/-15": -6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": -6.0,
+       "B1/inphase/-15": 6.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 0.5,
+       "B1/anti/+15": 0.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 9.0,
+       "B1/anti/+15": 4.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 8.5,
+       "B1/anti/+15": 3.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": 0.0,
+       "B1/inphase/+15": 0.0,
+       "B1/inphase/-15": 0.0,
+       "B1/indep/0": 0.0,
+       "B1/anti/0": 1.0,
+       "B1/anti/+15": 1.0,
+       "B2/inphase/0": 0.0,
+       "B2/anti/0": 0.0,
+       "LF/inphase/0": 0.0,
+       "LF/anti/0": 0.0
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "manual",
+   "typeName": "無法自動判斷，需人工",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +1.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = -2.0 dB",
+    "中置反相比同相 -8.0 dB",
+    "後方反相沒有比同相高至少 6 dB"
+   ],
+   "preset": null
+  },
+  {
+   "name": "absolute dBFS bose",
+   "meta": {
+    "positions": [
+     {
+      "name": "center",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -37.25,
+       "B1/inphase/+15": -37.25,
+       "B1/inphase/-15": -37.25,
+       "B1/indep/0": -37.25,
+       "B1/anti/0": -45.25,
+       "B1/anti/+15": -46.25,
+       "B2/inphase/0": -37.25,
+       "B2/anti/0": -37.25,
+       "LF/inphase/0": -37.25,
+       "LF/anti/0": -55.25
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -37.25,
+       "B1/inphase/+15": -31.25,
+       "B1/inphase/-15": -43.25,
+       "B1/indep/0": -37.25,
+       "B1/anti/0": -38.25,
+       "B1/anti/+15": -37.25,
+       "B2/inphase/0": -37.25,
+       "B2/anti/0": -37.25,
+       "LF/inphase/0": -37.25,
+       "LF/anti/0": -37.25
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "front-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -37.25,
+       "B1/inphase/+15": -43.25,
+       "B1/inphase/-15": -31.25,
+       "B1/indep/0": -37.25,
+       "B1/anti/0": -38.75,
+       "B1/anti/+15": -37.25,
+       "B2/inphase/0": -37.25,
+       "B2/anti/0": -37.25,
+       "LF/inphase/0": -37.25,
+       "LF/anti/0": -37.25
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -37.25,
+       "B1/inphase/+15": -31.25,
+       "B1/inphase/-15": -43.25,
+       "B1/indep/0": -37.25,
+       "B1/anti/0": -36.25,
+       "B1/anti/+15": -37.25,
+       "B2/inphase/0": -37.25,
+       "B2/anti/0": -37.25,
+       "LF/inphase/0": -37.25,
+       "LF/anti/0": -37.25
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -37.25,
+       "B1/inphase/+15": -43.25,
+       "B1/inphase/-15": -31.25,
+       "B1/indep/0": -37.25,
+       "B1/anti/0": -36.75,
+       "B1/anti/+15": -37.25,
+       "B2/inphase/0": -37.25,
+       "B2/anti/0": -37.25,
+       "LF/inphase/0": -37.25,
+       "LF/anti/0": -37.25
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-left",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -37.25,
+       "B1/inphase/+15": -37.25,
+       "B1/inphase/-15": -37.25,
+       "B1/indep/0": -37.25,
+       "B1/anti/0": -28.25,
+       "B1/anti/+15": -33.25,
+       "B2/inphase/0": -37.25,
+       "B2/anti/0": -37.25,
+       "LF/inphase/0": -37.25,
+       "LF/anti/0": -37.25
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     },
+     {
+      "name": "rear-window-right",
+      "skipped": false,
+      "levels": {
+       "B1/inphase/0": -37.25,
+       "B1/inphase/+15": -37.25,
+       "B1/inphase/-15": -37.25,
+       "B1/indep/0": -37.25,
+       "B1/anti/0": -28.75,
+       "B1/anti/+15": -34.25,
+       "B2/inphase/0": -37.25,
+       "B2/anti/0": -37.25,
+       "LF/inphase/0": -37.25,
+       "LF/anti/0": -37.25
+      },
+      "quality": {
+       "snr": 30.0
+      }
+     }
+    ]
+   },
+   "kind": "bose",
+   "typeName": "Bose 型上混（中置＋門板＋後方包圍）",
+   "reasons": [
+    "後方（左後窗／左後方／右後窗／右後方）反相比同相 +9.0／+8.5 dB",
+    "「反相偏左」時後方左減後方右 = +1.0 dB",
+    "中置反相比同相 -8.0 dB"
+   ],
+   "preset": {
+    "tracks": {
+     "vocals": {
+      "pan": 0,
+      "send": -6,
+      "rear": true,
+      "width": 0
+     },
+     "drums": {
+      "pan": -2,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "bass": {
+      "pan": 0,
+      "send": -40,
+      "rear": true,
+      "width": 0
+     },
+     "other": {
+      "pan": 4,
+      "send": 0,
+      "rear": true,
+      "width": 1
+     }
+    },
+    "amb": {
+     "on": true,
+     "rt60": 1.8,
+     "pre": 20,
+     "lo": 250,
+     "hi": 4000,
+     "hf": 1,
+     "lowFront": true,
+     "split": 250,
+     "style": "decorrelated",
+     "gate": 1,
+     "dryGate": false,
+     "db": -12
+    },
+    "early": {
+     "on": true,
+     "db": -10,
+     "min": 15,
+     "max": 30
+    },
+    "xover": 150
+   }
+  }
+ ]
+}

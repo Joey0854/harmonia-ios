@@ -76,6 +76,20 @@ jobs:
         run: |
           brew install xcodegen
           xcodegen generate
+      # The public car-measurement pairing ("https://<host>#<code>") goes into the generated
+      # Info.plist as CarProbePublic; it is never in the source. Without the secret the key is left
+      # out and the app asks for a pairing string before an upload.
+      - name: Public car pairing
+        if: always()
+        env:
+          CARPROBE_PUBLIC: ${{ secrets.CARPROBE_PUBLIC }}
+        run: |
+          if [ -n "$CARPROBE_PUBLIC" ]; then
+            plutil -replace CarProbePublic -string "$CARPROBE_PUBLIC" App/Info.plist
+            echo "CarProbePublic set"
+          else
+            echo "no CARPROBE_PUBLIC secret: built without the public pairing"
+          fi
       - name: Build
         if: always()
         run: |
