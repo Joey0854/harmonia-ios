@@ -139,7 +139,10 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
         let ytdlp = PythonRuntime.bundled ? "true" : "false"
         let account = Account.shared.isLoggedIn ? "true" : "false"
         let version = "\(Diag.version) (\(Diag.build))".filter { $0 != "\"" && $0 != "\\" }
-        content.addUserScript(WKUserScript(source: "window.__ytmNative = true; window.__ytmStandalone = true; window.__ytmYtdlp = \(ytdlp); window.__ytmAccount = \(account); window.__ytmAppVersion = \"\(version)\";",
+        // a build without the separation model (a release) hides the band modes
+        let bandModel = Bundle.main.bundleURL.appendingPathComponent("BandModel/HTDemucsBody.mlmodelc")
+        let noBand = FileManager.default.fileExists(atPath: bandModel.path) ? "false" : "true"
+        content.addUserScript(WKUserScript(source: "window.__ytmNative = true; window.__ytmStandalone = true; window.__ytmYtdlp = \(ytdlp); window.__ytmAccount = \(account); window.__ytmAppVersion = \"\(version)\"; window.__ytmNoBand = \(noBand);",
                                            injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController = content
 

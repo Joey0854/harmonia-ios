@@ -41,8 +41,10 @@ jobs:
             ~/.cache/torch/hub/checkpoints
             ~/Library/Caches/pip
           key: band-model-v1
+      # A release (a pushed tag) carries no separation models: the band modes wait for the
+      # project's own student model. The app sees the missing model and hides the band modes.
       - name: Convert the band model
-        if: always()
+        if: always() && !startsWith(github.ref, 'refs/tags/v')
         run: |
           set -o pipefail
           mkdir -p BandModel
@@ -59,7 +61,7 @@ jobs:
       # band step's venv; then where Core ML plans each op (MLComputePlan, compute units .all). A VM may
       # have no Neural Engine: the plan's device list says so, and the app logs the phone's own plan.
       - name: Convert the student models
-        if: always()
+        if: always() && !startsWith(github.ref, 'refs/tags/v')
         run: |
           set -o pipefail
           mkdir -p StudentModel
@@ -71,6 +73,9 @@ jobs:
           done
           du -sh StudentModel/* | tee -a student.log
           swift tools/student/plan.swift StudentModel/StudentA.mlmodelc StudentModel/StudentB.mlmodelc 2>&1 | tee student-plan.log
+      - name: Model folders
+        if: always()
+        run: mkdir -p BandModel StudentModel
       - name: Generate project
         if: always()
         run: |
@@ -126,4 +131,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" YTMRemote.ipa --title "$GITHUB_REF_NAME" --generate-notes
+        run: |
+          notes="docs/release-notes/$GITHUB_REF_NAME.md"
+          if [ -f "$notes" ]; then
+            gh release create "$GITHUB_REF_NAME" YTMRemote.ipa --title "Harmonia $GITHUB_REF_NAME" --notes-file "$notes"
+          else
+            gh release create "$GITHUB_REF_NAME" YTMRemote.ipa --title "$GITHUB_REF_NAME" --generate-notes
+          fi
