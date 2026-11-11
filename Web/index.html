@@ -1439,7 +1439,13 @@ function cpPendingRow(b) {
    explicit confirmation. The head unit's own surround / EQ stay as the user normally listens.
    "My cars" (ytm_my_cars): [{ id, name, kind, surround, date, p }]; the chosen car: ytm_car_chosen. */
 var CF = { body: null, step: 1, q: '', cat: null, idx: 0, level: null, playAt: 0, cls: null, checks: [false, false, false],
-  surround: 'unknown', name: '', agree: false, sent: false, ab: '' };
+  surround: 'unknown', name: '', agree: false, sent: false, ab: '', ask: false, more: false };
+/* the flow measures these five first (all the classifier needs), then offers the rest */
+var CF_REQUIRED = 5;
+var CF_ORDER = ['center', 'front-left', 'front-right', 'rear-left', 'rear-right', 'rear-window-left',
+  'rear-window-right', 'front-left-tweeter', 'front-right-tweeter', 'rear-center'].map(function (n) {
+  for (var i = 0; i < CP_POSITIONS.length; i++) if (CP_POSITIONS[i][0] === n) return CP_POSITIONS[i];
+});
 var CF_KIND = {
   plain: '一般立體聲音響：車機不會把聲音分到中置和後方',
   bose: '會自動環繞的音響（像 Bose Centerpoint）：中置、門板和後方包圍',
@@ -1474,7 +1480,7 @@ function cfEvent(e) {
   if (e.action === 'measure' && e.state === 'level') { CF.level = +e.db; }
   if (e.action === 'measure' && e.state === 'playing') { CF.playAt = Date.now(); CF.level = null; }
   if (e.action === 'measure' && e.state === 'done' && CF.step === 3) {
-    var cur = CP_POSITIONS[CF.idx];
+    var cur = CF_ORDER[CF.idx];
     if (cur && e.name === cur[0] && !(e.result && e.result.needsRetake)) cfNext();
   }
   if (cfLive()) cfRender();
@@ -1482,13 +1488,16 @@ function cfEvent(e) {
 function cfNext() {
   CF.idx++;
   CF.level = null;
-  if (CF.idx >= CP_POSITIONS.length) {
-    CF.step = 4;
-    CF.cls = null;
-    CF.agree = false;
-    CF.sent = false;
-    cpPost({ action: 'classify' });
-  }
+  if (CF.idx === CF_REQUIRED && !CF.more) CF.ask = true;
+  else if (CF.idx >= CF_ORDER.length) cfFinish();
+}
+function cfFinish() {
+  CF.step = 4;
+  CF.cls = null;
+  CF.agree = false;
+  CF.sent = false;
+  CF.ask = false;
+  cpPost({ action: 'classify' });
 }
 /* the car settings of a list entry or a result, applied to the car band at once */
 function cfApply(p, presetKey) {
@@ -1616,7 +1625,7 @@ function cfList(b) {
     box.setAttribute('style', 'margin:16px 0 0;padding:10px 12px;border-radius:10px;background:rgba(120,200,255,.08)');
     box.appendChild(el('div', null, '清單上沒有你的車？'));
     var r = el('div', 'sheetbtns');
-    cpBtn(r, '測量我的車（約 1 分鐘）', function () { CF.name = CF.q.trim(); CF.step = 2; cfRender(); }, false);
+    cpBtn(r, '測量我的車（約 2 分鐘）', function () { CF.name = CF.q.trim(); CF.step = 2; cfRender(); }, false);
     box.appendChild(r);
     b.appendChild(box);
     var adv = el('div', 'sheetbtns');
@@ -1658,6 +1667,8 @@ function cfPrepare(b) {
     CP.res = {};
     CP.upload = null;
     CF.idx = 0;
+    CF.ask = false;
+    CF.more = false;
     CF.cls = null;
     CF.step = 3;
     cpPost({ action: 'begin', carName: (CF.name || '我的車').slice(0, 80), surround: CF.surround });
@@ -1706,10 +1717,19 @@ function cfQuality() {
 }
 function cfMeasure(b) {
   cfHead(b, 3, '測量');
-  var cur = CP_POSITIONS[CF.idx];
+  if (CF.ask) {
+    cpNote(b, '必量的 5 個位置量完了，已經足夠判斷。車上還有高音喇叭或後架喇叭的話，多量幾個會更準（每個約 15 秒）。');
+    var ar = el('div', 'sheetbtns');
+    cpBtn(ar, '看結果', function () { cfFinish(); cfRender(); }, false);
+    cpBtn(ar, '繼續量其他喇叭', function () { CF.ask = false; CF.more = true; cfRender(); });
+    b.appendChild(ar);
+    return;
+  }
+  var cur = CF_ORDER[CF.idx];
   if (!cur) { CF.step = 4; return cfResult(b); }
   var label = cur[1];
-  cpNote(b, '第 ' + (CF.idx + 1) + ' 個位置，共 ' + CP_POSITIONS.length + ' 個');
+  cpNote(b, CF.idx < CF_REQUIRED ? '必量 ' + (CF.idx + 1) + ' / ' + CF_REQUIRED
+    : '選擇性 ' + (CF.idx - CF_REQUIRED + 1) + ' / ' + (CF_ORDER.length - CF_REQUIRED) + '（可略過）');
   b.appendChild(cfCarSvg(cur[0]));
   var big = el('p', null, '請把手機底部麥克風靠近〈' + label + '〉喇叭網 2–3 公分，按開始');
   big.setAttribute('style', 'margin:0 0 10px;font-size:19px;font-weight:700;line-height:1.4;color:inherit');
