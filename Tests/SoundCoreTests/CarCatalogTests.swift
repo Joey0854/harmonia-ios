@@ -98,6 +98,19 @@ final class CarCatalogTests: XCTestCase {
         XCTAssertNil(CarCatalogVerifier.newest([bad, Data()], publicKey: pub(key), now: now))
     }
 
+    /// The catalog that ships in the app (Web/car_catalog.json, signed on the PC) verifies with the
+    /// built-in key and has the generic car.
+    func testBundledCatalogVerifies() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("Web/car_catalog.json"))
+        let result = CarCatalogVerifier.verify(data)
+        guard case .success(let c) = result else { return XCTFail("\(result)") }
+        XCTAssertGreaterThanOrEqual(c.version, 1)
+        let generic = try XCTUnwrap(c.cars.first { $0.id == "generic-plain" })
+        XCTAssertEqual(generic.kind, "plain")
+        XCTAssertNotNil(generic.preset)
+    }
+
     func testFutureRefused() throws {
         let key = Curve25519.Signing.PrivateKey()
         var p = payload()
