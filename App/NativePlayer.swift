@@ -1162,10 +1162,22 @@ final class NativePlayer: NSObject {
         Diag.shared.log(line)
     }
 
+    /// The current output as the page is told about it (1.3.23): headphones, the car (CarPlay, with
+    /// the car's name) or a speaker. The page switches its sound profile by it.
+    func routeEvent() -> [String: Any] {
+        let outs = AVAudioSession.sharedInstance().currentRoute.outputs.map { (type: $0.portType.rawValue, name: $0.portName) }
+        let head: Set<String> = Set([AVAudioSession.Port.headphones, .bluetoothA2DP, .bluetoothLE, .bluetoothHFP, .usbAudio].map { $0.rawValue })
+        return AudioRoute.classify(outs, carTypes: [AVAudioSession.Port.carAudio.rawValue], headphoneTypes: head).event
+    }
+
     @objc private func handleRouteChange(_ note: Notification) {
         guard let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: raw) else { return }
-        DispatchQueue.main.async { [weak self] in self?.logAudioRoute("route change, reason \(raw)") }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.logAudioRoute("route change, reason \(raw)")
+            self.onEvent?(self.routeEvent())
+        }
         /* Headphones taken off or disconnected: do not carry on through the phone speaker. */
         if reason == .oldDeviceUnavailable {
             DispatchQueue.main.async { [weak self] in

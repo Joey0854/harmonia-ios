@@ -1047,7 +1047,11 @@
   /* Reports to a PC receiver (its own address, not the PC address above: setting it never
      makes the page use a PC). The app keeps the address and sends; this only asks it to. */
   var reportUi = null;
-  function reportControls(panel) {
+  function reportControls(outer) {
+    /* developer mode only (the page's html.dev); the headroom switch below is for everyone */
+    var panel = document.createElement('div');
+    panel.className = 'devonly';
+    outer.appendChild(panel);
     var h = document.createElement('h3');
     h.textContent = '診斷報告傳到電腦';
     panel.appendChild(h);
@@ -1084,7 +1088,7 @@
     cb.addEventListener('change', function () { raw({ cmd: 'headroom', on: !!cb.checked }); });
     hr.appendChild(cb);
     hr.appendChild(document.createTextNode('自動保留餘裕（避免低音重時人聲被壓低，最多降 3 dB）'));
-    panel.appendChild(hr);
+    outer.appendChild(hr);
     var NAMES = { set: '儲存', ping: '測試連線', send: '傳送報告', get: '' };
     reportUi = {
       update: function (e) {
@@ -1102,7 +1106,10 @@
   /* The student model stress test (1.3.11 pilot): the app separates the song now playing with a
      random-weights student model for 20 minutes and logs heat every 30 s; see App/StudentStress.swift. */
   var studentUi = null;
-  function studentControls(panel) {
+  function studentControls(outer) {
+    var panel = document.createElement('div');
+    panel.className = 'devonly';
+    outer.appendChild(panel);
     var h = document.createElement('h3');
     h.textContent = '學生模型壓力測試';
     panel.appendChild(h);
@@ -1184,8 +1191,10 @@
       var b = document.createElement('button');
       b.type = 'button';
       b.textContent = '診斷';
+      b.className = 'devonly';
       b.setAttribute('style', 'display:block;margin:14px 0 6px;' + BTN);
       var box = document.createElement('pre');
+      box.className = 'devonly';
       box.setAttribute('style', 'display:none;max-height:45vh;overflow:auto;-webkit-overflow-scrolling:touch;white-space:pre-wrap;word-break:break-all;font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;background:rgba(0,0,0,.45);border-radius:8px;padding:8px;margin:0 0 8px;user-select:text;-webkit-user-select:text');
       b.addEventListener('click', function () {
         diagBox = box;
@@ -1487,6 +1496,8 @@
     bandStatus: function () { return bandStatusText(); },
     /* the line under the player */
     status: function (surround) { return glueStatus(surround); },
+    /* the same line outside developer mode: only a download or a look-up in progress */
+    statusBrief: function () { return cur.progress || cur.lookup || ''; },
     /* the mixing switch was moved */
     mix: sendMix,
     /* title, artist, artwork and length of a song as it was last sent to the app in a queue */

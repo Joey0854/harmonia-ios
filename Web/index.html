@@ -248,6 +248,21 @@ input[type=range]:disabled{opacity:.45}
 .chipbtn.grp .car svg{width:18px;height:18px}
 .chipbtn.grp[aria-expanded="true"]{background:rgba(255,255,255,.28)}
 .chipbtn.grp[aria-expanded="true"] .car{transform:rotate(180deg)}
+/* ---------- developer mode (1.3.23): test items only show with html.dev ---------- */
+html:not(.dev) .devonly{display:none!important}
+.fchips.sub .chipbtn>[data-icon].mi,.fchips.sub .chipbtn>[data-icon].car{display:inline-flex}
+.chipbtn .mi svg{width:18px;height:18px}
+.modehd{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:rgba(120,200,255,.08);line-height:1.5}
+.modehd .sheetbtns{margin-top:8px}
+.modeitem{margin:0 0 8px;border-radius:12px;border:2px solid transparent;background:rgba(255,255,255,.06)}
+.modeitem.sel{border-color:rgba(120,200,255,.85);background:rgba(120,200,255,.1)}
+.modepick{display:block;width:100%;min-height:44px;text-align:left;padding:10px 12px;border:0;background:none;color:inherit;font:inherit;cursor:pointer}
+.modepick .mt{font-weight:600;font-size:16px}
+.modepick .md{font-size:12px;opacity:.75;margin-top:2px;line-height:1.45}
+.modecar{display:flex;align-items:center;gap:8px;padding:0 12px 10px;font-size:13px}
+.modecar span{flex:1;min-width:0;opacity:.85}
+.mixline{display:flex;gap:10px;align-items:center;min-height:44px;margin:0 0 12px}
+.verline{margin:16px 0 4px;font-size:12px;opacity:.55;user-select:none;-webkit-user-select:none;cursor:default}
 /* ---------- motion ---------- */
 body.calm *,body.calm *::before,body.calm *::after{animation:none!important}
 @keyframes pgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
@@ -360,12 +375,9 @@ body:not(.playing) #fullArt{transform:scale(.9)}
     <button class="chipbtn grp" id="fGrpMore" type="button" aria-expanded="false" aria-controls="rowMore"><span>更多</span><span class="car" data-icon="down"></span></button>
   </div>
   <div class="fchips sub" id="rowSound" hidden>
-    <button class="chipbtn" id="fSurround" type="button" aria-pressed="true"><span data-icon="headset"></span><span id="fSurroundTxt">環繞 開</span></button>
-    <button class="chipbtn" id="fAB" type="button"><span id="fABTxt">比較</span></button>
-    <button class="chipbtn" id="fProfile" type="button" aria-pressed="false"><span id="fProfileTxt">耳機</span></button>
-    <button class="chipbtn" id="fMix" type="button" aria-pressed="false"><span>混音</span></button>
-    <button class="chipbtn" id="fStyle" type="button"><span id="fStyleTxt">風格</span></button>
+    <button class="chipbtn grp" id="fMode" type="button" aria-haspopup="dialog"><span class="mi" id="fModeIcon" data-icon="headset"></span><span id="fModeTxt">原音</span><span class="car" data-icon="down"></span></button>
     <button class="chipbtn" id="fEq" type="button"><span id="fEqTxt">EQ</span></button>
+    <button class="chipbtn" id="fTune" type="button"><span>微調</span></button>
   </div>
   <div class="fchips sub" id="rowMore" hidden>
     <button class="chipbtn" id="fDl" type="button"><span data-icon="dlIcon"></span><span id="fDlTxt">下載</span></button>
@@ -431,6 +443,8 @@ var ICONS = {
   shuffle: 'M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z',
   repeat: 'M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z',
   repeatOne: 'M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z',
+  carIcon: 'M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z',
+  speakerIcon: 'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z',
   headset: 'M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-4v8h3c1.66 0 3-1.34 3-3v-7c0-4.97-4.03-9-9-9z',
   gear: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-1.99-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'
 };
@@ -855,6 +869,32 @@ var HEAD_STYLE = { b: 'dh', w: 0, v: 50, h: 60, t: 100, o: 0, g: 0 };
 var CAR_STYLE = { b: 'dh', w: 40, v: 50, h: 0, t: 100, o: 30, g: 0 };
 var CAR_EQ = [-3, 0, 0, 0, 0];
 function isCar() { return lsGet('ytm_profile') === 'car'; }
+/* Developer mode (1.3.23): the test items (diagnosis, report sending, the student test, the car's
+   pairing and per-speaker measuring, the status line, the app's log gesture) are hidden unless it
+   is on. Seven taps on the version in the settings turn it on or off. */
+function devOn() { return lsGet('ytm_dev') === '1'; }
+function devApply() {
+  try { document.documentElement.classList.toggle('dev', devOn()); } catch (e) {}
+  if (inApp()) nativePost({ cmd: 'devMode', on: devOn() });
+}
+var devTaps = { n: 0, at: 0 };
+function devTap() {
+  var now = Date.now();
+  devTaps.n = now - devTaps.at > 1500 ? 1 : devTaps.n + 1;
+  devTaps.at = now;
+  if (devTaps.n >= 7) {
+    devTaps.n = 0;
+    lsSet('ytm_dev', devOn() ? '' : '1');
+    devApply();
+    dbg('I', 'setting', { dev: devOn() ? 1 : 0 });
+    renderPlayer();
+    renderModeChip();
+    toast(devOn() ? '已開啟開發者模式' : '已關閉開發者模式');
+  } else if (devTaps.n >= 4) {
+    toast('再點 ' + (7 - devTaps.n) + ' 次' + (devOn() ? '關閉' : '開啟') + '開發者模式');
+  }
+}
+function appVersion() { return window.__ytmAppVersion ? String(window.__ytmAppVersion) : '網頁版'; }
 function psuf() { return isCar() ? '_car' : ''; }
 var STYLE_DEFAULT = isCar() ? CAR_STYLE : HEAD_STYLE;
 /* Automatic mixing between songs is done by the app's player. The page keeps the switch; the glue
@@ -862,6 +902,7 @@ var STYLE_DEFAULT = isCar() ? CAR_STYLE : HEAD_STYLE;
 function mixOn() { return lsGet('ytm_mix') === '1'; }
 function renderMixChip() {
   var b = $('fMix');
+  if (!b) return;
   b.classList.toggle('on', mixOn());
   b.setAttribute('aria-pressed', mixOn() ? 'true' : 'false');
 }
@@ -873,6 +914,7 @@ function toggleMix() {
   toast(mixOn() ? '自動混音已開啟' : '自動混音已關閉');
 }
 function renderProfileChip() {
+  renderModeChip();
   var b = $('fProfile');
   if (!b) return;
   $('fProfileTxt').textContent = isCar() ? '車用' : '耳機';
@@ -1524,6 +1566,7 @@ function cfPick(c) {
   var key = cfRemember(c.title, c.p);
   if (!cfApply(c.p, key)) return;
   lsSet('ytm_car_chosen', c.id);
+  carPortSave();
   dbg('I', 'car-flow-pick', { id: c.id, kind: c.kind });
   toast('已套用：' + c.title);
   closeSheet();
@@ -1611,7 +1654,7 @@ function cfList(b) {
           var u = carUserPresets();
           delete u['車：' + String(c.title).slice(0, 24)];
           lsSet('ytm_car_presets', JSON.stringify(u));
-          if (lsGet('ytm_car_chosen') === c.id) lsSet('ytm_car_chosen', '');
+          if (lsGet('ytm_car_chosen') === c.id) { lsSet('ytm_car_chosen', ''); carPortSave(); }
           draw();
         });
       }
@@ -1628,7 +1671,7 @@ function cfList(b) {
     cpBtn(r, '測量我的車（約 2 分鐘）', function () { CF.name = CF.q.trim(); CF.step = 2; cfRender(); }, false);
     box.appendChild(r);
     b.appendChild(box);
-    var adv = el('div', 'sheetbtns');
+    var adv = el('div', 'sheetbtns devonly');
     cpBtn(adv, '進階：配對與逐顆量測', openCarProbe);
     b.appendChild(adv);
   }
@@ -1820,6 +1863,7 @@ function cfResult(b) {
     cfSaveMyCars(list);
     if (!cfApply(p, cfRemember(n, p))) return;
     lsSet('ytm_car_chosen', id);
+    carPortSave();
     CF.name = n;
     toast('已記住並套用：' + n);
     if (!manual) closeSheet();
@@ -1997,7 +2041,7 @@ function carState() {
   if (!s || !s.p) return { preset: 'v2b', p: carNormalize(CAR_PRESETS.v2b.p) };
   return { preset: s.preset || 'v2b', p: carNormalize(s.p) };
 }
-function carSave(st) { lsSet('ytm_car_band' + psuf(), JSON.stringify(st)); }
+function carSave(st) { lsSet('ytm_car_band' + psuf(), JSON.stringify(st)); carPortSave(); }
 /* what goes to the app: volumes, solo and mute as for the other band modes, the rest as `car` */
 function carMixSetting() {
   var p = carState().p, parts = {}, tracks = {};
@@ -2819,6 +2863,8 @@ window.__ytmNativeEvent = function (e) {
     carProbeEvent(e);
   } else if (e.type === 'carPreset') {
     carPresetGot(e);
+  } else if (e.type === 'route') {
+    routeEvent(e);
   }
 };
 
@@ -3232,6 +3278,8 @@ function statusText() {
   if (S.err) return S.err;
   if (S.loading) return '載入中…';
   if (!S.ready) return '';
+  /* what the sound engine is doing is for developers; others only see downloads and look-ups */
+  if (!devOn()) return window.__ytmGlue && window.__ytmGlue.statusBrief ? window.__ytmGlue.statusBrief() : '';
   return window.__ytmGlue && window.__ytmGlue.status ? window.__ytmGlue.status(S.surround) : (S.surround ? 'App：手機處理環繞' : 'App：環繞關閉');
 }
 
@@ -3869,9 +3917,7 @@ function closeQueue() {
   q.classList.remove('open');
   q.setAttribute('aria-hidden', 'true');
 }
-function renderStyleChip() {
-  $('fStyleTxt').textContent = { stage: '舞台', band: '樂團', bandHead: '樂團', bandCar: '車用樂團' }[stageMode()] || '風格';
-}
+function renderStyleChip() { renderModeChip(); }
 /* The surround panel's first row: HRIR or stage. Changing it redraws the panel. */
 function surroundModeRow(body) {
   var sel = document.createElement('select');
@@ -3897,6 +3943,7 @@ function surroundModeRow(body) {
     fxApply();
     /* the car band without a car chosen yet: the car flow first */
     if (sel.value === 'bandCar' && !lsGet('ytm_car_chosen')) { openCarFlow(1); return; }
+    renderToggles();
     openStyles();
   });
 }
@@ -4085,8 +4132,29 @@ function styleScene(p, rows, save) {
   cv.addEventListener('pointercancel', end);
   return { el: cv, draw: draw };
 }
+function openTune() { openStyles(); }
+function mixLine(body) {
+  var lab = document.createElement('label');
+  lab.className = 'mixline';
+  var cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = mixOn();
+  cb.addEventListener('change', function () { if (cb.checked !== mixOn()) toggleMix(); });
+  lab.appendChild(cb);
+  lab.appendChild(document.createTextNode('自動混音（歌與歌之間自動接歌）'));
+  body.appendChild(lab);
+}
 function openStyles() {
-  openPanel('環繞風格', function (body) {
+  openPanel('微調', function (body) {
+    mixLine(body);
+    /* the developer's list of every mode (the band test among them) */
+    var devRow = el('div', 'devonly');
+    surroundModeRow(devRow);
+    body.appendChild(devRow);
+    if (!S.surround) {
+      cpNote(body, '目前是「原音」，沒有空間效果可調。點音效列的第一個按鈕換成其他模式後，這裡會出現它的調整。');
+      return;
+    }
     /* the car's own surround must be off, or the sound is processed twice; not for the car
        band, which is measured and tuned with the head unit as the user normally listens */
     if (bandSetting() !== 'bandCar') {
@@ -4094,9 +4162,8 @@ function openStyles() {
       warn.setAttribute('style', 'margin:0 0 12px;padding:10px 12px;border-radius:10px;background:rgba(255,190,60,.14);border:1px solid rgba(255,190,60,.45)');
       body.appendChild(warn);
     }
-    /* the car flow (pick the car, or measure it: inside the app); shown in every mode, so that it
-       is there in a build without the band modes too */
-    if (inApp() || bandSetting() === 'bandCar') {
+    /* the car flow (pick the car, or measure it): with the car band; also in the mode menu */
+    if (bandSetting() === 'bandCar') {
       var mrow = el('div', 'sheetbtns');
       mrow.setAttribute('style', 'margin:0 0 12px');
       var mb = el('button', 'btn ghost', '換車／重新測量');
@@ -4105,7 +4172,6 @@ function openStyles() {
       mrow.appendChild(mb);
       body.appendChild(mrow);
     }
-    surroundModeRow(body);
     if (stageMode() === 'stage') { stageControls(body); return; }
     if (bandSetting() === 'bandCar') {
       var ct = el('p', null, '用模型把歌分成人聲、鼓、貝斯與其他樂器，照車上 Bose 音響的上混規則擺位：人聲進中置、樂器進門板、殘響進後窗。手機算不及時會先播耳機環繞的替代音。');
@@ -4191,8 +4257,8 @@ function openStyles() {
     });
     enable();
     var scene = styleScene(p, rows, save);
-    /* below the warning and the mode row */
-    body.insertBefore(scene.el, body.children[2] || null);
+    /* above the base list */
+    body.insertBefore(scene.el, srow);
     body.insertBefore(el('div', 'scenetip', '拖曳圖上的點來調整：白色方塊是前方喇叭，藍點是包圍範圍，紫點是高度，橘點是人聲。'), scene.el.nextSibling);
     rows.forEach(function (r) { r.input.addEventListener('input', function () { scene.draw(); }); });
     sel.addEventListener('change', function () { setTimeout(scene.draw, 0); });
@@ -4457,16 +4523,14 @@ function shuffleUpcoming() {
 }
 function renderToggles() {
   nativeQueue();
-  var sh = $('fShuffle'), rp = $('fRepeat'), su = $('fSurround');
+  var sh = $('fShuffle'), rp = $('fRepeat');
   sh.classList.toggle('on', S.shuffle);
   sh.setAttribute('aria-pressed', S.shuffle ? 'true' : 'false');
   rp.classList.toggle('on', S.repeat !== 'off');
   setIcon(rp, S.repeat === 'one' ? 'repeatOne' : 'repeat');
   rp.setAttribute('aria-label', S.repeat === 'one' ? '重複播放：單曲' : (S.repeat === 'all' ? '重複播放：全部' : '重複播放：關閉'));
-  su.classList.toggle('off', !S.surround);
-  su.setAttribute('aria-pressed', S.surround ? 'true' : 'false');
-  $('fSurroundTxt').textContent = S.surround ? '環繞 開' : '環繞 關';
   renderAbChip();
+  renderModeChip();
 }
 /* One button to compare by ear: original -> HRIR surround -> stage -> band (speakers) ->
    band (headphones) -> original ... */
@@ -4493,6 +4557,199 @@ function cycleAb() {
   renderToggles();
   renderPlayer();
   toast('現在：' + AB_NAME[next]);
+}
+
+/* ---------- the sound mode (1.3.23) ----------
+   One menu instead of the surround / compare / profile / style chips. The output decides the
+   category: headphones ('head'), the car ('car', CarPlay) or a speaker ('spk'); the profile
+   follows it (the speaker uses the car's, speakers either way) and each category remembers
+   the mode last picked (ytm_pick_<cat>). The app tells the page when the output changes
+   (event "route"); a category picked by hand in the menu holds until the output changes. */
+var RT = { seen: false, kind: '', name: '', manual: '' };
+var CAT_NAME = { head: '耳機', car: 'CarPlay', spk: '手機喇叭' };
+var MODE_INFO = {
+  off: ['原音', '不加空間效果，聽原本的立體聲。'],
+  hrir: ['耳機環繞', '用耳機模擬一圈喇叭，聲音像從頭的外面傳來。'],
+  stage: ['舞台', '把歌粗分成人聲、低音、左右聲部與環境聲，擺在你前方的舞台上。'],
+  bandHead: ['耳機樂團', '手機把歌分成人聲、鼓、貝斯與其他樂器，各自擺位（較耗電；手機來不及時先播原音）。'],
+  band: ['樂團（喇叭，測試）', '開發者測試用：分軌後擺在前方舞台。'],
+  bandCar: ['車用樂團', '依你這台車的音響擺放人聲與樂器（要先選車或量一次）。']
+};
+var MODE_ALL = ['off', 'hrir', 'stage', 'bandHead', 'band', 'bandCar'];
+function modeCat() {
+  if (RT.manual) return RT.manual;
+  if (RT.kind) return RT.kind;
+  return isCar() ? 'car' : 'head';
+}
+function modeList(cat, plain) {
+  var l = cat === 'head' ? ['off', 'hrir', 'stage'] : ['off', 'stage'];
+  if (carBandSupported() && cat === 'head') l.push('bandHead');
+  if (carBandSupported() && cat === 'car') l.push('bandCar');
+  if (devOn() && !plain) MODE_ALL.forEach(function (m) { if (l.indexOf(m) < 0) l.push(m); });
+  return l;
+}
+function modeName(m, cat) {
+  if (m === 'stage' && cat !== 'head') return '音樂廳';
+  return (MODE_INFO[m] || MODE_INFO.off)[0];
+}
+function modeDesc(m, cat) {
+  if (m === 'stage' && cat !== 'head') return '立體聲加上空間感，不需要分軌，任何車和喇叭都能用。';
+  if (m === 'off' && cat !== 'head') return '不加空間效果，照車機或喇叭原本的聲音播放。';
+  return (MODE_INFO[m] || MODE_INFO.off)[1];
+}
+function renderModeChip() {
+  var cat = modeCat(), m = abState();
+  /* every change of the mode ends up here: what this category last used */
+  lsSet('ytm_pick_' + cat, m);
+  var t = $('fModeTxt');
+  if (!t) return;
+  t.textContent = modeName(m, cat);
+  setIcon($('fModeIcon'), cat === 'head' ? 'headset' : (cat === 'car' ? 'carIcon' : 'speakerIcon'));
+  $('fMode').setAttribute('aria-label', '音效模式：' + modeName(m, cat) + '（' + (cat === 'head' ? '耳機' : '車用') + '）');
+}
+function setMode(m) {
+  if (m === 'off') S.surround = false;
+  else { S.surround = true; lsSet('ytm_surround_mode' + psuf(), m); }
+  lsSet('ytm_surround', S.surround ? '1' : '0');
+  dbg('I', 'setting', { mode: m, cat: modeCat() });
+  fxApply();
+  renderToggles();
+  renderPlayer();
+}
+/* switches the profile to the category's and puts its last mode back */
+function applyCat(cat, auto) {
+  var wasCat = RT.applied || '';
+  var wantCar = cat !== 'head';
+  if (wantCar !== isCar()) {
+    lsSet('ytm_profile', wantCar ? 'car' : '');
+    carPresetPendingUse();
+    STYLE_DEFAULT = isCar() ? CAR_STYLE : HEAD_STYLE;
+  }
+  if (cat === 'car') carPortRestore();
+  var list = modeList(cat), m = lsGet('ytm_pick_' + cat);
+  if (list.indexOf(m) < 0) m = list.indexOf(abState()) >= 0 ? abState() : (cat === 'head' ? 'hrir' : 'stage');
+  if (m === 'off') S.surround = false;
+  else { S.surround = true; lsSet('ytm_surround_mode' + psuf(), m); }
+  lsSet('ytm_surround', S.surround ? '1' : '0');
+  RT.applied = cat;
+  fxApply();
+  renderEqChip();
+  renderToggles();
+  renderPlayer();
+  if (auto && wasCat && wasCat !== cat) toast('偵測到 ' + CAT_NAME[cat] + '：' + modeName(m, cat));
+}
+/* the app: the output changed (or the page asked) */
+function routeEvent(e) {
+  var kind = { headphones: 'head', car: 'car', speaker: 'spk' }[e && e.kind];
+  if (!kind) return;
+  var name = String(e.name || '').slice(0, 80);
+  var changed = !RT.seen || kind !== RT.kind || name !== RT.name;
+  RT.seen = true;
+  RT.kind = kind;
+  RT.name = name;
+  if (!changed) return;
+  RT.manual = '';
+  dbg('I', 'route', { kind: kind, named: name ? 1 : 0 });
+  applyCat(kind, true);
+  if (modeSheetLive()) openModeMenu();
+}
+function setManualCat(cat) {
+  RT.manual = cat === RT.kind ? '' : cat;
+  applyCat(cat, false);
+  toast(cat === 'head' ? '已切到耳機設定' : '已切到車用設定');
+  openModeMenu();
+}
+/* CarPlay: each car (by the port name CarPlay gives) keeps the car last chosen for the car band */
+function carPorts() {
+  var o = null;
+  try { o = JSON.parse(lsGet('ytm_car_ports') || 'null'); } catch (e) { o = null; }
+  return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+}
+function carPortSave() {
+  if (RT.kind !== 'car' || !RT.name || !isCar()) return;
+  var o = carPorts();
+  o[RT.name] = { chosen: lsGet('ytm_car_chosen') || '', band: lsGet('ytm_car_band_car') || '', at: Date.now() };
+  var keys = Object.keys(o).sort(function (a, b) { return (+o[b].at || 0) - (+o[a].at || 0); });
+  keys.slice(20).forEach(function (k) { delete o[k]; });
+  lsSet('ytm_car_ports', JSON.stringify(o));
+}
+function carPortRestore() {
+  if (RT.kind !== 'car' || !RT.name) return;
+  var c = carPorts()[RT.name];
+  if (!c) return;
+  lsSet('ytm_car_chosen', c.chosen || '');
+  if (c.band) lsSet('ytm_car_band_car', c.band);
+}
+/* the name of the car the car band is set for */
+function carLabel() {
+  if (!lsGet('ytm_car_chosen')) return '尚未選車';
+  var k = carState().preset || '';
+  if (k.indexOf('user:車：') === 0) return k.slice(7);
+  if (k.indexOf('user:') === 0) return k.slice(5);
+  return (CAR_PRESETS[k] && CAR_PRESETS[k].name) || '已選';
+}
+var modeBody = null;
+function modeSheetLive() { return !!(modeBody && document.body.contains(modeBody) && !$('sheet').hidden); }
+function pickMode(m) {
+  setMode(m);
+  /* the car band without a car chosen yet: the car flow first */
+  if (m === 'bandCar' && !lsGet('ytm_car_chosen')) { openCarFlow(1); return; }
+  toast('現在：' + modeName(m, modeCat()));
+  openModeMenu();
+}
+function openModeMenu() {
+  openPanel('音效模式', function (body) {
+    modeBody = body;
+    var cat = modeCat(), cur = abState();
+    var hd = el('div', 'modehd');
+    var det = RT.kind ? '偵測到：' + CAT_NAME[RT.kind] + (RT.kind === 'car' && RT.name ? '（' + RT.name + '）' : '') + (RT.manual ? '' : '（自動）')
+      : '輸出裝置：' + (inApp() ? '偵測中…' : '無法偵測，請手動選');
+    hd.appendChild(el('div', null, det));
+    if (RT.manual) hd.appendChild(el('div', null, '目前手動使用' + (RT.manual === 'head' ? '耳機' : '車用') + '設定，換輸出裝置時會自動切回。'));
+    var btns = el('div', 'sheetbtns');
+    /* a speaker can go either way (a Bluetooth car radio without CarPlay shows as headphones) */
+    (cat === 'head' ? ['car'] : (cat === 'car' ? ['head'] : ['head', 'car'])).forEach(function (other) {
+      var sw = el('button', 'btn ghost', other === 'head' ? '改成耳機' : '改成車用');
+      sw.type = 'button';
+      sw.addEventListener('click', function () { setManualCat(other); });
+      btns.appendChild(sw);
+    });
+    if (RT.manual && RT.kind) {
+      var au = el('button', 'btn ghost', '改回自動');
+      au.type = 'button';
+      au.addEventListener('click', function () { setManualCat(RT.kind); });
+      btns.appendChild(au);
+    }
+    hd.appendChild(btns);
+    body.appendChild(hd);
+    modeList(cat).forEach(function (m) {
+      var item = el('div', 'modeitem' + (m === cur ? ' sel' : ''));
+      var pick = el('button', 'modepick');
+      pick.type = 'button';
+      pick.setAttribute('aria-pressed', m === cur ? 'true' : 'false');
+      pick.appendChild(el('div', 'mt', modeName(m, cat) + (modeList(cat, true).indexOf(m) < 0 ? '（測試）' : '')));
+      var d = modeDesc(m, cat);
+      if (m === cur && /^band/.test(m) && window.__ytmGlue && window.__ytmGlue.bandStatus) {
+        var bs = window.__ytmGlue.bandStatus();
+        if (bs) d += '\n' + bs;
+      }
+      var md = el('div', 'md', d);
+      md.style.whiteSpace = 'pre-line';
+      pick.appendChild(md);
+      pick.addEventListener('click', function () { pickMode(m); });
+      item.appendChild(pick);
+      if (m === 'bandCar') {
+        var cr = el('div', 'modecar');
+        cr.appendChild(el('span', null, '目前的車：' + carLabel()));
+        var ch = el('button', 'btn ghost', '換車／重新測量');
+        ch.type = 'button';
+        ch.addEventListener('click', function () { openCarFlow(1); });
+        cr.appendChild(ch);
+        item.appendChild(cr);
+      }
+      body.appendChild(item);
+    });
+  });
 }
 
 function openSheet() {
@@ -4523,6 +4780,10 @@ function buildSheet() {
   panel.appendChild(el('p', null, '藍牙耳機或車機的聲音會比畫面晚。開著歌詞模式播一首有逐句歌詞的歌，光效或歌詞比聲音慢就往左拉（提前），比聲音快就往右拉（延後），拉到對上為止。耳機和車用各記一組。'));
   /* the app's own items (ambient light, account, diagnostics) go here; the close button is last */
   if (window.__ytmGlue && window.__ytmGlue.diag) window.__ytmGlue.diag(panel);
+  var ver = el('p', 'verline', '版本 ' + appVersion());
+  ver.addEventListener('click', devTap);
+  panel.appendChild(ver);
+  panel.appendChild(el('p', 'verline devonly', '開發者模式已開啟（再連點版本號 7 次關閉）'));
   var row = el('div', 'sheetbtns');
   var cl = el('button', 'btn', '關閉');
   cl.type = 'button';
@@ -5019,6 +5280,7 @@ function renderBrowse(vt, page, id) {
 /* ---------- wiring ---------- */
 function bindUI() {
   initIcons();
+  devApply();
   $('miniOpen').addEventListener('click', openFull);
   $('fullClose').addEventListener('click', closeFull);
   $('fullGear').addEventListener('click', openSheet);
@@ -5029,13 +5291,14 @@ function bindUI() {
   $('fPrev').addEventListener('click', function () { prev(true); });
   $('nextBar').addEventListener('click', openQueue);
   $('qClose').addEventListener('click', closeQueue);
-  $('fStyle').addEventListener('click', openStyles);
-  $('fProfile').addEventListener('click', toggleProfile);
-  $('fMix').addEventListener('click', toggleMix);
+  $('fMode').addEventListener('click', openModeMenu);
+  $('fTune').addEventListener('click', openTune);
   renderMixChip();
   renderProfileChip();
   /* a remote car preset the app fetched before the page was up */
   if (inApp()) nativePost({ cmd: 'carProbe', action: 'presetPending' });
+  /* what the output is now (changes come by themselves) */
+  if (inApp()) nativePost({ cmd: 'route' });
   $('fEq').addEventListener('click', openEq);
   renderEqChip();
   renderStyleChip();
@@ -5078,14 +5341,6 @@ function bindUI() {
     renderToggles();
     extendQueue();
   });
-  $('fSurround').addEventListener('click', function () {
-    S.surround = !S.surround;
-    lsSet('ytm_surround', S.surround ? '1' : '0');
-    fxApply();
-    renderToggles();
-    renderPlayer();
-  });
-  $('fAB').addEventListener('click', cycleAb);
   renderToggles();
   $('fRetry').addEventListener('click', function () {
     if (S.cur) playTrack(S.cur, true);

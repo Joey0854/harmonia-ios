@@ -138,7 +138,8 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
            signed in, so the page's own youtubei calls come back personal. */
         let ytdlp = PythonRuntime.bundled ? "true" : "false"
         let account = Account.shared.isLoggedIn ? "true" : "false"
-        content.addUserScript(WKUserScript(source: "window.__ytmNative = true; window.__ytmStandalone = true; window.__ytmYtdlp = \(ytdlp); window.__ytmAccount = \(account);",
+        let version = "\(Diag.version) (\(Diag.build))".filter { $0 != "\"" && $0 != "\\" }
+        content.addUserScript(WKUserScript(source: "window.__ytmNative = true; window.__ytmStandalone = true; window.__ytmYtdlp = \(ytdlp); window.__ytmAccount = \(account); window.__ytmAppVersion = \"\(version)\";",
                                            injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController = content
 
@@ -180,6 +181,7 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
 
         /* A way to read the app's own log on the phone that needs neither the page nor the PC:
            tap three times with two fingers. */
+        /* Developer mode only (1.3.23): the page's settings turn it on, see the "devMode" command. */
         let tap = UITapGestureRecognizer(target: self, action: #selector(showLog))
         tap.numberOfTapsRequired = 3
         tap.numberOfTouchesRequired = 2
@@ -243,7 +245,12 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
         return true
     }
 
+    /// Developer mode (seven taps on the version in the page's settings): the test items show, and
+    /// the two-finger log gesture works. Off for everyone else.
+    static let devModeKey = "ytm.devMode"
+
     @objc private func showLog() {
+        if !UserDefaults.standard.bool(forKey: PlayerViewController.devModeKey) { return }
         if presentedViewController != nil { return }
         present(UINavigationController(rootViewController: LogViewController()), animated: true)
     }
@@ -551,6 +558,15 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
             player.setMix(on: body["on"] as? Bool ?? false)
         case "carProbe":
             CarMeasure.shared.handle(body)
+        case "route":
+            /* the page asks what the output is (once when it starts; changes come by themselves) */
+            send(player.routeEvent())
+        case "devMode":
+            let on = body["on"] as? Bool ?? false
+            if UserDefaults.standard.bool(forKey: PlayerViewController.devModeKey) != on {
+                UserDefaults.standard.set(on, forKey: PlayerViewController.devModeKey)
+                Diag.shared.log("developer mode \(on ? "on" : "off")")
+            }
         case "mixInfo":
             if let id = body["id"] as? String, let info = body["mix"] as? [String: Any] {
                 player.setMixInfo(MixAnalysis(info), of: id)
