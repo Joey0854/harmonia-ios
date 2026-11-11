@@ -249,4 +249,14 @@ public enum CarProbeClassifier {
         let key = presetKey(for: kind)
         return CarProbeClassification(kind: kind, reasons: why, preset: key.flatMap { presets[$0] }, presetKey: key)
     }
+
+    /// A car field the user typed for the upload (make, model, sound system): only a string is
+    /// taken; line breaks and tabs become spaces; trimmed; at most 60 characters.
+    public static let uploadFieldMax = 60
+    public static func uploadField(_ value: Any?) -> String {
+        guard let s = value as? String else { return "" }
+        let flat = s.unicodeScalars.map { CharacterSet.newlines.contains($0) || $0 == "\t" ? " " : String($0) }.joined()
+        let cut = String(flat.trimmingCharacters(in: .whitespaces).prefix(uploadFieldMax))
+        return cut.trimmingCharacters(in: .whitespaces)
+    }
 }

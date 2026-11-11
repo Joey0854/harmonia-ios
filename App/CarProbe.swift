@@ -26,9 +26,14 @@ import UIKit
    classify                            reads the session on the phone (CarProbeClassifier),
                                        answered with a classify event
    catalog                             the car list (signed; bundled Web/car_catalog.json, the cached
-                                       one or GET <server>/carprobe/catalog), answered with a catalog event
-   upload    { consent: true, carName? }  saves the session as a file in Documents/CarProbe/pending,
-                                       then sends it; without consent nothing is done
+                                       one or GET <server>/carprobe/catalog), answered with a catalog event;
+                                       also asks the server at once (not again within 30 s). The app
+                                       asks by itself at launch and when the route becomes car audio,
+                                       at most once an hour
+   upload    { consent: true, carName?, make?, model?, system? }  saves the session as a file in
+                                       Documents/CarProbe/pending, then sends it; without consent
+                                       nothing is done. make / model / system: what the user typed
+                                       about the car (one line, at most 60 characters each)
    retry                               sends every saved file again
    presetCheck                         asks the server for a preset now
    presetPending                       sends the preset still waiting for the page, if any
@@ -92,6 +97,10 @@ final class CarMeasure {
     }
 
     private var carName = ""
+    /// the car as the user described it for the upload (make, model with year / code, sound system)
+    private var carMake = ""
+    private var carModel = ""
+    private var carSystem = ""
     /// the head unit's own surround while measuring: "on" | "off" | "unknown"
     private var surround = "unknown"
     private var levelTimer: Timer?
@@ -178,7 +187,10 @@ final class CarMeasure {
         NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
             self?.routeChanged()
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.checkPreset(why: "launch") }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            self?.checkPreset(why: "launch")
+            self?.fetchCatalog()
+        }
     }
 
     private static func isCarAudio() -> Bool {
@@ -189,7 +201,10 @@ final class CarMeasure {
         let car = CarMeasure.isCarAudio()
         defer { wasCar = car }
         if run != nil { return }    // our own category change
-        if car && !wasCar { checkPreset(why: "route became car audio") }
+        if car && !wasCar {
+            checkPreset(why: "route became car audio")
+            fetchCatalog()
+        }
     }
 
     // MARK: commands
@@ -222,6 +237,9 @@ final class CarMeasure {
             carName = String((body["carName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
             let sr = body["surround"] as? String ?? "unknown"
             surround = ["on", "off"].contains(sr) ? sr : "unknown"
+            carMake = ""
+            carModel = ""
+            carSystem = ""
             clearSession()
             Diag.shared.log("carprobe: new session for \"\(carName)\"")
             sendStatus()
@@ -239,7 +257,7 @@ final class CarMeasure {
             sendClassification()
         case "catalog":
             sendCatalog()
-            fetchCatalog()
+            fetchCatalog(force: true)
         case "upload":
             guard body["consent"] as? Bool == true else {
                 emit(["action": "upload", "state": "failed", "message": "需要先同意上傳", "pending": pendingFiles().count])
@@ -247,6 +265,9 @@ final class CarMeasure {
             }
             let name = (body["carName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if !name.isEmpty { carName = String(name.prefix(200)) }
+            carMake = CarProbeClassifier.uploadField(body["make"])
+            carModel = CarProbeClassifier.uploadField(body["model"])
+            carSystem = CarProbeClassifier.uploadField(body["system"])
             upload()
         case "retry":
             sendPending(attempt: 0)
@@ -582,6 +603,10 @@ final class CarMeasure {
             "codeKind": pub ? "public" : "personal",
             "headUnitSurround": surround,
             "carName": String(carName.prefix(200)),
+            /* the car for the car list (the server keeps unknown top-level fields in meta.json) */
+            "make": carMake,
+            "model": carModel,
+            "system": carSystem,
             "appVersion": version,
             "probeVersion": CarProbe.version,
             "probe": CarProbe.definition,
@@ -740,9 +765,12 @@ final class CarMeasure {
               "cars": (c?.catalog.cars ?? []).map { $0.json }])
     }
 
-    /// GET <server>/carprobe/catalog; a newer one that verifies is cached and sent to the page.
-    private func fetchCatalog() {
-        guard pairing != nil, run == nil, Date().timeIntervalSince(lastCatalogFetch) > 600,
+    /// GET <server>/carprobe/catalog (the personal pairing first, else the public one; none: skipped);
+    /// a newer one that verifies is cached and sent to the page. At most once an hour; `force` (the
+    /// page opened the car list) asks again unless it asked within 30 s. Failures are only logged.
+    private func fetchCatalog(force: Bool = false) {
+        guard pairing != nil, run == nil,
+              Date().timeIntervalSince(lastCatalogFetch) >= (force ? 30 : 3600),
               let req = request("carprobe/catalog") else { return }
         lastCatalogFetch = Date()
         URLSession.shared.dataTask(with: req) { [weak self] body, response, error in

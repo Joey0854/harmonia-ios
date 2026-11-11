@@ -1481,7 +1481,8 @@ function cpPendingRow(b) {
    explicit confirmation. The head unit's own surround / EQ stay as the user normally listens.
    "My cars" (ytm_my_cars): [{ id, name, kind, surround, date, p }]; the chosen car: ytm_car_chosen. */
 var CF = { body: null, step: 1, q: '', cat: null, idx: 0, level: null, playAt: 0, cls: null, checks: [false, false, false],
-  surround: 'unknown', name: '', agree: false, sent: false, ab: '', ask: false, more: false };
+  surround: 'unknown', name: '', agree: false, sent: false, ab: '', ask: false, more: false,
+  make: '', model: '', system: '', myId: '' };
 /* the flow measures these five first (all the classifier needs), then offers the rest */
 var CF_REQUIRED = 5;
 var CF_ORDER = ['center', 'front-left', 'front-right', 'rear-left', 'rear-right', 'rear-window-left',
@@ -1507,7 +1508,7 @@ function cfMyCars() {
 }
 function cfSaveMyCars(list) { lsSet('ytm_my_cars', JSON.stringify(list.slice(0, 30))); }
 function openCarFlow(step) {
-  openPanel('車用樂團：你的車', function (body) {
+  openPanel(carBandSupported() ? '車用樂團：你的車' : '幫你的車建檔', function (body) {
     CF.body = body;
     CF.step = step || 1;
     CF.q = '';
@@ -1517,7 +1518,11 @@ function openCarFlow(step) {
 }
 /* events from the app that matter to the flow (carProbeEvent calls this) */
 function cfEvent(e) {
-  if (e.action === 'catalog') CF.cat = e;
+  if (e.action === 'catalog') {
+    CF.cat = e;
+    /* a newer list while the list is shown: only the list is drawn again (the search box keeps its focus) */
+    if (cfLive() && CF.step === 1 && CF.draw) { CF.draw(); return; }
+  }
   if (e.action === 'classify') { CF.cls = e; cfTry(); }
   if (e.action === 'measure' && e.state === 'level') { CF.level = +e.db; }
   if (e.action === 'measure' && e.state === 'playing') { CF.playAt = Date.now(); CF.level = null; }
@@ -1539,6 +1544,7 @@ function cfFinish() {
   CF.agree = false;
   CF.sent = false;
   CF.ask = false;
+  CF.myId = '';
   cpPost({ action: 'classify' });
 }
 /* the car settings of a list entry or a result, applied to the car band at once */
@@ -1564,6 +1570,16 @@ function cfRemember(name, p) {
 }
 function cfPick(c) {
   var key = cfRemember(c.title, c.p);
+  if (!carBandSupported()) {
+    /* a build without the car band: only kept as "my car", for the band build to use */
+    carSave({ preset: key, p: carNormalize(c.p) });
+    lsSet('ytm_car_chosen', c.id);
+    carPortSave();
+    dbg('I', 'car-flow-keep', { id: c.id, kind: c.kind });
+    toast('已記成「我的車」：' + c.title + '，樂團模式推出後會自動用上');
+    closeSheet();
+    return;
+  }
   if (!cfApply(c.p, key)) return;
   lsSet('ytm_car_chosen', c.id);
   carPortSave();
@@ -1586,6 +1602,7 @@ function cfRender() {
   var b = CF.body;
   if (!b) return;
   b.textContent = '';
+  CF.draw = null;
   if (CF.step === 2) return cfPrepare(b);
   if (CF.step === 3) return cfMeasure(b);
   if (CF.step === 4) return cfResult(b);
@@ -1662,6 +1679,7 @@ function cfList(b) {
     });
   };
   search.addEventListener('input', function () { CF.q = search.value; draw(); });
+  CF.draw = draw;
   draw();
   if (inApp()) {
     var box = el('div');
@@ -1818,9 +1836,24 @@ function cfTry() {
   if (!c || c.applied) return;
   c.applied = true;
   var p = c.preset && typeof c.preset === 'object' ? c.preset : CAR_PRESETS.plain.p;
+  if (!carBandSupported()) { cfKeep(c, p); dbg('I', 'car-flow-result', { kind: c.kind, measured: c.measured, kept: 1 }); return; }
   cfApply(p, c.kind === 'bose' && c.preset ? 'hall' : 'plain');
   CF.ab = 'band';
   dbg('I', 'car-flow-result', { kind: c.kind, measured: c.measured });
+}
+/* a build without the car band: the result is kept as "my car" (not applied), for the band build */
+function cfKeep(c, p) {
+  var n = String(CF.name || (CP.st && CP.st.carName) || '').trim().slice(0, 30) || '我的車';
+  var q = carNormalize(p);
+  var id = 'my:' + Date.now();
+  var list = cfMyCars().filter(function (m) { return m.name !== n; });
+  list.unshift({ id: id, name: n, kind: c.kind, surround: CF.surround, date: new Date().toISOString(), p: q });
+  cfSaveMyCars(list);
+  carSave({ preset: cfRemember(n, q), p: q });
+  lsSet('ytm_car_chosen', id);
+  carPortSave();
+  CF.name = n;
+  CF.myId = id;
 }
 function cfResult(b) {
   cfHead(b, 4, '結果');
@@ -1830,6 +1863,18 @@ function cfResult(b) {
   t.setAttribute('style', 'margin:0 0 8px;font-size:18px;font-weight:700;line-height:1.4;color:inherit');
   b.appendChild(t);
   var manual = !(c.preset && typeof c.preset === 'object');
+  if (!carBandSupported()) {
+    if (manual) cpNote(b, '手機無法自動判斷這台車的音響類型。', 'warn');
+    if ((c.reasons || []).length) cpNote(b, '判斷依據：\n· ' + c.reasons.join('\n· '));
+    cpNote(b, '已存進「我的車」' + (CF.name && CF.name !== '我的車' ? '（' + CF.name + '）' : '') + '，樂團模式推出後會自動套用。', 'info');
+    cfUploadBox(b, c, null);
+    var done = el('div', 'sheetbtns');
+    done.setAttribute('style', 'margin-top:12px');
+    cpBtn(done, '完成', closeSheet, false);
+    cpBtn(done, '重新測量', function () { CF.step = 2; cfRender(); });
+    b.appendChild(done);
+    return;
+  }
   if (manual) cpNote(b, '手機無法自動判斷這台車的音響類型，先套用「一般原廠音響」的設定。', 'warn');
   else cpNote(b, '已依這個類型套用設定。', 'info');
   if ((c.reasons || []).length) cpNote(b, '判斷依據：\n· ' + c.reasons.join('\n· '));
@@ -1873,19 +1918,25 @@ function cfResult(b) {
   b.appendChild(row);
   if (manual) cfUploadBox(b, c, name);
 }
+/* a car field the user typed: one line, at most 60 characters (the app checks it again) */
+function cfField(s) { return String(s || '').replace(/[\r\n\t\u2028\u2029]+/g, ' ').trim().slice(0, 60); }
+function cfCarOk() { return !!(cfField(CF.make) && cfField(CF.model)); }
 function cfUploadBox(b, c, nameInput) {
+  /* a build without the car band always offers it (to add the car to the list) and needs make and model */
+  var need = !carBandSupported(), manual = !(c.preset && typeof c.preset === 'object');
   var box = el('div');
   box.setAttribute('style', 'margin:16px 0 0;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05)');
-  var h = el('div', null, '上傳讓開發者幫你調整');
+  var h = el('div', null, manual ? '判斷不出來，上傳讓開發者幫你調整' : '把這台車加進車型清單');
   h.setAttribute('style', 'font-weight:600;margin-bottom:6px');
   box.appendChild(h);
   b.appendChild(box);
   var st = CP.st || {};
   var u = CP.upload;
   if (CF.sent && u && u.state === 'done') {
-    cpNote(box, '已上傳。調好後會自動送到你的手機。', 'info');
+    cpNote(box, manual ? '已上傳。調好後會自動送到你的手機。' : '已上傳，謝謝！開發者會把這台車加進車型清單。', 'info');
     return;
   }
+  if (!manual) cpNote(box, '上傳後開發者會依你的量測把這台車加進清單，之後同款車的人就能直接選。');
   var info = c.uploadInfo || {};
   cpNote(box, '會上傳以下內容（不含姓名、帳號、聯絡人或位置）：\n' +
     '· 量測數字：每個位置各頻段的音量差與訊噪比\n' +
@@ -1893,7 +1944,7 @@ function cfUploadBox(b, c, nameInput) {
     '· 手機型號：' + (info.phoneModel || st.phoneModel || '?') + '\n' +
     '· iOS 版本：' + (info.iosVersion || st.iosVersion || '?') + '\n' +
     '· 音訊路徑：' + (info.route || '?') + '\n' +
-    '· 你填的車名與「量的時候車機環繞」的選擇\n' +
+    '· 你填的車名、車廠、車型、音響品牌與「量的時候車機環繞」的選擇\n' +
     '· 一組隨機的裝置代碼（只用來把調好的設定送回這支手機）');
   if (!st.paired) {
     cpNote(box, '這個版本沒有內建上傳設定：要上傳，需要先輸入開發者給你的配對字串。', 'warn');
@@ -1903,6 +1954,20 @@ function cfUploadBox(b, c, nameInput) {
     return;
   }
   cpNote(box, '上傳到：' + (info.server || st.server || '?') + '，不會傳到其他地方。');
+  var go = null;
+  var fields = [['make', need ? '車廠（必填，例如 Mazda、Mercedes-Benz）' : '車廠（可選，例如 Mazda）', '車廠'],
+    ['model', need ? '車型（必填，可加年份或代號，例如 C43 2019、W205）' : '車型（可選，可加年份或代號）', '車型'],
+    ['system', '音響品牌（可選，例如 Bose、Burmester）', '音響品牌']];
+  fields.forEach(function (f) {
+    var x = cpInput(f[1], CF[f[0]], f[2]);
+    x.setAttribute('maxlength', '60');
+    x.setAttribute('data-cf', f[0]);
+    x.addEventListener('input', function () {
+      CF[f[0]] = x.value;
+      if (go) go.disabled = !CF.agree || (u && u.state === 'sending') || (need && !cfCarOk());
+    });
+    box.appendChild(x);
+  });
   var lab = document.createElement('label');
   lab.setAttribute('style', 'display:flex;gap:8px;align-items:center;margin:0 0 6px;min-height:44px');
   var cb = document.createElement('input');
@@ -1912,14 +1977,18 @@ function cfUploadBox(b, c, nameInput) {
   lab.appendChild(document.createTextNode('我看過上面的清單，同意上傳'));
   box.appendChild(lab);
   var r = el('div', 'sheetbtns');
-  var go = cpBtn(r, '確認上傳', function () {
-    if (!cb.checked) return;
+  go = cpBtn(r, '確認上傳', function () {
+    if (!cb.checked || (need && !cfCarOk())) return;
+    var nm = ((nameInput && nameInput.value) || CF.name || '').trim();
+    if (!nm || nm === '我的車') nm = (cfField(CF.make) + ' ' + cfField(CF.model)).trim() || '我的車';
     CF.sent = true;
     CP.upload = { state: 'sending', message: '準備上傳…' };
-    cpPost({ action: 'upload', consent: true, carName: (nameInput.value || CF.name || '我的車').trim().slice(0, 80) });
+    cpPost({ action: 'upload', consent: true, carName: nm.slice(0, 80),
+      make: cfField(CF.make), model: cfField(CF.model), system: cfField(CF.system) });
     cfRender();
-  }, false, !CF.agree || (u && u.state === 'sending'));
-  cb.addEventListener('change', function () { CF.agree = cb.checked; go.disabled = !cb.checked; });
+  }, false, !CF.agree || (u && u.state === 'sending') || (need && !cfCarOk()));
+  if (need && !cfCarOk()) cpNote(box, '填好車廠和車型、勾選同意後才能上傳。');
+  cb.addEventListener('change', function () { CF.agree = cb.checked; go.disabled = !cb.checked || (u && u.state === 'sending') || (need && !cfCarOk()); });
   box.appendChild(r);
   if (CF.sent && u && u.message) cpNote(box, u.message, u.state === 'failed' ? 'warn' : 'info');
 }
@@ -4749,6 +4818,23 @@ function openModeMenu() {
       }
       body.appendChild(item);
     });
+    /* a build without the car band: measuring the car still builds the car list for the band build */
+    if (!carBandSupported() && cat !== 'head') {
+      var ci = el('div', 'modeitem');
+      var cp = el('button', 'modepick');
+      cp.type = 'button';
+      cp.setAttribute('data-carflow', '1');
+      cp.appendChild(el('div', 'mt', '幫你的車建檔（約 2 分鐘）'));
+      cp.appendChild(el('div', 'md', '量一次你的車機音響，樂團模式推出後會自動用上'));
+      cp.addEventListener('click', function () { openCarFlow(1); });
+      ci.appendChild(cp);
+      if (lsGet('ytm_car_chosen')) {
+        var cc = el('div', 'modecar');
+        cc.appendChild(el('span', null, '我的車：' + carLabel()));
+        ci.appendChild(cc);
+      }
+      body.appendChild(ci);
+    }
   });
 }
 

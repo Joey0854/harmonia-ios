@@ -98,4 +98,16 @@ final class CarProbeClassifierTests: XCTestCase {
         XCTAssertNil(CarProbeClassifier.val(t, "center", "B1/anti/0"))
         XCTAssertEqual(CarProbeClassifier.val(t, "center", "B1/inphase/0"), 0)
     }
+
+    func testUploadField() {
+        XCTAssertEqual(CarProbeClassifier.uploadField("  Mazda  "), "Mazda")
+        XCTAssertEqual(CarProbeClassifier.uploadField("C43\r\n2019\tW205\u{2028}x"), "C43  2019 W205 x")
+        XCTAssertEqual(CarProbeClassifier.uploadField(nil), "")
+        XCTAssertEqual(CarProbeClassifier.uploadField(42), "")
+        XCTAssertEqual(CarProbeClassifier.uploadField(["Bose"]), "")
+        let long = String(repeating: "賓", count: 80)
+        XCTAssertEqual(CarProbeClassifier.uploadField(long).count, 60)
+        XCTAssertEqual(CarProbeClassifier.uploadField(String(repeating: "a", count: 59) + "   b"), String(repeating: "a", count: 59))
+        XCTAssertFalse(CarProbeClassifier.uploadField("a\nb\rc").contains(where: { $0.isNewline }))
+    }
 }
