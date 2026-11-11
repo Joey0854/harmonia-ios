@@ -1057,7 +1057,7 @@
     panel.appendChild(h);
     var input = document.createElement('input');
     input.type = 'url';
-    input.placeholder = 'http://100.66.200.10:8790';
+    input.placeholder = 'http://<電腦的 Tailscale IP>:8790';
     input.setAttribute('aria-label', '報告接收位址');
     input.setAttribute('style', 'width:100%;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.25);color:inherit;font:inherit;margin:4px 0 8px');
     panel.appendChild(input);

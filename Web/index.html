@@ -4585,7 +4585,7 @@ function modeList(cat, plain) {
   var l = cat === 'head' ? ['off', 'hrir', 'stage'] : ['off', 'stage'];
   if (carBandSupported() && cat === 'head') l.push('bandHead');
   if (carBandSupported() && cat === 'car') l.push('bandCar');
-  if (devOn() && !plain) MODE_ALL.forEach(function (m) { if (l.indexOf(m) < 0) l.push(m); });
+  if (devOn() && !plain) MODE_ALL.forEach(function (m) { if (l.indexOf(m) < 0 && (carBandSupported() || !/^band/.test(m))) l.push(m); });
   return l;
 }
 function modeName(m, cat) {
