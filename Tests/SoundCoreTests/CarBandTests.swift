@@ -622,10 +622,11 @@ final class CarBandTests: XCTestCase {
         XCTAssertEqual(out.latency, CarBandMixer(sampleRate: 44100).latency)
         let db = errorDb(out, (allpass(x.left), allpass(x.right)))
         XCTAssertLessThan(db, -60, "stereo path differs from the input by \(db) dB")
-        /* and the side (left - right) alone: the input's side, untouched apart from the all-pass */
+        /* and the side (left - right) alone: the input's side, untouched apart from the all-pass
+           (from 0.5 s on: the side tones start abruptly, and that click's low part is mono) */
         var err = 0.0, energy = 0.0
         let side = allpass(zip(x.left, x.right).map { $0 - $1 })
-        for j in 0..<(n - out.latency) {
+        for j in 22050..<(n - out.latency) {
             let s = Double(out.left[j + out.latency] - out.right[j + out.latency])
             err += (s - Double(side[j])) * (s - Double(side[j]))
             energy += Double(side[j] * side[j])
@@ -750,17 +751,21 @@ final class CarBandTests: XCTestCase {
             let t = tone(outL, 3000, from: at, count: 441)
             return (t.re * t.re + t.im * t.im).squareRoot()
         }
+        /* a new setting reaches the output somewhere between the switch and the switch plus
+           `latency` (the front's delay comes before it), so look at all of that */
         for (start, rising) in [(44100, true), (88200, false)] {
-            let at = start + d
-            let before = level(at - 882), after = level(at + 441 * 20)
+            let end = start + d + 441 * 20
+            let before = level(start - 882), after = level(end)
             XCTAssertEqual(before, rising ? 0 : 0.2, accuracy: 0.01)
             XCTAssertEqual(after, rising ? 0.2 : 0, accuracy: 0.01)
             var worst = 0.0
-            var last = level(at - 588)
-            for w in 0..<60 {
-                let v = level(at - 441 + 147 * w)
+            var last = level(start - 588)
+            var at = start - 441
+            while at <= end {
+                let v = level(at)
                 worst = max(worst, abs(v - last))
                 last = v
+                at += 147
             }
             XCTAssertLessThan(worst, 0.25 * 0.2, "a step of \(worst) per move (rising: \(rising))")
             XCTAssertGreaterThan(worst, 0.01, "the switch did not show (rising: \(rising))")
