@@ -21,12 +21,18 @@ public struct CarBandTrack: Equatable {
     /// phase, so Centerpoint sends it to the doors, not the rear windows), shifted by `panDb`.
     /// 2: those differences doubled. See `CarSpreader`.
     public var width: Float
+    /// True: the part keeps its own stereo sound above the crossover, left as left and right as
+    /// right (not made mono, not through `CarSpreader`), only times the `panDb` gains; `width`
+    /// is not used then. Below the crossover it stays mono like every part. Its reverb send and
+    /// the early reflections still take the mono sound.
+    public var stereo: Bool
 
-    public init(panDb: Float = 0, sendDb: Float = CarBandParams.sendOff, rear: Bool = true, width: Float = 0) {
+    public init(panDb: Float = 0, sendDb: Float = CarBandParams.sendOff, rear: Bool = true, width: Float = 0, stereo: Bool = false) {
         self.panDb = panDb
         self.sendDb = sendDb
         self.rear = rear
         self.width = width
+        self.stereo = stereo
     }
 
     /// The send as a factor (0 when off).
@@ -142,6 +148,15 @@ public struct CarBandParams: Equatable {
         CarBandTrack(panDb: 0, sendDb: -10, rear: true)         // vocals
     ])
 
+    /// "v2c, the parts' own stereo": v2b with every part keeping its own left / right above the
+    /// crossover (`CarBandTrack.stereo`), nothing made mono or rebuilt there; everything else as
+    /// in v2b (kept for comparison by ear).
+    public static let v2c: CarBandParams = {
+        var p = CarBandParams.v2b
+        for t in 0..<p.tracks.count { p.tracks[t].stereo = true }
+        return p
+    }()
+
     /// For comparison (make.py v3a): everything in front, the reverb the same on both sides,
     /// parts 4 dB apart, nothing in opposite phase.
     public static let v3 = CarBandParams(tracks: [
@@ -182,7 +197,7 @@ public struct CarBandParams: Equatable {
         var t = Array(tracks.prefix(4))
         while t.count < 4 { t.append(CarBandTrack()) }
         t = t.map { CarBandTrack(panDb: c($0.panDb, -12, 12), sendDb: c($0.sendDb, CarBandParams.sendOff, 6), rear: $0.rear,
-                                 width: c($0.width, 0, 2)) }
+                                 width: c($0.width, 0, 2), stereo: $0.stereo) }
         let lo = c(lowHz, 120, 1000)
         let e0 = c(earlyMinMs, 5, 60)
         return CarBandParams(tracks: t, ambienceOn: ambienceOn, ambienceDb: c(ambienceDb, -30, -3),
@@ -869,6 +884,13 @@ final class CarGate {
 ///   Its reverb send and the early reflections still take the mono sound. Going between 0 and
 ///   above 0 cross-fades (about 20 ms). Parts at width 0 take the mono path as before.
 ///
+/// - a part with `stereo` keeps its own left and right above the crossover: each side through
+///   the same Linkwitz-Riley high-pass as the mono path (so the two bands still add up flat),
+///   times the part's pan gains, added where the mono part's high band would go (so it has the
+///   same latency as every other part); below the crossover it stays mono, its sends and the
+///   early reflections take the mono sound. `width` is not used then. Switching cross-fades
+///   (about 20 ms); the side filters always run, so they are settled when a switch comes.
+///
 /// - the rear bus comes out as `reverbStyle` says: w1 (the response above) and w2 (the same
 ///   kind of response, another seed) mixed per side; the front bus and the low part always
 ///   take w1 alone, the same on both sides. Changing the style glides (about 20 ms).
@@ -892,6 +914,10 @@ public final class CarBandMixer {
 
     private var lowpass: [[CarBiquad]]
     private var highpass: [[CarBiquad]]
+    /* per track: the Linkwitz-Riley high-pass at the crossover on the part's own left (0, 1)
+       and right (2, 3), for `stereo`; how much of the high band is taken from it (glides 0 ... 1) */
+    private var stereoHigh: [[CarBiquad]] = []
+    private var stereoAmount: [Float] = [0, 0, 0, 0]
     private var band: [[CarBiquad]]
     /* per track: pan factors above the crossover (left, right), front send (left, right), rear send */
     private var now: [[Float]]
@@ -978,7 +1004,8 @@ public final class CarBandMixer {
         styleMix = params.clamped().reverbStyle.mix
         design()
         now = (0..<4).map { targets(track: $0) }
-        spreadAmount = (0..<4).map { self.params.tracks[$0].width > 0 ? 1 : 0 }
+        spreadAmount = (0..<4).map { self.params.tracks[$0].width > 0 && !self.params.tracks[$0].stereo ? 1 : 0 }
+        stereoAmount = (0..<4).map { self.params.tracks[$0].stereo ? 1 : 0 }
         dryAmount = self.params.dryGate ? 1 : 0
         /* before the first sample there is only silence, so a gate started now is filled */
         let p = self.params
@@ -1077,11 +1104,16 @@ public final class CarBandMixer {
         if lowpass.count != 4 {
             lowpass = (0..<4).map { _ in CarBiquad.butterworth(CarBiquad.q2 + CarBiquad.q2, highpass: false, frequency: x, sampleRate: sr) }
             highpass = (0..<4).map { _ in CarBiquad.butterworth(CarBiquad.q2 + CarBiquad.q2, highpass: true, frequency: x, sampleRate: sr) }
+            stereoHigh = (0..<4).map { _ in CarBiquad.butterworth(CarBiquad.q2 + CarBiquad.q2 + CarBiquad.q2 + CarBiquad.q2,
+                                                                  highpass: true, frequency: x, sampleRate: sr) }
         } else {
             for t in 0..<4 {
                 for k in 0..<2 {
                     lowpass[t][k].design(highpass: false, frequency: x, q: CarBiquad.q2[0], sampleRate: sr)
                     highpass[t][k].design(highpass: true, frequency: x, q: CarBiquad.q2[0], sampleRate: sr)
+                }
+                for k in 0..<4 {
+                    stereoHigh[t][k].design(highpass: true, frequency: x, q: CarBiquad.q2[0], sampleRate: sr)
                 }
             }
         }
@@ -1152,8 +1184,13 @@ public final class CarBandMixer {
             let left = dryStems + (t * 2) * cap, right = dryStems + (t * 2 + 1) * cap
             let sendLeft = sendStems + (t * 2) * cap, sendRight = sendStems + (t * 2 + 1) * cap
             let width = params.tracks[t].width
-            let aim: Float = width > 0 ? 1 : 0
+            let stereo = params.tracks[t].stereo
+            let aim: Float = width > 0 && !stereo ? 1 : 0
             var a = spreadAmount[t]
+            /* the part's own left / right above the crossover (`stereo`), weight sa */
+            let stereoAim: Float = stereo ? 1 : 0
+            var sa = stereoAmount[t]
+            var sl0 = stereoHigh[t][0], sl1 = stereoHigh[t][1], sr0 = stereoHigh[t][2], sr1 = stereoHigh[t][3]
             let idle = spreadTail[t] <= 0
             let spreading = aim > 0 || a > 0 || !idle
             /* what goes into the spreader: the part's stereo sound × a */
@@ -1168,12 +1205,26 @@ public final class CarBandMixer {
                     a += (aim - a) * k
                     if aim == 0 && a < 1e-4 { a = 0 } else if aim == 1 && a > 1 - 1e-5 { a = 1 }
                 }
+                if sa != stereoAim {
+                    sa += (stereoAim - sa) * k
+                    if stereoAim == 0 && sa < 1e-4 { sa = 0 } else if stereoAim == 1 && sa > 1 - 1e-5 { sa = 1 }
+                }
                 let m = (left[j] + right[j]) * 0.5
                 let md = Double(m)
                 let lo = Float(lp1.step(lp0.step(md)))
-                let hi = (1 - a) * Float(hp1.step(hp0.step(md)))
-                dryL[j] += lo + g[0] * hi
-                dryR[j] += lo + g[1] * hi
+                let hl = Float(sl1.step(sl0.step(Double(left[j]))))
+                let hr = Float(sr1.step(sr0.step(Double(right[j]))))
+                if sa == 0 {
+                    let hi = (1 - a) * Float(hp1.step(hp0.step(md)))
+                    dryL[j] += lo + g[0] * hi
+                    dryR[j] += lo + g[1] * hi
+                } else {
+                    /* the spread and the stereo weights glide towards a sum of 1 from opposite
+                       sides, so what is left of the mono high band never goes below 0 */
+                    let hi = max(0, 1 - a - sa) * Float(hp1.step(hp0.step(md)))
+                    dryL[j] += lo + g[0] * (hi + sa * hl)
+                    dryR[j] += lo + g[1] * (hi + sa * hr)
+                }
                 let ms = (sendLeft[j] + sendRight[j]) * 0.5
                 buses[0][j] += ms * g[2]
                 buses[1][j] += ms * g[3]
@@ -1187,6 +1238,8 @@ public final class CarBandMixer {
             lowpass[t][0] = lp0; lowpass[t][1] = lp1; highpass[t][0] = hp0; highpass[t][1] = hp1
             now[t] = g
             spreadAmount[t] = a
+            stereoAmount[t] = sa
+            stereoHigh[t] = [sl0, sl1, sr0, sr1]
             if spreading {
                 let s = spreaders[t] ?? CarSpreader(sampleRate: sampleRate)
                 spreaders[t] = s

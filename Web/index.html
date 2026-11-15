@@ -2048,10 +2048,17 @@ var CAR_PARTS = [['vocals', '人聲'], ['drums', '鼓'], ['bass', '貝斯'], ['o
 /* the rear reverb's left / right relation (amb.style; CarReverbStyle in the app) */
 var CAR_STYLES = [['decorrelated', '不相關（預設，像真實音樂廳）'], ['half', '各半'], ['anti', '反相（後窗最多）']];
 /* width: how far the part is spread out above the crossover (0: one point, 1: each frequency where it is in the song, 2: wider) */
-function carTrack(pan, send, rear, width) { return { gain: 0, pan: pan, send: send, rear: rear, width: width || 0, solo: false, mute: false }; }
+/* stereo: the part keeps its own left / right above the crossover (not made mono, not spread; width unused) */
+function carTrack(pan, send, rear, width, stereo) { return { gain: 0, pan: pan, send: send, rear: rear, width: width || 0, stereo: !!stereo, solo: false, mute: false }; }
 var CAR_PRESETS = {
   v2b: { name: 'v2b（預設）', p: {
     tracks: { vocals: carTrack(0, -10, true), drums: carTrack(-2, CAR_SEND_OFF, true), bass: carTrack(0, CAR_SEND_OFF, true), other: carTrack(6, 0, true, 1) },
+    piano: { pan: -6, send: 0, rear: true, width: 0 },
+    amb: { on: true, db: -15, rt60: 1.4, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250, style: 'decorrelated', gate: 1, dryGate: false },
+    early: { on: false, db: -10, min: 15, max: 30 }, xover: 150 } },
+  /* CarBandParams.v2c: v2b with every part in its own stereo above the crossover */
+  v2c: { name: 'v2c 原樣立體聲', desc: '同 v2b，但每一軌分頻點以上保留原本的左右聲道（不先混成單聲道、不重建位置）', p: {
+    tracks: { vocals: carTrack(0, -10, true, 0, true), drums: carTrack(-2, CAR_SEND_OFF, true, 0, true), bass: carTrack(0, CAR_SEND_OFF, true, 0, true), other: carTrack(6, 0, true, 1, true) },
     piano: { pan: -6, send: 0, rear: true, width: 0 },
     amb: { on: true, db: -15, rt60: 1.4, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250, style: 'decorrelated', gate: 1, dryGate: false },
     early: { on: false, db: -10, min: 15, max: 30 }, xover: 150 } },
@@ -2082,7 +2089,7 @@ function carNormalize(p) {
   CAR_PARTS.forEach(function (cp) {
     var n = cp[0], s = (p.tracks && p.tracks[n]) || {}, t = d.tracks[n];
     out.tracks[n] = { gain: num(s.gain, t.gain, -30, 3), pan: num(s.pan, t.pan, -12, 12), send: num(s.send, t.send, CAR_SEND_OFF, 6),
-      rear: bool(s.rear, t.rear), width: num(s.width, t.width, 0, 2), solo: !!s.solo, mute: !!s.mute };
+      rear: bool(s.rear, t.rear), width: num(s.width, t.width, 0, 2), stereo: bool(s.stereo, false), solo: !!s.solo, mute: !!s.mute };
   });
   var pi = p.piano || {};
   out.piano = { pan: num(pi.pan, d.piano.pan, -12, 12), send: num(pi.send, d.piano.send, CAR_SEND_OFF, 6), rear: bool(pi.rear, d.piano.rear),
@@ -2117,7 +2124,7 @@ function carMixSetting() {
   CAR_PARTS.forEach(function (cp) {
     var t = p.tracks[cp[0]];
     parts[cp[0]] = { gain: Math.round(1000 * Math.pow(10, t.gain / 20)) / 10, solo: t.solo, mute: t.mute, az: 0, depth: 0, width: 100 };
-    tracks[cp[0]] = { pan: t.pan, send: t.send, rear: t.rear, width: t.width };
+    tracks[cp[0]] = { pan: t.pan, send: t.send, rear: t.rear, width: t.width, stereo: t.stereo };
   });
   return { mode: 'bandCar', parts: parts, low: 0,
     car: { tracks: tracks, amb: p.amb, early: p.early, xover: p.xover } };
@@ -2162,12 +2169,14 @@ function carControls(body) {
     input.max = String(max);
     input.step = String(step);
     input.value = get();
-    input.disabled = !!disabled;
+    /* disabled: a value, or a function asked again on every refresh */
+    var off = function () { return typeof disabled === 'function' ? !!disabled() : !!disabled; };
+    input.disabled = off();
     input.setAttribute('aria-label', label);
     input.addEventListener('input', function () { set(+input.value); val.textContent = fmt(get()); save(); });
     row.appendChild(input);
     box.appendChild(row);
-    controls.push(function () { input.value = get(); val.textContent = fmt(get()); });
+    controls.push(function () { input.value = get(); val.textContent = fmt(get()); input.disabled = off(); });
   };
   var toggle = function (parent, text, get, set, disabled) {
     var b = el('button', 'btn ghost', text);
@@ -2219,7 +2228,7 @@ function carControls(body) {
   var fill = function () {
     sel.innerHTML = '';
     var add = function (v, t) { var o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); };
-    ['v2b', 'v3', 'hall', 'plain'].forEach(function (k) { add(k, CAR_PRESETS[k].name); });
+    ['v2b', 'v2c', 'v3', 'hall', 'plain'].forEach(function (k) { add(k, CAR_PRESETS[k].name); });
     var u = carUserPresets();
     Object.keys(u).sort().forEach(function (k) { add('user:' + k, '自訂：' + k); });
     sel.value = st.preset;
@@ -2304,7 +2313,14 @@ function carControls(body) {
     box.appendChild(head);
     slider(box, '音量', function () { return t().gain; }, function (v) { t().gain = v; }, -30, 3, 0.5, db);
     slider(box, '左右偏移（分頻點以上；− 左 / + 右）', function () { return t().pan; }, function (v) { t().pan = v; }, -12, 12, 0.5, pan);
-    slider(box, '攤開程度（0＝單點，1＝照原曲位置，2＝更開）', function () { return t().width; }, function (v) { t().width = v; }, 0, 2, 0.1, spread);
+    var srow = el('div', 'sheetbtns');
+    toggle(srow, '原樣立體聲', function () { return t().stereo; }, function (v) { t().stereo = v; refresh(); });
+    box.appendChild(srow);
+    var sth = el('p', null, '開：分頻點以上直接用這一軌原本的左右聲道（只套左右偏移），不先混成單聲道、不重建位置；分頻點以下仍左右相同。開啟時下面的「攤開程度」不作用。');
+    sth.setAttribute('style', 'margin:6px 0 0;opacity:.7;font-size:12px');
+    box.appendChild(sth);
+    slider(box, '攤開程度（0＝單點，1＝照原曲位置，2＝更開）', function () { return t().width; }, function (v) { t().width = v; }, 0, 2, 0.1,
+      function (v) { return t().stereo ? '原樣立體聲中，不作用' : spread(v); }, function () { return t().stereo; });
     slider(box, '殘響送出量（最左＝關）', function () { return t().send; }, function (v) { t().send = v; }, CAR_SEND_OFF, 6, 0.5, send);
     var trow = el('div', 'sheetbtns');
     toggle(trow, '殘響送到後座', function () { return t().rear; }, function (v) { t().rear = v; });

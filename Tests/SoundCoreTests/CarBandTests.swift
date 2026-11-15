@@ -539,4 +539,289 @@ final class CarBandTests: XCTestCase {
         for i in 0..<min(n, l.count) { worst = max(worst, abs(l[i] - x.left[i]), abs(r[i] - x.right[i])) }
         XCTAssertLessThan(worst, 1e-6)
     }
+
+    // MARK: - the part's own stereo (CarBandTrack.stereo)
+
+    /// Dry only, every other part at width 0 in the centre, "other" in its own stereo (its
+    /// width left at 1 to show that it is not used then).
+    private func stereoParams(pan: Float = 0) -> CarBandParams {
+        var p = dryParams(width: 1, pan: pan)
+        p.tracks[CarBandTests.other].stereo = true
+        return p
+    }
+
+    /// `x` through the Linkwitz-Riley (24 dB/oct) low-pass or high-pass at `crossover`, written
+    /// out with the same RBJ sections as `reference`.
+    private func lr4(_ x: [Float], highpass: Bool, crossover: Double) -> [Float] {
+        let w = 2 * Double.pi * crossover / 44100
+        let c = cos(w), alpha = sin(w) / (2 * 0.70710678)
+        let a0 = 1 + alpha
+        let b0 = (highpass ? (1 + c) : (1 - c)) / 2 / a0
+        let b1 = (highpass ? -(1 + c) : (1 - c)) / a0
+        let a1 = -2 * c / a0, a2 = (1 - alpha) / a0
+        var z = [Double](repeating: 0, count: 4)
+        var out = [Float](repeating: 0, count: x.count)
+        for j in 0..<x.count {
+            var v = Double(x[j])
+            for s in 0..<2 {
+                let y = b0 * v + z[2 * s]
+                z[2 * s] = b1 * v - a1 * y + z[2 * s + 1]
+                z[2 * s + 1] = b0 * v - a2 * y
+                v = y
+            }
+            out[j] = Float(v)
+        }
+        return out
+    }
+
+    /// Broadband noise the same on both sides (with bass in it) plus a side part (left +,
+    /// right −) of tones from 2 to 10 kHz only.
+    private func stereoAboveCrossover(_ n: Int) -> (left: [Float], right: [Float]) {
+        var a = TestRandom(seed: 21)
+        var l = [Float](repeating: 0, count: n), r = l
+        let tones: [(hz: Float, amp: Float, phase: Float)] = [(2000, 0.08, 0.3), (3100, 0.06, 1.1), (4700, 0.05, 2.0), (6900, 0.04, 0.7), (9800, 0.03, 2.9)]
+        for j in 0..<n {
+            let t = Float(j) / 44100
+            let common = 0.2 * a.next() + 0.15 * sin(2 * Float.pi * 60 * t)
+            var side: Float = 0
+            for x in tones { side += x.amp * sin(2 * Float.pi * x.hz * t + x.phase) }
+            l[j] = common + side
+            r[j] = common - side
+        }
+        return (l, r)
+    }
+
+    private func errorDb(_ out: (left: [Float], right: [Float], latency: Int), _ ref: (left: [Float], right: [Float]),
+                         from: Int = 0) -> Double {
+        let d = out.latency
+        var err = 0.0, energy = 0.0
+        for j in from..<(ref.left.count - d) {
+            let el = Double(out.left[j + d] - ref.left[j]), er = Double(out.right[j + d] - ref.right[j])
+            err += el * el + er * er
+            energy += Double(ref.left[j] * ref.left[j] + ref.right[j] * ref.right[j])
+        }
+        XCTAssertGreaterThan(energy, 1)
+        return 10 * log10(max(err, 1e-30) / energy)
+    }
+
+    /// (a) Stereo at pan 0, no reverb, no early reflections: above the crossover the output is
+    /// the input, left as left and right as right (`latency` later). The left / right
+    /// difference above 2 kHz comes out as it went in; together with the mono part below the
+    /// crossover the output is the input through the crossover's all-pass (the Linkwitz-Riley
+    /// low-pass plus high-pass, the same as for every other part): under -60 dB.
+    func testStereoIsTheInputAboveTheCrossover() {
+        let n = 2 * 44100
+        let x = stereoAboveCrossover(n)
+        let params = stereoParams()
+        let out = runOther(params, left: x.left, right: x.right)
+        let f = Double(params.crossoverHz)
+        func allpass(_ v: [Float]) -> [Float] {
+            let lo = lr4(v, highpass: false, crossover: f), hi = lr4(v, highpass: true, crossover: f)
+            return zip(lo, hi).map { $0 + $1 }
+        }
+        XCTAssertEqual(out.latency, CarBandMixer(sampleRate: 44100).latency)
+        let db = errorDb(out, (allpass(x.left), allpass(x.right)))
+        XCTAssertLessThan(db, -60, "stereo path differs from the input by \(db) dB")
+        /* and the side (left - right) alone: the input's side, untouched apart from the all-pass */
+        var err = 0.0, energy = 0.0
+        let side = allpass(zip(x.left, x.right).map { $0 - $1 })
+        for j in 0..<(n - out.latency) {
+            let s = Double(out.left[j + out.latency] - out.right[j + out.latency])
+            err += (s - Double(side[j])) * (s - Double(side[j]))
+            energy += Double(side[j] * side[j])
+        }
+        XCTAssertLessThan(10 * log10(max(err, 1e-30) / energy), -60, "the side above the crossover was changed")
+        for j in 0..<out.latency { XCTAssertEqual(out.left[j], 0) }
+    }
+
+    /// (b) Any stereo input with pan 4: below the crossover mono, above it each side's own sound
+    /// times the pan gains (the Linkwitz-Riley sections written out): under -60 dB.
+    func testStereoWithPanIsTheWrittenOutPath() {
+        let n = 2 * 44100
+        let x = noiseStereo(n)
+        let params = stereoParams(pan: 4)
+        let out = runOther(params, left: x.left, right: x.right)
+        let f = Double(params.crossoverHz)
+        let lo = lr4(zip(x.left, x.right).map { ($0 + $1) * 0.5 }, highpass: false, crossover: f)
+        let hl = lr4(x.left, highpass: true, crossover: f), hr = lr4(x.right, highpass: true, crossover: f)
+        let gl = pow(10, Float(-4) / 40), gr = pow(10, Float(4) / 40)
+        let ref = (left: (0..<n).map { lo[$0] + gl * hl[$0] }, right: (0..<n).map { lo[$0] + gr * hr[$0] })
+        let db = errorDb(out, ref)
+        XCTAssertLessThan(db, -60, "stereo path with pan differs by \(db) dB")
+    }
+
+    /// (c) Flat over the whole range: a signal the same on both sides comes out at the same level
+    /// at every frequency (the two bands add up to 1, within 0.05 dB, also at the crossover),
+    /// and tones above the crossover keep their left / right relation (level and phase) within
+    /// -60 dB.
+    func testStereoIsFlat() {
+        let n = 3 * 44100
+        let freqs: [Double] = [40, 90, 150, 220, 500, 1500, 4000, 11000]
+        var l = [Float](repeating: 0, count: n), r = l
+        for j in 0..<n {
+            var v = 0.0
+            for (i, f) in freqs.enumerated() { v += 0.05 * sin(2 * Double.pi * f * Double(j) / 44100 + Double(i)) }
+            l[j] = Float(v)
+            r[j] = Float(v)
+        }
+        let out = runOther(stereoParams(), left: l, right: r)
+        let from = out.latency + 44100
+        for f in freqs {
+            for side in [out.left, out.right] {
+                let t = tone(side, f, from: from, count: 44100)
+                let db = 20 * log10((t.re * t.re + t.im * t.im).squareRoot() / 0.05)
+                XCTAssertLessThan(abs(db), 0.05, "\(f) Hz: \(db) dB")
+            }
+        }
+        /* left and right different (levels and phases, the right partly in opposite phase) */
+        let highs: [(hz: Double, l: Double, r: Double, pr: Double)] = [(1500, 0.1, 0.03, 2.5), (4000, 0.02, 0.09, -1.2), (11000, 0.06, 0.06, Double.pi)]
+        for j in 0..<n {
+            var a = 0.0, b = 0.0
+            for h in highs {
+                let w = 2 * Double.pi * h.hz * Double(j) / 44100
+                a += h.l * sin(w)
+                b += h.r * sin(w + h.pr)
+            }
+            l[j] = Float(a)
+            r[j] = Float(b)
+        }
+        let out2 = runOther(stereoParams(), left: l, right: r)
+        let from2 = out2.latency + 44100
+        for h in highs {
+            let tl = tone(out2.left, h.hz, from: from2, count: 44100), tr = tone(out2.right, h.hz, from: from2, count: 44100)
+            let il = tone(l, h.hz, from: 44100, count: 44100), ir = tone(r, h.hz, from: 44100, count: 44100)
+            /* the response on each side, out / in (complex), must be the same on both sides */
+            func div(_ a: (re: Double, im: Double), _ b: (re: Double, im: Double)) -> (re: Double, im: Double) {
+                let d = b.re * b.re + b.im * b.im
+                return ((a.re * b.re + a.im * b.im) / d, (a.im * b.re - a.re * b.im) / d)
+            }
+            let hl = div(tl, il), hr = div(tr, ir)
+            let diff = ((hl.re - hr.re) * (hl.re - hr.re) + (hl.im - hr.im) * (hl.im - hr.im)).squareRoot()
+            let mag = (hl.re * hl.re + hl.im * hl.im).squareRoot()
+            XCTAssertLessThan(20 * log10(max(diff, 1e-12)), -60, "\(h.hz) Hz: left / right relation changed")
+            XCTAssertLessThan(abs(20 * log10(mag)), 0.05, "\(h.hz) Hz: level changed")
+        }
+    }
+
+    /// (d) An impulse comes out at the same sample in the stereo path as in the mono one.
+    func testStereoKeepsTimeAlignment() {
+        let n = 44100
+        var l = [Float](repeating: 0, count: n), r = l
+        l[20000] = 1
+        r[20000] = 0.5
+        func peak(_ p: CarBandParams) -> Int {
+            let out = runOther(p, left: l, right: r)
+            var best = 0
+            for j in 0..<n where abs(out.left[j]) > abs(out.left[best]) { best = j }
+            return best
+        }
+        let mono = peak(dryParams(width: 0)), stereo = peak(stereoParams())
+        XCTAssertLessThanOrEqual(abs(mono - stereo), 1, "mono at \(mono), stereo at \(stereo)")
+    }
+
+    /// (e) Switching stereo on and off while playing cross-fades: a 3 kHz tone that only the
+    /// stereo path keeps (opposite phase on the two sides) rises and falls over tens of
+    /// milliseconds, never in one step; spread -> stereo -> mono stays finite and bounded.
+    func testStereoSwitchGlides() {
+        let block = 441, blocks = 300   // 3 s, a switch at 1 s and at 2 s
+        let mixer = CarBandMixer(sampleRate: 44100, params: dryParams(width: 0))
+        var outL: [Float] = []
+        var x = 0
+        for b in 0..<blocks {
+            if b == 100 { mixer.set(stereoParams()) }
+            if b == 200 { mixer.set(dryParams(width: 0)) }
+            var stems = [[Float]](repeating: [Float](repeating: 0, count: block), count: 8)
+            for j in 0..<block {
+                let t = Float(x + j) / 44100
+                let a1 = 0.2 * sin(2 * Float.pi * 1000 * t), a3 = 0.2 * sin(2 * Float.pi * 3000 * t)
+                stems[CarBandTests.other * 2][j] = a1 + a3
+                stems[CarBandTests.other * 2 + 1][j] = a1 - a3
+            }
+            x += block
+            let zero = [Float](repeating: 0, count: block)
+            outL += mixer.process(stems: stems, standIn: (zero, zero)).left
+        }
+        XCTAssertTrue(outL.allSatisfy { $0.isFinite })
+        let d = mixer.latency
+        /* the 3 kHz level in windows of 441 samples (whole cycles of 1 and 3 kHz), moved on by
+           147 samples at a time: a switch in one step would change it by a third of the way
+           per move, the 20 ms glide by at most about 15 % */
+        func level(_ at: Int) -> Double {
+            let t = tone(outL, 3000, from: at, count: 441)
+            return (t.re * t.re + t.im * t.im).squareRoot()
+        }
+        for (start, rising) in [(44100, true), (88200, false)] {
+            let at = start + d
+            let before = level(at - 882), after = level(at + 441 * 20)
+            XCTAssertEqual(before, rising ? 0 : 0.2, accuracy: 0.01)
+            XCTAssertEqual(after, rising ? 0.2 : 0, accuracy: 0.01)
+            var worst = 0.0
+            var last = level(at - 588)
+            for w in 0..<60 {
+                let v = level(at - 441 + 147 * w)
+                worst = max(worst, abs(v - last))
+                last = v
+            }
+            XCTAssertLessThan(worst, 0.25 * 0.2, "a step of \(worst) per move (rising: \(rising))")
+            XCTAssertGreaterThan(worst, 0.01, "the switch did not show (rising: \(rising))")
+        }
+        /* spread -> stereo -> mono: no jumps beyond the signal's own */
+        let x2 = noiseStereo(3 * 44100)
+        let m2 = CarBandMixer(sampleRate: 44100, params: dryParams(width: 2))
+        var out: [Float] = []
+        for (i, p) in [dryParams(width: 2), stereoParams(), dryParams(width: 0)].enumerated() {
+            m2.set(p)
+            var stems = [[Float]](repeating: [Float](repeating: 0, count: 44100), count: 8)
+            stems[CarBandTests.other * 2] = Array(x2.left[i * 44100..<(i + 1) * 44100])
+            stems[CarBandTests.other * 2 + 1] = Array(x2.right[i * 44100..<(i + 1) * 44100])
+            let zero = [Float](repeating: 0, count: 44100)
+            out += m2.process(stems: stems, standIn: (zero, zero)).left
+        }
+        XCTAssertTrue(out.allSatisfy { $0.isFinite })
+        XCTAssertLessThan(out.map { abs($0) }.max() ?? 0, 2)
+    }
+
+    /// (f) The settings: off unless asked for (an old setting or the old initialiser), kept by
+    /// `clamped`; v2b as it was; v2c is v2b with every part in its own stereo.
+    func testStereoSettings() {
+        XCTAssertFalse(CarBandTrack().stereo)
+        XCTAssertFalse(CarBandTrack(panDb: 3, sendDb: -6, rear: false, width: 1).stereo)
+        let v2b = CarBandParams.v2b
+        XCTAssertEqual(v2b.tracks.map { $0.panDb }, [-2, 0, 6, 0])
+        XCTAssertEqual(v2b.tracks.map { $0.sendDb }, [CarBandParams.sendOff, CarBandParams.sendOff, 0, -10])
+        XCTAssertEqual(v2b.tracks.map { $0.width }, [0, 0, 1, 0])
+        XCTAssertEqual(v2b.tracks.map { $0.rear }, [true, true, true, true])
+        XCTAssertEqual(v2b.tracks.map { $0.stereo }, [false, false, false, false])
+        for p in [CarBandParams.v3, .concertHall, .plainStereo] {
+            XCTAssertFalse(p.tracks.contains { $0.stereo })
+        }
+        let v2c = CarBandParams.v2c
+        XCTAssertEqual(v2c.tracks.map { $0.stereo }, [true, true, true, true])
+        var back = v2c
+        for t in 0..<back.tracks.count { back.tracks[t].stereo = false }
+        XCTAssertEqual(back, v2b)
+        XCTAssertEqual(v2c, v2c.clamped())
+        var wild = v2c
+        wild.tracks[0].width = 9
+        wild.tracks[1].panDb = .nan
+        let c = wild.clamped()
+        XCTAssertEqual(c.tracks.map { $0.stereo }, [true, true, true, true])
+        XCTAssertEqual(c.tracks[0].width, 2)
+        XCTAssertEqual(c.tracks[1].panDb, -12)
+        /* fewer than four tracks: the missing ones are filled in off */
+        let short = CarBandParams(tracks: [CarBandTrack(stereo: true)]).clamped()
+        XCTAssertEqual(short.tracks.map { $0.stereo }, [true, false, false, false])
+        /* a mixer started with v2c and one switched to it end up the same */
+        let x = noiseStereo(44100)
+        let a = CarBandMixer(sampleRate: 44100, params: v2c)
+        let b = CarBandMixer(sampleRate: 44100, params: v2b)
+        b.set(v2c)
+        XCTAssertEqual(a.params, b.params)
+        var stems = [[Float]](repeating: [Float](repeating: 0, count: x.left.count), count: 8)
+        for t in 0..<4 { stems[2 * t] = x.left; stems[2 * t + 1] = x.right }
+        let zero = [Float](repeating: 0, count: x.left.count)
+        let oa = a.process(stems: stems, standIn: (zero, zero)).left
+        XCTAssertTrue(oa.allSatisfy { $0.isFinite })
+        XCTAssertGreaterThan(oa.map { abs($0) }.max() ?? 0, 0.01)
+    }
 }

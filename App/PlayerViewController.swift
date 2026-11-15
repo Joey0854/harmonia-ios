@@ -446,8 +446,9 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
             var carText = ""
             if let c = mix.car {
                 carText = ", car: " + c.tracks.enumerated().map { i, t in
-                    String(format: "%@ pan %.1f width %.1f send %@%@", Demucs.sources[i], t.panDb, t.width,
-                           t.sendDb <= CarBandParams.sendOff ? "off" : String(format: "%.1f", t.sendDb), t.rear ? " rear" : " front")
+                    String(format: "%@ pan %.1f width %.1f send %@%@%@", Demucs.sources[i], t.panDb, t.width,
+                           t.sendDb <= CarBandParams.sendOff ? "off" : String(format: "%.1f", t.sendDb), t.rear ? " rear" : " front",
+                           t.stereo ? " stereo" : "")
                 }.joined(separator: ", ")
                 carText += String(format: "; reverb %@ %.1f dB RT60 %.2f s pre %.0f ms %.0f-%.0f Hz hf %.2f low %@ %.0f Hz reverbStyle %@ sendGate %.2f dryGate %@; early %@ %.1f dB %.0f-%.0f ms; xover %.0f Hz",
                                   c.ambienceOn ? "on" : "off", c.ambienceDb, c.rt60, c.predelayMs, c.lowHz, c.highHz, c.hfDamping,
