@@ -154,6 +154,22 @@ test('at most four requests; then songs from the history may come back so the qu
   assert.deepEqual(ids(S.queue), ['a', 'h1', 'h2']);
 });
 
+test('everything the radio gives was offered before: those songs come back rather than none', async () => {
+  // a radio restored after a restart: its token has run out, and the new radio from the last song
+  // gives only songs it offered before (the queue kept fewer songs than the seen list)
+  const p = page((q) => (q.startsWith('/api/queue?c=') ? new Error('HTTP 400')
+    : q.startsWith('/api/queue?videoId=') ? answer(['s1', 's2', 's3', 'a'], '') : new Error('unexpected ' + q)));
+  const S = p.ctx.S;
+  S.queue = [item('a')];
+  S.index = 0;
+  S.radioQ = S.queue;
+  S.radioCont = 'TOKEN-OLD-xx';
+  S.radioSeen = [vid('s1'), vid('s2'), vid('s3')];
+  p.ctx.extendQueue();
+  await settle(p);
+  assert.deepEqual(ids(S.queue), ['a', 's1', 's2', 's3']);
+});
+
 test('a continuation that no longer works: a new radio from the last song', async () => {
   const p = page((q) => (q.startsWith('/api/queue?c=') ? new Error('HTTP 400') : answer(['b', 'c', 'd', 'e'], 'TOKEN-NEW-xx')));
   const S = p.ctx.S;

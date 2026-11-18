@@ -3164,6 +3164,9 @@ function radioMore(o) {
   }
   return ask().then(function () {
     if (got.length < RADIO_MIN_NEW) got = got.concat(radioPick(queue.concat(got), pool, null, seen, true));
+    /* last resort, when nothing at all is left: songs this radio offered before (but not those in
+       the queue) may come back too, so that the queue does not run dry */
+    if (!got.length) got = got.concat(radioPick(queue.concat(got), pool, null, null, true));
     return { items: got, cont: cont, seen: radioSeenAdd(seen, pool), fresh: fresh, asks: asks };
   });
 }
