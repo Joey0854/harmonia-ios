@@ -3054,7 +3054,9 @@ function realDur(a) {
 
 /* When only a couple of songs are left, append related ones, like autoplay in YT Music. */
 var extending = false;
-/* ---- the same song in another version (official video, lyric video, "Artist - Title", bonus track) ---- */
+/* RADIO-BEGIN ---------- what autoplay adds, and lists that come in pages ----------
+   Plain functions without S or the page (Tests/web runs this part in Node). */
+/* the same song in another version (official video, lyric video, "Artist - Title", bonus track) */
 function qdupLetters(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
 /* the title without bracketed tags and without a tail after a slash or a spaced dash */
 function qdupCore(title) {
@@ -3085,37 +3087,191 @@ function qdupSame(a, b) {
   const long = function (k) { return k.length >= 6 || (k.length >= 2 && /[぀-ヿ㐀-鿿가-힯]/.test(k)); };
   return (long(a.core) && b.full.indexOf(a.core) >= 0) || (long(b.core) && a.full.indexOf(b.core) >= 0);
 }
+/* Autoplay: how many of the latest songs in the play history are not queued again, how many
+   songs of the running radio are remembered as already offered, how few new songs are too few,
+   and how many requests one extension may make before it settles for what it has. */
+var RADIO_RECENT = 150, RADIO_SEEN_MAX = 300, RADIO_MIN_NEW = 3, RADIO_MAX_ASKS = 4;
+/* the videoIds of the newest n songs of the play history (newest first, as HIST.list() gives) */
+function radioRecent(hist, n) {
+  var out = {}, i, max = n || RADIO_RECENT;
+  hist = hist || [];
+  for (i = 0; i < hist.length && i < max; i++) if (hist[i] && hist[i].videoId) out[hist[i].videoId] = 1;
+  return out;
+}
+/* the ids the radio has offered so far, with these items added; the oldest go past the limit */
+function radioSeenAdd(seen, items) {
+  var out = [], at = {};
+  (seen || []).concat((items || []).map(function (x) { return x && x.videoId; })).forEach(function (id) {
+    if (typeof id === 'string' && id && !at[id]) { at[id] = 1; out.push(id); }
+  });
+  return out.length > RADIO_SEEN_MAX ? out.slice(out.length - RADIO_SEEN_MAX) : out;
+}
+/* Of items, the songs worth queueing after queue: not in it already (nor another version of one
+   in it), not offered by this radio before (seen), and - unless relax - not heard lately (recent). */
+function radioPick(queue, items, recent, seen, relax) {
+  var have = {}, infos = [], seenAt = {}, kept = [];
+  (seen || []).forEach(function (id) { seenAt[id] = 1; });
+  (queue || []).forEach(function (x) {
+    if (x && x.videoId) { have[x.videoId] = 1; infos.push(qdupInfo(x)); }
+  });
+  (items || []).forEach(function (x) {
+    if (!isSong(x) || have[x.videoId] || seenAt[x.videoId]) return;
+    if (!relax && recent && recent[x.videoId]) return;
+    var info = qdupInfo(x);
+    if (infos.some(function (k) { return qdupSame(k, info); })) return;
+    have[x.videoId] = 1;
+    infos.push(info);
+    kept.push(x);
+  });
+  return kept;
+}
+/* The next songs of the radio. The radio that was started goes on where it stopped (cont, as the
+   official player does); only when there is nothing to go on with is a new radio started from
+   seed (the last song). When too little is new after the filter, the following part of the radio
+   is asked for (RADIO_MAX_ASKS requests in all), and only then may songs from the history come
+   back, so that the queue never runs dry.
+   o: { queue, cont, seed, playlistId, params, recent, seen, api(path) -> Promise, enc }
+   -> Promise of { items, cont, seen, fresh (a new radio was started), asks } */
+function radioMore(o) {
+  var enc = o.enc || encodeURIComponent;
+  var cont = o.cont || '', fresh = false, asks = 0, pool = [], got = [], seen = o.seen || [];
+  var queue = o.queue || [];
+  function ask() {
+    var useCont = !!cont;
+    if (!useCont) {
+      if (fresh || !o.seed || !o.seed.videoId) return Promise.resolve();
+      fresh = true;
+    }
+    asks++;
+    var path = useCont ? '/api/queue?c=' + enc(cont)
+      : '/api/queue?videoId=' + enc(o.seed.videoId) + (o.playlistId ? '&playlistId=' + enc(o.playlistId) : '');
+    /* params: a filter of the radio (YT Music's chips over the queue), passed on as it is */
+    if (o.params) path += '&params=' + enc(o.params);
+    return Promise.resolve().then(function () { return o.api(path); }).then(function (d) { return d || {}; }, function (e) {
+      /* a token that no longer works: a new radio from the last song instead */
+      if (useCont) return {};
+      if (got.length) return { items: [] };
+      throw e;
+    }).then(function (d) {
+      var items = Array.isArray(d.items) ? d.items : [];
+      cont = typeof d.continuation === 'string' ? d.continuation : '';
+      pool = pool.concat(items);
+      got = got.concat(radioPick(queue.concat(got), items, o.recent, seen));
+      if (got.length >= RADIO_MIN_NEW || asks >= RADIO_MAX_ASKS) return;
+      if (!cont && fresh) return;
+      return ask();
+    });
+  }
+  return ask().then(function () {
+    if (got.length < RADIO_MIN_NEW) got = got.concat(radioPick(queue.concat(got), pool, null, seen, true));
+    return { items: got, cont: cont, seen: radioSeenAdd(seen, pool), fresh: fresh, asks: asks };
+  });
+}
+/* What the saved state keeps of the radio (only when the radio belongs to the queue saved). */
+function radioToState(own, cont, seen, params) {
+  return own ? { cont: cont || '', seen: radioSeenAdd(seen, []), params: params || '' } : null;
+}
+function radioFromState(r) {
+  if (!r || typeof r !== 'object' || typeof r.cont !== 'string') return null;
+  var seen = Array.isArray(r.seen) ? r.seen.filter(function (id) { return typeof id === 'string' && /^[\w-]{11}$/.test(id); }) : [];
+  return { cont: r.cont, seen: radioSeenAdd(seen, []), params: typeof r.params === 'string' ? r.params : '' };
+}
+
+/* A list that YouTube Music sends in pages (liked songs, a long playlist): items is the array the
+   page shows and plays from, kept up to date in place; load(token) gets the next page
+   ({ sections, next }). One page at a time; after 3 failures in a row the rest is given up. */
+function listMerge(have, sections) {
+  var add = [];
+  (sections || []).forEach(function (s) {
+    ((s && s.items) || []).forEach(function (x) {
+      if (isSong(x) && !have[x.videoId]) { have[x.videoId] = 1; add.push(x); }
+    });
+  });
+  return add;
+}
+function makeListSource(items, next, load) {
+  var have = {};
+  items.forEach(function (x) { if (x && x.videoId) have[x.videoId] = 1; });
+  var src = { items: items, next: next || '', busy: null, fails: 0, subs: [] };
+  src.more = function () {
+    if (src.busy) return src.busy;
+    if (!src.next) return Promise.resolve([]);
+    var token = src.next;
+    src.busy = Promise.resolve().then(function () { return load(token); }).then(function (d) {
+      src.busy = null;
+      src.fails = 0;
+      /* the same token again would load the same page for ever */
+      src.next = d && typeof d.next === 'string' && d.next !== token ? d.next : '';
+      var add = listMerge(have, d && d.sections);
+      add.forEach(function (x) { items.push(x); });
+      src.subs.forEach(function (f) { try { f(add); } catch (e) {} });
+      return add;
+    }, function (e) {
+      src.busy = null;
+      if (++src.fails >= 3) src.next = '';
+      throw e;
+    });
+    return src.busy;
+  };
+  return src;
+}
+/* The songs of the list from pos on that the queue does not have yet; pos = how far the queue has
+   taken the list. */
+function listTake(src, pos, queue) {
+  var have = {};
+  (queue || []).forEach(function (x) { if (x && x.videoId) have[x.videoId] = 1; });
+  var out = src.items.slice(pos).filter(function (x) {
+    if (!isSong(x) || have[x.videoId]) return false;
+    have[x.videoId] = 1;
+    return true;
+  });
+  return { items: out, pos: src.items.length };
+}
+/* RADIO-END */
 function extendQueue() {
   /* With "repeat all" the queue loops instead of growing. */
   if (S.repeat === 'all') return;
   if (extending || !S.queue.length || S.queue.length - S.index > 3) return;
-  var last = S.queue[S.queue.length - 1];
-  if (!last || !last.videoId) return;
   var q = S.queue;
-  extending = true;
-  /* The radio that was started goes on where it stopped (as in the official player); only when
-     there is nothing to go on with is a new radio started from the last song. */
-  var more = (S.radioQ === q && S.radioCont) ? S.radioCont : '';
-  api(more ? '/api/queue?c=' + enc(more) : '/api/queue?videoId=' + enc(last.videoId)).then(function (d) {
-    if (S.queue !== q) return;
-    if (more) {
-      S.radioCont = (d && d.continuation) || '';
-      if (!(d && d.items && d.items.length)) { S.radioCont = ''; return; }
-    }
-    var have = {}, infos = [];
-    q.forEach(function (x) { have[x.videoId] = 1; infos.push(qdupInfo(x)); });
-    ((d && d.items) || []).forEach(function (x) {
-      /* the same song in another version is not queued again */
-      if (!isSong(x) || have[x.videoId]) return;
-      var info = qdupInfo(x);
-      if (infos.some(function (k) { return qdupSame(k, info); })) return;
-      have[x.videoId] = 1;
-      infos.push(info);
-      q.push(x);
+  /* Played from a list that has more pages: the list goes on first (as far as it goes). */
+  var src = S.listQ === q ? S.listSrc : null;
+  if (src && (src.items.length > S.listPos || src.next)) {
+    extending = true;
+    var added = 0;
+    (src.items.length > S.listPos ? Promise.resolve() : src.more()).then(function () {
+      if (S.queue !== q) return;
+      var t = listTake(src, S.listPos, q);
+      S.listPos = t.pos;
+      added = t.items.length;
+      t.items.forEach(function (x) { q.push(x); });
+      if (S.shuffle) shuffleUpcoming();
+      renderQueue();
+      prefetch();
+    }).catch(function () {}).then(function () {
+      extending = false;
+      /* a page with nothing new in it, or the list at its end: on with the next page or the radio */
+      if (!added && S.queue === q) extendQueue();
     });
+    return;
+  }
+  var last = q[q.length - 1];
+  if (!last || !last.videoId) return;
+  extending = true;
+  var own = S.radioQ === q;
+  radioMore({
+    queue: q, cont: own ? S.radioCont : '', seed: last, params: own ? S.radioParams : '',
+    recent: radioRecent(HIST.list()), seen: own ? S.radioSeen : [], api: api, enc: enc
+  }).then(function (r) {
+    if (S.queue !== q) return;
+    S.radioQ = q;
+    S.radioCont = r.cont;
+    S.radioSeen = r.seen;
+    if (!own) S.radioParams = '';
+    r.items.forEach(function (x) { q.push(x); });
     if (S.shuffle) shuffleUpcoming();
     renderQueue();
     prefetch();
+    saveState(true);
   }).catch(function () {}).then(function () { extending = false; });
 }
 
@@ -3301,46 +3457,64 @@ function playFromList(list, item) {
   var tapped = qdupInfo(S.queue[0]);
   S.queue = S.queue.filter(function (x, n) { return n === 0 || !qdupSame(tapped, qdupInfo(x)); });
   S.index = 0;
+  listFollow(list);
   playTrack(S.queue[0], true);
 }
 
-function playAll(songs) {
+function playAll(songs, list) {
   if (!songs.length) return;
   S.queue = songs.slice();
   S.index = 0;
+  listFollow(list);
   playTrack(S.queue[0], true);
+}
+
+/* The queue goes on with the list's further pages when list is one that comes in pages (the queue
+   starts with all of it that is loaded). */
+function listFollow(list) {
+  var src = listSourceOf(list);
+  S.listSrc = src;
+  S.listQ = src ? S.queue : null;
+  S.listPos = src ? src.items.length : 0;
 }
 
 function playSingle(item) {
   S.queue = [item];
   S.index = 0;
+  /* playTrack would start a radio of its own (extendQueue); the one asked for here is enough */
+  extending = true;
   playTrack(item, true);
-  var q = '/api/queue?videoId=' + enc(item.videoId);
-  if (item.playlistId) q += '&playlistId=' + enc(item.playlistId);
-  api(q).then(function (d) {
-    if (S.queue.length !== 1 || S.queue[0] !== item) return;
-    var rest = ((d && d.items) || []).filter(function (x) {
-      return isSong(x) && x.videoId !== item.videoId;
-    });
-    /* A radio must not lead to the same song again in another version (a playlist or album the
-       user chose is left as it is). */
-    if (!item.playlistId || /^RD/.test(item.playlistId)) {
-      var seen = [qdupInfo(item)];
-      rest = rest.filter(function (x) {
-        var info = qdupInfo(x);
-        if (seen.some(function (k) { return qdupSame(k, info); })) return false;
-        seen.push(info);
-        return true;
-      });
-    }
+  var q = S.queue;
+  var chosen = !!item.playlistId && !/^RD/.test(item.playlistId);
+  var done = function (rest, cont, seen) {
+    if (S.queue !== q || S.queue.length !== 1 || S.queue[0] !== item) return;
     /* where this radio goes on when the queue runs low */
     S.radioQ = S.queue;
-    S.radioCont = (d && d.continuation) || '';
+    S.radioCont = cont || '';
+    S.radioSeen = seen || [];
+    S.radioParams = '';
     rest.forEach(function (x) { S.queue.push(x); });
     if (S.shuffle) shuffleUpcoming();
     renderQueue();
     prefetch();
-  }).catch(function () {});
+  };
+  var asked;
+  if (chosen) {
+    /* a playlist or album the user chose is played as it is */
+    asked = api('/api/queue?videoId=' + enc(item.videoId) + '&playlistId=' + enc(item.playlistId)).then(function (d) {
+      done(((d && d.items) || []).filter(function (x) { return isSong(x) && x.videoId !== item.videoId; }), d && d.continuation, []);
+    });
+  } else {
+    /* a radio: not the same song again in another version, nor what was heard lately */
+    asked = radioMore({
+      queue: q, cont: '', seed: item, playlistId: item.playlistId || '', recent: radioRecent(HIST.list()),
+      seen: [], api: api, enc: enc
+    }).then(function (r) { done(r.items, r.cont, r.seen); });
+  }
+  asked.catch(function () {}).then(function () {
+    extending = false;
+    if (S.queue === q && S.queue.length < 2) extendQueue();
+  });
 }
 
 function openItem(item, list) {
@@ -5369,14 +5543,70 @@ function renderBrowse(vt, page, id) {
         }
       });
     });
+    /* The list proper (the last all-song section) may come in pages: the rest is loaded when
+       scrolled near the end, or when the queue playing from it runs low. */
+    var main = null;
+    (d.sections || []).forEach(function (s) {
+      if (s && s.items && s.items.length && s.items.every(isSong)) main = s;
+    });
+    var src = main && d.next ? listSourceFor(id, main.items, d.next) : null;
     var pb = el('button', 'btn', '全部播放');
     pb.type = 'button';
     pb.disabled = !songs.length;
-    pb.addEventListener('click', function () { playAll(songs); openFull(); });
+    pb.addEventListener('click', function () { playAll(songs, src ? src.items : null); openFull(); });
     head.appendChild(pb);
     host.appendChild(head);
     renderSections(host, d.sections, 'list');
+    if (src) listPaging(vt, host, src, songs, seen);
   }, true);
+}
+
+/* ---------- lists in pages ---------- */
+var LISTS = {};
+function listSourceFor(id, items, next) {
+  var src = LISTS[id];
+  if (src && src.items === items) return src;
+  src = LISTS[id] = makeListSource(items, next, function (token) {
+    return api('/api/browse?id=' + enc(id) + '&c=' + enc(token));
+  });
+  return src;
+}
+function listSourceOf(list) {
+  if (!list) return null;
+  for (var k in LISTS) if (LISTS[k].items === list) return LISTS[k];
+  return null;
+}
+/* the browse page: further pages added at the end of the drawn list, one page at a time */
+function listPaging(vt, host, src, songs, seen) {
+  var lists = host.querySelectorAll('.songlist');
+  var box = lists.length ? lists[lists.length - 1] : null;
+  if (!box) return;
+  var foot = el('div', 'hint', '載入更多…');
+  host.appendChild(foot);
+  var showFoot = function () {
+    foot.textContent = src.next ? '載入更多…' : '';
+    foot.hidden = !src.next;
+  };
+  showFoot();
+  src.subs = [function (add) {
+    add.forEach(function (it) { if (!seen[it.videoId]) { seen[it.videoId] = 1; songs.push(it); } });
+    if (vt !== viewToken) return;
+    var frag = document.createDocumentFragment();
+    add.forEach(function (it) { frag.appendChild(rowEl(it, function () { openItem(it, src.items); })); });
+    box.appendChild(frag);
+    showFoot();
+    highlight();
+  }];
+  var check = function () {
+    if (vt !== viewToken) { view.removeEventListener('scroll', check); return; }
+    if (!src.next || src.busy) return;
+    if (view.scrollTop + view.clientHeight < view.scrollHeight - 1200) return;
+    src.more().then(function () { setTimeout(check, 0); }, function () {
+      if (vt === viewToken) { foot.textContent = src.next ? '載入失敗，捲動以重試' : ''; foot.hidden = !src.next; }
+    });
+  };
+  view.addEventListener('scroll', check, { passive: true });
+  setTimeout(check, 0);
 }
 
 /* ---------- wiring ---------- */
@@ -5486,7 +5716,9 @@ function saveState(force) {
   lastSave = now;
   var from = Math.max(0, S.index - 5);
   var pos = S.ready ? curTime() : (S.resumeAt || 0);
-  lsSet('ytm_state', JSON.stringify({ at: now, index: S.index - from, queue: S.queue.slice(from, from + 60), t: pos }));
+  /* the radio goes on where it was after a restart, without offering again what it offered */
+  var radio = radioToState(S.radioQ === S.queue, S.radioCont, S.radioSeen, S.radioParams);
+  lsSet('ytm_state', JSON.stringify({ at: now, index: S.index - from, queue: S.queue.slice(from, from + 60), t: pos, radio: radio }));
 }
 function restoreState() {
   var d = null;
@@ -5497,6 +5729,13 @@ function restoreState() {
   if (q.length !== d.queue.length || i < 0) return;
   S.queue = q;
   S.index = i;
+  var radio = radioFromState(d.radio);
+  if (radio) {
+    S.radioQ = q;
+    S.radioCont = radio.cont;
+    S.radioSeen = radio.seen;
+    S.radioParams = radio.params;
+  }
   S.cur = q[i];
   S.vid = q[i].videoId;
   S.resumeAt = +d.t || 0;

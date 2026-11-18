@@ -353,15 +353,28 @@
         var song = /^\/api\/song\/([\w-]{11})\/(like|playlists|save)$/.exec(p0);
         if (song && accountOn()) return accountCall(song[2], song[1], u);
         if (p0 === '/api/home' || p0 === '/api/search' || p0 === '/api/browse') return inPage(path, method, headers, u, signal);
+        /* Autoplay's radio (and its continuation) from the account, like the official player's;
+           when the app cannot get it, the PC (or, without one, the anonymous answer) as before. */
+        if (p0 === '/api/queue') {
+          return inPage(path, method, headers, u, signal).then(function (r) {
+            return r.ok ? r : viaPc(path, method, headers, u, signal);
+          }, function (e) {
+            if (e && e.name === 'AbortError') throw e;
+            return viaPc(path, method, headers, u, signal);
+          });
+        }
       }
       /* The surround setting must be buildable without the PC, and the icons never needed it. */
       if (p0 === '/api/ir/bases' || p0.indexOf('/api/ir/custom/') === 0 || p0.indexOf('/api/') !== 0 && p0.indexOf('/media/') !== 0) return inPage(path, method, headers, u, signal);
-      return pcUp().then(function (up) {
-        if (!up) return offline(path, method, headers, u, signal);
-        return toPc(path, method, headers, u).catch(function (e) {
-          pcSet(false, 0, (e && e.message) || e);
-          return offline(path, method, headers, u, signal);
-        });
+      return viaPc(path, method, headers, u, signal);
+    });
+  }
+  function viaPc(path, method, headers, u, signal) {
+    return pcUp().then(function (up) {
+      if (!up) return offline(path, method, headers, u, signal);
+      return toPc(path, method, headers, u).catch(function (e) {
+        pcSet(false, 0, (e && e.message) || e);
+        return offline(path, method, headers, u, signal);
       });
     });
   }

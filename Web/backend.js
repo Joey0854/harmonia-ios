@@ -3869,6 +3869,56 @@ function parseQueue(json) {
   return items.filter((i) => (seen.has(i.videoId) ? false : seen.add(i.videoId)));
 }
 
+/* ---- a list in pages (liked songs, long playlists) ----
+   The token for the rest of the list proper: at the end of a playlist shelf's contents (or of a
+   continuation's items) as a continuationItemRenderer, or in the older "continuations" field.
+   The page's own continuation (more shelves below the list) is not this one. */
+function shelfToken(shelf) {
+  if (!shelf || typeof shelf !== 'object') return '';
+  const list = shelf.contents || shelf.continuationItems || [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const c = list[i] && list[i].continuationItemRenderer;
+    const cmd = c && c.continuationEndpoint && c.continuationEndpoint.continuationCommand;
+    if (cmd && typeof cmd.token === 'string') return cmd.token;
+  }
+  const n = (shelf.continuations || []).find((x) => x && x.nextContinuationData && x.nextContinuationData.continuation);
+  return n ? n.nextContinuationData.continuation : '';
+}
+function listContinuation(json) {
+  let playlist = null;
+  const shelves = [];
+  (function walk(o, depth) {
+    if (playlist || !o || typeof o !== 'object' || depth > 16) return;
+    for (const k in o) {
+      if (k === 'musicPlaylistShelfRenderer') { playlist = o[k]; return; }
+      if (k === 'musicShelfRenderer') { shelves.push(o[k]); continue; }
+      walk(o[k], depth + 1);
+    }
+  })(json, 0);
+  if (playlist) return shelfToken(playlist);
+  // a library page with a single song shelf
+  const withToken = shelves.filter((s) => shelfToken(s));
+  return withToken.length === 1 ? shelfToken(withToken[0]) : '';
+}
+/* The answer to a list's continuation: { sections: [{ title: '', items }], next } */
+function parseListMore(json) {
+  let items = [];
+  let next = '';
+  const cc = json && json.continuationContents;
+  const part = cc && (cc.musicPlaylistShelfContinuation || cc.musicShelfContinuation);
+  if (part) {
+    items = parseItems(part.contents);
+    next = shelfToken(part);
+  }
+  ((json && json.onResponseReceivedActions) || []).forEach((a) => {
+    const add = a && a.appendContinuationItemsAction;
+    if (!add) return;
+    items = items.concat(parseItems(add.continuationItems));
+    next = next || shelfToken(add);
+  });
+  return { sections: items.length ? [{ title: '', items }] : [], next };
+}
+
 /* ---- the same song in another version (official video, lyric video, "Artist - Title", bonus track) ---- */
 function qdupLetters(s) { return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
 /* the title without bracketed tags and without a tail after a slash or a spaced dash */
@@ -3914,10 +3964,13 @@ function withoutSameSong(items) {
   }
   return kept.length >= 3 ? kept : items;
 }
-async function getQueue(videoId, playlistId) {
+/* params: the opaque parameter YouTube Music puts on a radio (a filter chip over the queue, an
+   automix); passed on as it is. */
+async function getQueue(videoId, playlistId, params) {
   const body = { enablePersistentPlaylistPanel: true, isAudioOnly: true, tunerSettingValue: 'AUTOMIX_SETTING_NORMAL' };
   if (videoId) body.videoId = videoId;
   body.playlistId = playlistId || (videoId ? 'RDAMVM' + videoId : '');
+  if (params) body.params = params;
   const { json } = await ytApi('next', body);
   const items = parseQueue(json);
   /* a playlist or album the user chose is played as it is; the automatic radios ("RD..." mixes,
@@ -5226,12 +5279,19 @@ async function handle(req, res) {
     if (GET && p === '/api/browse') {
       const id = url.searchParams.get('id') || '';
       if (!/^[\w-]{2,80}$/.test(id)) return send(res, 400, { error: 'bad id' });
+      // c = the continuation of the list on that page (liked songs and long playlists come in pages)
+      const c = url.searchParams.get('c') || '';
+      if (c) {
+        if (!/^[\w%=-]{10,4000}$/.test(c)) return send(res, 400, { error: 'bad continuation' });
+        const q = 'ctoken=' + encodeURIComponent(c) + '&continuation=' + encodeURIComponent(c) + '&type=next';
+        return send(res, 200, parseListMore((await ytApi('browse', { continuation: c }, q)).json));
+      }
       let r = await ytApi('browse', { browseId: id });
-      let out = Object.assign(parseHeader(r.json), { sections: parseSections(r.json) });
+      let out = Object.assign(parseHeader(r.json), { sections: parseSections(r.json), next: listContinuation(r.json) });
       // Private pages (liked songs, own playlists) come back empty without the signed-in account.
       if (!out.sections.length && agentUsable()) {
         r = await ytApiPersonal('browse', { browseId: id }, '', 25000);
-        out = Object.assign(parseHeader(r.json), { sections: parseSections(r.json) });
+        out = Object.assign(parseHeader(r.json), { sections: parseSections(r.json), next: listContinuation(r.json) });
       }
       // Radio mixes have no browse page; show their queue as a track list instead.
       if (!out.sections.length && id.startsWith('VL')) {
@@ -5273,10 +5333,12 @@ async function handle(req, res) {
         if (!/^[\w%=-]{10,4000}$/.test(more)) return send(res, 400, { error: 'bad continuation' });
         return send(res, 200, await getQueueMore(more));
       }
+      const params = url.searchParams.get('params') || '';
+      if (params && !/^[\w%=-]{2,400}$/.test(params)) return send(res, 400, { error: 'bad params' });
       if (videoId && !ID_RE.test(videoId)) return send(res, 400, { error: 'bad videoId' });
       if (playlistId && !/^[\w-]{2,80}$/.test(playlistId)) return send(res, 400, { error: 'bad playlistId' });
       if (!videoId && !playlistId) return send(res, 400, { error: 'videoId or playlistId required' });
-      return send(res, 200, await getQueue(videoId, playlistId));
+      return send(res, 200, await getQueue(videoId, playlistId, params));
     }
   } catch (e) {
     return send(res, 502, { error: String(e.message || e) });

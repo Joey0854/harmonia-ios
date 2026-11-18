@@ -16,11 +16,24 @@ jobs:
         run: |
           set -o pipefail
           swift test -c release 2>&1 | tee test.log
+      # The page's own code (autoplay's radio, lists in pages, the app's backend) with made-up
+      # YouTube Music answers (Tests/web). A failing test fails the workflow too.
+      - uses: actions/setup-node@v4
+        if: always()
+        with:
+          node-version: "22"
+      - name: Test web code
+        if: always()
+        run: |
+          set -o pipefail
+          node --test "Tests/web/*.test.js" 2>&1 | tee web-test.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-log
-          path: test.log
+          path: |
+            test.log
+            web-test.log
       - name: Build the Python runtime
         if: always()
         run: |

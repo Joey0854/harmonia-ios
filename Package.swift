@@ -19,7 +19,7 @@ let package = Package(
             name: "SoundCoreTests",
             dependencies: ["SoundCore", "LightCore"],
             path: "Tests",
-            exclude: ["tools"],
+            exclude: ["tools", "web"],
             sources: ["SoundCoreTests"],
             resources: [.copy("Fixtures")]
         )
