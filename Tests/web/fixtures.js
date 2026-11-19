@@ -21,13 +21,33 @@ function wrappedSong(name) {
 }
 const entry = (n) => (typeof n === 'string' ? panelSong(n) : n);
 
+// a filter chip over a radio's queue: asks the radio again with its own playlistId and params
+function chip(title, playlistId, params, selected) {
+  return { chipCloudChipRenderer: {
+    text: runs(title), isSelected: !!selected,
+    navigationEndpoint: { queueUpdateCommand: { fetchContentsCommand: { watchEndpoint: { videoId: vid('any'), playlistId, params } } } },
+  } };
+}
+// the chip that saves the queue to a playlist: not a filter
+function saveChip(title) {
+  return { chipCloudChipRenderer: { text: runs(title), isSelected: false, navigationEndpoint: { saveQueueToPlaylistCommand: { onCreateListCommand: {} } } } };
+}
+// what plays on after a user's playlist (the shape it is believed to have)
+function automix(playlistId, params) {
+  return { automixPreviewVideoRenderer: { content: { automixPlaylistVideoRenderer: { navigationEndpoint: { watchPlaylistEndpoint: { playlistId, params } } } } } };
+}
+
 // the first answer of a radio: the queue panel with the token for the rest
-function nextFirst(names, token) {
+// extra: { chips: [chip...] (above the queue), automix: automix(...) (at the end of the queue) }
+function nextFirst(names, token, extra) {
+  extra = extra || {};
+  const queue = {
+    content: { playlistPanelRenderer: { contents: names.map(entry).concat(extra.automix ? [extra.automix] : []), continuations: token ? [radioToken(token)] : [] } },
+  };
+  if (extra.chips) queue.subHeaderChipCloud = { chipCloudRenderer: { chips: extra.chips } };
   return {
     contents: { singleColumnMusicWatchNextResultsRenderer: { tabbedRenderer: { watchNextTabbedResultsRenderer: { tabs: [{
-      tabRenderer: { content: { musicQueueRenderer: { content: { playlistPanelRenderer: {
-        contents: names.map(entry), continuations: token ? [radioToken(token)] : [],
-      } } } } },
+      tabRenderer: { content: { musicQueueRenderer: queue } },
     }] } } } },
   };
 }
@@ -78,4 +98,4 @@ function item(name, extra) {
   return Object.assign({ kind: 'song', title: 'Song ' + name, subtitle: 'Artist ' + name, thumb: '', videoId: vid(name), playlistId: '', browseId: '', duration: '3:30' }, extra || {});
 }
 
-module.exports = { vid, wrappedSong, nextFirst, nextMore, browseFirst, browseMore, browseMoreOld, item };
+module.exports = { vid, chip, saveChip, automix, wrappedSong, nextFirst, nextMore, browseFirst, browseMore, browseMoreOld, item };

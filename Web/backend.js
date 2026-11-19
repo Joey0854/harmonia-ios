@@ -3980,7 +3980,51 @@ async function getQueue(videoId, playlistId, params) {
   /* a playlist or album the user chose is played as it is; the automatic radios ("RD..." mixes,
      which is also what the home page's songs carry) are thinned out */
   const radio = !playlistId || /^RD/.test(playlistId);
-  return { items: radio ? withoutSameSong(items) : items, continuation: radioContinuation(json) };
+  return { items: radio ? withoutSameSong(items) : items, continuation: radioContinuation(json), chips: queueChips(json), automix: queueAutomix(json) };
+}
+/* The filter chips over a radio's queue (all / familiar / popular / discover ...), which only the
+   first answer of a radio carries. Each is the radio asked again with its own playlistId and
+   params, so those are kept as they are; a chip without them (the one that saves the queue to a
+   playlist) is not a filter and is left out. */
+function queueChips(json) {
+  const out = [];
+  (function walk(o, depth) {
+    if (out.length || !o || typeof o !== 'object' || depth > 24) return;
+    const cloud = o.subHeaderChipCloud && o.subHeaderChipCloud.chipCloudRenderer;
+    if (cloud && Array.isArray(cloud.chips)) {
+      cloud.chips.forEach((c) => {
+        const r = c && c.chipCloudChipRenderer;
+        const w = r && r.navigationEndpoint && r.navigationEndpoint.queueUpdateCommand &&
+          r.navigationEndpoint.queueUpdateCommand.fetchContentsCommand &&
+          r.navigationEndpoint.queueUpdateCommand.fetchContentsCommand.watchEndpoint;
+        if (!w || !/^[\w-]{2,80}$/.test(w.playlistId || '') || !/^[\w%=-]{2,400}$/.test(w.params || '')) return;
+        const title = runsText(r.text);
+        if (!title) return;
+        out.push({ title, playlistId: w.playlistId, params: w.params, selected: r.isSelected === true });
+      });
+      return;
+    }
+    for (const k in o) walk(o[k], depth + 1);
+  })(json, 0);
+  return out;
+}
+/* What YouTube Music plays on when a user's playlist or album runs out (its "automix"). Not yet
+   seen in a real answer: the shape (automixPlaylistVideoRenderer with a watchPlaylistEndpoint) is
+   what it is believed to be, so a missing or different one just means null, and the page starts a
+   radio from the last song as before. */
+function queueAutomix(json) {
+  let found = null;
+  (function walk(o, depth) {
+    if (found || !o || typeof o !== 'object' || depth > 24) return;
+    const a = o.automixPlaylistVideoRenderer;
+    const w = a && a.navigationEndpoint && a.navigationEndpoint.watchPlaylistEndpoint;
+    if (w && /^[\w-]{2,80}$/.test(w.playlistId || '') && (!w.params || /^[\w%=-]{2,400}$/.test(w.params))) {
+      found = { playlistId: w.playlistId, params: w.params || '' };
+      return;
+    }
+    for (const k in o) walk(o[k], depth + 1);
+  })(json, 0);
+  return found;
 }
 /* The token with which the official player asks for the rest of the same radio. */
 function radioContinuation(json) {

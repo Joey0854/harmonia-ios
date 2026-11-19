@@ -38,8 +38,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Harmonia
-        CFBundleShortVersionString: "1.3.27"
-        CFBundleVersion: "77"
+        CFBundleShortVersionString: "1.3.28"
+        CFBundleVersion: "78"
         UILaunchScreen: {}
         UIBackgroundModes:
           - audio

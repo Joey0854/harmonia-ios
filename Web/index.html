@@ -230,6 +230,10 @@ input[type=range]:disabled{opacity:.45}
 .hchips::-webkit-scrollbar{display:none}
 .hchip{flex:none;min-height:44px;padding:0 14px;border:0;border-radius:8px;background:rgba(255,255,255,.1);color:var(--fg);font:inherit;font-size:14px;font-weight:500;white-space:nowrap}
 .hchip.on{background:#fff;color:#000}
+/* the filter chips over the queue: the same chips, inside the queue panel's own side padding */
+.qchips{margin:0 -12px 6px;padding:2px 12px 6px}
+.qchips[hidden]{display:none}
+.qchips.busy{opacity:.5;pointer-events:none}
 .dlside{display:flex;align-items:center;gap:4px;flex:none;color:rgba(255,255,255,.6);font-size:13px}
 .dldel{min-width:44px;min-height:44px;border:0;background:none;color:rgba(255,255,255,.7);border-radius:22px;font:inherit;font-size:13px}
 .dldel.arm{color:#ff6b6b;font-weight:700}
@@ -404,6 +408,7 @@ body:not(.playing) #fullArt{transform:scale(.9)}
   <div id="qpanel" aria-hidden="true">
     <div class="qhead"><span>即將播放</span><button class="iconbtn" id="qClose" type="button" aria-label="關閉清單" data-icon="down"></button></div>
     <div class="qtip">左右滑動移除，長按後拖曳可改順序</div>
+    <div class="hchips qchips" id="qchips" hidden></div>
     <div id="qlist"></div>
   </div>
   <div id="fullBg" aria-hidden="true"></div>
@@ -3054,6 +3059,9 @@ function realDur(a) {
 
 /* When only a couple of songs are left, append related ones, like autoplay in YT Music. */
 var extending = false;
+/* radioTok changes when the songs after the playing one are replaced (a chip was picked), so that
+   an extension that was asked for before does not add the old radio's songs to the new one */
+var radioTok = 0, chipBusy = false;
 /* RADIO-BEGIN ---------- what autoplay adds, and lists that come in pages ----------
    Plain functions without S or the page (Tests/web runs this part in Node). */
 /* the same song in another version (official video, lyric video, "Artist - Title", bonus track) */
@@ -3134,7 +3142,7 @@ function radioPick(queue, items, recent, seen, relax) {
    -> Promise of { items, cont, seen, fresh (a new radio was started), asks } */
 function radioMore(o) {
   var enc = o.enc || encodeURIComponent;
-  var cont = o.cont || '', fresh = false, asks = 0, pool = [], got = [], seen = o.seen || [];
+  var cont = o.cont || '', fresh = false, asks = 0, pool = [], got = [], seen = o.seen || [], chips = null;
   var queue = o.queue || [];
   function ask() {
     var useCont = !!cont;
@@ -3155,6 +3163,8 @@ function radioMore(o) {
     }).then(function (d) {
       var items = Array.isArray(d.items) ? d.items : [];
       cont = typeof d.continuation === 'string' ? d.continuation : '';
+      /* the filter chips come with the first answer of a radio only */
+      if (!chips && Array.isArray(d.chips) && d.chips.length) chips = d.chips;
       pool = pool.concat(items);
       got = got.concat(radioPick(queue.concat(got), items, o.recent, seen));
       if (got.length >= RADIO_MIN_NEW || asks >= RADIO_MAX_ASKS) return;
@@ -3167,17 +3177,60 @@ function radioMore(o) {
     /* last resort, when nothing at all is left: songs this radio offered before (but not those in
        the queue) may come back too, so that the queue does not run dry */
     if (!got.length) got = got.concat(radioPick(queue.concat(got), pool, null, null, true));
-    return { items: got, cont: cont, seen: radioSeenAdd(seen, pool), fresh: fresh, asks: asks };
+    return { items: got, cont: cont, seen: radioSeenAdd(seen, pool), fresh: fresh, asks: asks, chips: chips || [] };
   });
 }
+/* What to ask for when the queue runs low. A radio that has a continuation goes on with it. With
+   none (a list the user chose has run out, or there never was a radio) the list's automix goes
+   on, as YT Music does it, when its first answer had one; otherwise a new radio is started from
+   the last song, with the filter of the radio that was running (if any).
+   s: { own (the radio belongs to the queue), cont, playlistId, params, automix: {playlistId, params} | null } */
+function radioPlan(s) {
+  var cont = s.own ? (s.cont || '') : '';
+  var am = !cont && s.automix && s.automix.playlistId ? s.automix : null;
+  if (am) return { cont: '', playlistId: am.playlistId, params: am.params || '', automix: true };
+  return { cont: cont, playlistId: s.own ? (s.playlistId || '') : '', params: s.own ? (s.params || '') : '', automix: false };
+}
+/* Of a filter chip's answer, the songs to put after the playing one: the same filter as autoplay's
+   (not queued yet, not heard lately); when that leaves too few the recent ones may come back, and
+   when nothing is left the songs played before in this queue may too, so that picking a chip never
+   empties the queue. base: the queue up to and including the playing song. */
+function radioChipItems(base, items, recent) {
+  var got = radioPick(base, items, recent, []);
+  if (got.length < RADIO_MIN_NEW) got = got.concat(radioPick(base.concat(got), items, null, [], true));
+  if (!got.length) got = radioPick(base.slice(-1), items, null, [], true);
+  return got;
+}
 /* What the saved state keeps of the radio (only when the radio belongs to the queue saved). */
-function radioToState(own, cont, seen, params) {
-  return own ? { cont: cont || '', seen: radioSeenAdd(seen, []), params: params || '' } : null;
+function radioToState(own, cont, seen, params, playlistId, chips) {
+  if (!own) return null;
+  var r = { cont: cont || '', seen: radioSeenAdd(seen, []), params: params || '' };
+  if (playlistId) r.playlistId = playlistId;
+  if (chips && chips.length) {
+    r.chips = chips.map(function (c) { return { title: c.title, playlistId: c.playlistId, params: c.params, selected: !!c.selected }; });
+  }
+  return r;
 }
 function radioFromState(r) {
   if (!r || typeof r !== 'object' || typeof r.cont !== 'string') return null;
   var seen = Array.isArray(r.seen) ? r.seen.filter(function (id) { return typeof id === 'string' && /^[\w-]{11}$/.test(id); }) : [];
-  return { cont: r.cont, seen: radioSeenAdd(seen, []), params: typeof r.params === 'string' ? r.params : '' };
+  var chips = Array.isArray(r.chips) ? r.chips.filter(function (c) {
+    return c && typeof c.title === 'string' && c.title && /^[\w-]{2,80}$/.test(c.playlistId || '') && /^[\w%=-]{2,400}$/.test(c.params || '');
+  }).map(function (c) { return { title: c.title, playlistId: c.playlistId, params: c.params, selected: c.selected === true }; }) : [];
+  return {
+    cont: r.cont, seen: radioSeenAdd(seen, []), params: typeof r.params === 'string' ? r.params : '',
+    playlistId: typeof r.playlistId === 'string' && /^[\w-]{2,80}$/.test(r.playlistId) ? r.playlistId : '', chips: chips
+  };
+}
+
+/* The songs of a list, each videoId once (the first one stays): YouTube's own lists repeat some. */
+function listUnique(songs) {
+  var have = {};
+  return (songs || []).filter(function (x) {
+    if (!isSong(x) || have[x.videoId]) return false;
+    have[x.videoId] = 1;
+    return true;
+  });
 }
 
 /* A list that YouTube Music sends in pages (liked songs, a long playlist): items is the array the
@@ -3260,22 +3313,73 @@ function extendQueue() {
   var last = q[q.length - 1];
   if (!last || !last.videoId) return;
   extending = true;
-  var own = S.radioQ === q;
+  var own = S.radioQ === q, tok = radioTok;
+  var plan = radioPlan({
+    own: own, cont: S.radioCont, playlistId: S.radioPid, params: S.radioParams, automix: S.automixQ === q ? S.automix : null
+  });
   radioMore({
-    queue: q, cont: own ? S.radioCont : '', seed: last, params: own ? S.radioParams : '',
+    queue: q, cont: plan.cont, seed: last, playlistId: plan.playlistId, params: plan.params,
     recent: radioRecent(HIST.list()), seen: own ? S.radioSeen : [], api: api, enc: enc
   }).then(function (r) {
-    if (S.queue !== q) return;
+    if (S.queue !== q || tok !== radioTok) return;
     S.radioQ = q;
     S.radioCont = r.cont;
     S.radioSeen = r.seen;
-    if (!own) S.radioParams = '';
+    if (plan.automix) {
+      /* the list's automix is a radio now; it keeps its filter if a new one has to be started */
+      S.automix = null;
+      S.radioPid = plan.playlistId;
+      S.radioParams = plan.params;
+    } else if (!own) {
+      S.radioPid = '';
+      S.radioParams = '';
+    }
+    /* the chips of a radio that was started now; a running radio keeps its own */
+    if (!own || !S.chips || !S.chips.length) S.chips = r.chips || [];
     r.items.forEach(function (x) { q.push(x); });
     if (S.shuffle) shuffleUpcoming();
     renderQueue();
     prefetch();
     saveState(true);
-  }).catch(function () {}).then(function () { extending = false; });
+  }).catch(function () {
+    /* an automix that cannot be had is not asked for again: the next time is a radio from the last song */
+    if (plan.automix && S.automixQ === q) S.automix = null;
+  }).then(function () { extending = false; });
+}
+
+/* A filter chip of the radio was tapped (i = its place in S.chips): the songs after the playing one
+   are replaced by the radio asked again with that chip, and the radio goes on with the token of
+   that answer. Any failure leaves the queue as it was. */
+function pickChip(i) {
+  var q = S.queue, chip = S.chips && S.chips[i], cur = q[S.index];
+  if (!chip || chip.selected || chipBusy || S.radioQ !== q || !cur) return;
+  chipBusy = true;
+  renderQueue();
+  var path = '/api/queue?videoId=' + enc(cur.videoId) + '&playlistId=' + enc(chip.playlistId) + '&params=' + enc(chip.params);
+  Promise.resolve().then(function () { return api(path); }).then(function (d) {
+    /* another song or list was started meanwhile: nothing to replace */
+    if (S.queue !== q || S.radioQ !== q) return;
+    var at = S.index;
+    var items = Array.isArray(d && d.items) ? d.items : [];
+    var got = radioChipItems(q.slice(0, at + 1), items, radioRecent(HIST.list()));
+    if (!got.length) throw new Error('empty');
+    radioTok++;
+    q.length = at + 1;
+    got.forEach(function (x) { q.push(x); });
+    S.radioCont = typeof d.continuation === 'string' ? d.continuation : '';
+    S.radioSeen = radioSeenAdd([], items);
+    S.radioPid = chip.playlistId;
+    S.radioParams = chip.params;
+    S.chips = S.chips.map(function (c, n) { return { title: c.title, playlistId: c.playlistId, params: c.params, selected: n === i }; });
+    if (S.shuffle) shuffleUpcoming();
+    prefetch();
+    saveState(true);
+  }).catch(function () {
+    toast('切換失敗，請稍後再試');
+  }).then(function () {
+    chipBusy = false;
+    renderQueue();
+  });
 }
 
 function next(gesture) {
@@ -3448,13 +3552,15 @@ window.addEventListener('focus', resumeIfNeverStarted);
 
 /* ---------- queue sources ---------- */
 function playFromList(list, item) {
-  var songs = list.filter(isSong);
+  var songs = listUnique(list);
   var i = -1, k;
   for (k = 0; k < songs.length; k++) {
     if (songs[k].videoId === item.videoId) { i = k; break; }
   }
   if (i < 0) i = 0;
   if (!songs.length) return;
+  S.chips = [];
+  S.automix = null;
   S.queue = songs.slice(i);
   /* The song that was tapped is not queued again in another version right after it. */
   var tapped = qdupInfo(S.queue[0]);
@@ -3466,7 +3572,9 @@ function playFromList(list, item) {
 
 function playAll(songs, list) {
   if (!songs.length) return;
-  S.queue = songs.slice();
+  S.chips = [];
+  S.automix = null;
+  S.queue = listUnique(songs);
   S.index = 0;
   listFollow(list);
   playTrack(S.queue[0], true);
@@ -3482,6 +3590,8 @@ function listFollow(list) {
 }
 
 function playSingle(item) {
+  S.chips = [];
+  S.automix = null;
   S.queue = [item];
   S.index = 0;
   /* playTrack would start a radio of its own (extendQueue); the one asked for here is enough */
@@ -3489,13 +3599,18 @@ function playSingle(item) {
   playTrack(item, true);
   var q = S.queue;
   var chosen = !!item.playlistId && !/^RD/.test(item.playlistId);
-  var done = function (rest, cont, seen) {
+  var done = function (rest, cont, seen, chips, automix) {
     if (S.queue !== q || S.queue.length !== 1 || S.queue[0] !== item) return;
     /* where this radio goes on when the queue runs low */
     S.radioQ = S.queue;
     S.radioCont = cont || '';
     S.radioSeen = seen || [];
     S.radioParams = '';
+    S.radioPid = '';
+    /* a radio's filter chips; or, for a list that was chosen, what plays on after its last song */
+    S.chips = chips || [];
+    S.automixQ = S.queue;
+    S.automix = automix || null;
     rest.forEach(function (x) { S.queue.push(x); });
     if (S.shuffle) shuffleUpcoming();
     renderQueue();
@@ -3505,14 +3620,14 @@ function playSingle(item) {
   if (chosen) {
     /* a playlist or album the user chose is played as it is */
     asked = api('/api/queue?videoId=' + enc(item.videoId) + '&playlistId=' + enc(item.playlistId)).then(function (d) {
-      done(((d && d.items) || []).filter(function (x) { return isSong(x) && x.videoId !== item.videoId; }), d && d.continuation, []);
+      done(listUnique((d && d.items) || []).filter(function (x) { return x.videoId !== item.videoId; }), d && d.continuation, [], null, d && d.automix);
     });
   } else {
     /* a radio: not the same song again in another version, nor what was heard lately */
     asked = radioMore({
       queue: q, cont: '', seed: item, playlistId: item.playlistId || '', recent: radioRecent(HIST.list()),
       seen: [], api: api, enc: enc
-    }).then(function (r) { done(r.items, r.cont, r.seen); });
+    }).then(function (r) { done(r.items, r.cont, r.seen, r.chips); });
   }
   asked.catch(function () {}).then(function () {
     extending = false;
@@ -3785,9 +3900,32 @@ function highlight() {
   }
 }
 
+/* The radio's filter chips above the queue (only while the queue is the radio's); redrawn only
+   when they change, so that the row keeps its scroll position as the queue grows. */
+function renderChips() {
+  var box = $('qchips');
+  if (!box) return;
+  var chips = S.radioQ === S.queue && S.chips && S.chips.length ? S.chips : null;
+  var sig = chips ? chips.map(function (c) { return (c.selected ? '*' : '') + c.title; }).join('|') : '';
+  box.hidden = !chips;
+  box.classList.toggle('busy', chipBusy);
+  if (box.sig === sig) return;
+  box.sig = sig;
+  box.textContent = '';
+  if (!chips) return;
+  chips.forEach(function (c, i) {
+    var b = el('button', 'hchip' + (c.selected ? ' on' : ''), c.title);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', c.selected ? 'true' : 'false');
+    b.addEventListener('click', function () { pickChip(i); });
+    box.appendChild(b);
+  });
+}
+
 function renderQueue() {
   nativeQueue();
   renderNext();
+  renderChips();
   var box = $('qlist');
   box.textContent = '';
   if (!S.queue.length) {
@@ -5720,7 +5858,7 @@ function saveState(force) {
   var from = Math.max(0, S.index - 5);
   var pos = S.ready ? curTime() : (S.resumeAt || 0);
   /* the radio goes on where it was after a restart, without offering again what it offered */
-  var radio = radioToState(S.radioQ === S.queue, S.radioCont, S.radioSeen, S.radioParams);
+  var radio = radioToState(S.radioQ === S.queue, S.radioCont, S.radioSeen, S.radioParams, S.radioPid, S.chips);
   lsSet('ytm_state', JSON.stringify({ at: now, index: S.index - from, queue: S.queue.slice(from, from + 60), t: pos, radio: radio }));
 }
 function restoreState() {
@@ -5738,6 +5876,8 @@ function restoreState() {
     S.radioCont = radio.cont;
     S.radioSeen = radio.seen;
     S.radioParams = radio.params;
+    S.radioPid = radio.playlistId;
+    S.chips = radio.chips;
   }
   S.cur = q[i];
   S.vid = q[i].videoId;

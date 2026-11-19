@@ -89,6 +89,45 @@ test('/api/queue: params are passed on to YouTube Music; bad ones are refused', 
   assert.equal(bad.status, 400);
 });
 
+test('/api/queue: the filter chips of a radio (the save chip left out); a chip playlistId and params go through', async () => {
+  const chips = [
+    F.chip('All', 'RDATfakeall', 'fakeparamsAll%3D', true), F.chip('Familiar', 'RDATfakefam', 'fakeparamsFam%3D'),
+    F.saveChip('Save'), F.chip('Discover', 'RDATfakedis', 'fakeparamsDis%3D'),
+  ];
+  const b = backend((ep, body) => {
+    if (ep !== 'next') return null;
+    // the answer to a chip is a new queue without chips
+    return body.params ? F.nextFirst(['a', 'x', 'y'], 'CHIP-CONT-TWO') : F.nextFirst(['a', 'b', 'c'], 'RADIO-CONT-TWO', { chips });
+  });
+  const r = await b.get('/api/queue?videoId=' + F.vid('a'));
+  assert.deepEqual(r.json.items.map((x) => x.videoId), [F.vid('a'), F.vid('b'), F.vid('c')], 'existing keys unchanged');
+  assert.equal(r.json.continuation, 'RADIO-CONT-TWO');
+  assert.deepEqual(r.json.chips, [
+    { title: 'All', playlistId: 'RDATfakeall', params: 'fakeparamsAll%3D', selected: true },
+    { title: 'Familiar', playlistId: 'RDATfakefam', params: 'fakeparamsFam%3D', selected: false },
+    { title: 'Discover', playlistId: 'RDATfakedis', params: 'fakeparamsDis%3D', selected: false },
+  ]);
+  const c = r.json.chips[1];
+  const r2 = await b.get('/api/queue?videoId=' + F.vid('a') + '&playlistId=' + encodeURIComponent(c.playlistId) + '&params=' + encodeURIComponent(c.params));
+  assert.equal(r2.status, 200);
+  assert.equal(b.sent[1].body.playlistId, 'RDATfakefam');
+  assert.equal(b.sent[1].body.params, 'fakeparamsFam%3D');
+  assert.deepEqual(r2.json.chips, []);
+  assert.equal(r2.json.continuation, 'CHIP-CONT-TWO');
+});
+
+test('/api/queue: the automix of a chosen list is passed on when the answer has one, else null', async () => {
+  const b = backend((ep, body) => (body.playlistId === 'PLfakelist'
+    ? F.nextFirst(['a', 'b', 'c'], '', { automix: F.automix('RDAMPLfakelist', 'fakeAutomix%3D') })
+    : F.nextFirst(['a', 'b', 'c'], '')));
+  const r = await b.get('/api/queue?videoId=' + F.vid('a') + '&playlistId=PLfakelist');
+  assert.deepEqual(r.json.automix, { playlistId: 'RDAMPLfakelist', params: 'fakeAutomix%3D' });
+  assert.deepEqual(r.json.items.map((x) => x.videoId), [F.vid('a'), F.vid('b'), F.vid('c')], 'the automix is not a song');
+  const plain = await b.get('/api/queue?videoId=' + F.vid('a'));
+  assert.equal(plain.json.automix, null);
+  assert.deepEqual(plain.json.chips, []);
+});
+
 test('/api/browse: the list\'s own continuation, not the page\'s', async () => {
   const b = backend((ep, body) => (ep === 'browse' && body.browseId === 'VLPLtest' ? F.browseFirst(['l1', 'l2', 'l3'], 'LIST-CONT-TWO', 'PAGE-CONT-XYZ') : null));
   const r = await b.get('/api/browse?id=VLPLtest');

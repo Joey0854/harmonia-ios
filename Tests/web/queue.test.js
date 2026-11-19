@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { item, vid } = require('./fixtures');
+const { item, vid, chip } = require('./fixtures');
 
 const html = fs.readFileSync(path.join(__dirname, '..', '..', 'Web', 'index.html'), 'utf8');
 
@@ -27,12 +27,15 @@ function fnSrc(name) {
 
 const RADIO = html.slice(html.indexOf('var extending = false;'), html.indexOf('/* RADIO-END */') + 15);
 const EXTEND = fnSrc('extendQueue');
+// parts of the page that an older page does not have yet
+const maybe = (name) => (html.includes('\nfunction ' + name + '(') ? fnSrc(name) : '');
 
 // a fresh page: the radio part, extendQueue, saveState / restoreState, with stand-ins
 function page(answers, opts) {
   opts = opts || {};
   const asked = [];
   const store = {};
+  const toasts = [];
   const ctx = {
     console, Promise, JSON, Math, Date, Array, Object, encodeURIComponent,
     S: { queue: [], index: -1, shuffle: false, repeat: 'off' },
@@ -44,14 +47,17 @@ function page(answers, opts) {
       const a = answers(p, asked.length);
       return a instanceof Error ? Promise.reject(a) : Promise.resolve(a);
     },
+    toasts, toast(m) { toasts.push(m); }, listFollow() {}, playTrack() {},
     renderQueue() {}, prefetch() {}, shuffleUpcoming() {}, renderPlayer() {}, updateProgress() {},
     curTime: () => 12, parseDur: () => 210,
     lsSet: (k, v) => { store[k] = v; }, lsGet: (k) => (k in store ? store[k] : null),
   };
   vm.createContext(ctx);
-  vm.runInContext(RADIO + EXTEND + 'var lastSave = 0;' + fnSrc('saveState') + fnSrc('restoreState') +
+  vm.runInContext(RADIO + EXTEND + maybe('pickChip') + fnSrc('playFromList') + fnSrc('playAll') + 'var lastSave = 0;' + fnSrc('saveState') + fnSrc('restoreState') +
     '\nthis.extendQueue = extendQueue; this.saveState = saveState; this.restoreState = restoreState;' +
     'this.radioMore = radioMore; this.radioPick = radioPick; this.makeListSource = makeListSource; this.listTake = listTake;' +
+    'this.pickChip = typeof pickChip === "function" ? pickChip : undefined; this.playFromList = playFromList; this.playAll = playAll;' +
+    'this.isChipBusy = function () { return typeof chipBusy !== "undefined" && chipBusy; };' +
     'this.listMerge = listMerge; this.radioSeenAdd = radioSeenAdd; this.isExtending = function () { return extending; };', ctx);
   return { ctx, asked, store };
 }
@@ -319,4 +325,161 @@ test('the same token again ends the list instead of loading the same page for ev
   await src.more();
   assert.equal(src.next, '');
   assert.deepEqual(ids(list), ['a', 'b']);
+});
+
+// ---- filter chips, the end of a chosen list, lists with repeated songs
+
+const CHIPS = [chip('All', 'RDATfakeall', 'fakeAll%3D', true), chip('Familiar', 'RDATfakefam', 'fakeFam%3D')]
+  .map((c) => {
+    const r = c.chipCloudChipRenderer;
+    const w = r.navigationEndpoint.queueUpdateCommand.fetchContentsCommand.watchEndpoint;
+    return { title: r.text.runs[0].text, selected: r.isSelected, playlistId: w.playlistId, params: w.params };
+  });
+const CHIP_PATH = (n) => '/api/queue?videoId=' + vid(n) + '&playlistId=RDATfakefam&params=fakeFam%253D';
+
+async function chipSettle(p) {
+  for (let i = 0; i < 200 && p.ctx.isChipBusy(); i++) await new Promise((r) => setTimeout(r, 1));
+  await new Promise((r) => setTimeout(r, 1));
+}
+
+test('radioMore hands on the chips of the radio\'s first answer', async () => {
+  const p = page(() => Object.assign(answer(['b', 'c', 'd'], ''), { chips: CHIPS }));
+  const r = await p.ctx.radioMore({ queue: [item('a')], cont: '', seed: item('a'), api: p.ctx.api });
+  assert.equal(r.chips.length, 2);
+  assert.equal(r.chips[1].params, 'fakeFam%3D');
+});
+
+test('picking a chip replaces only the songs after the playing one; the radio goes on with that answer\'s token', async () => {
+  const p = page((q) => (q === CHIP_PATH('b') ? answer(['b', 'x1', 'x2', 'x3', 'a', 'd'], 'CHIP-TOKEN-xx') : new Error('unexpected ' + q)));
+  const S = p.ctx.S;
+  S.queue = [item('a'), item('b'), item('c'), item('d')];
+  S.index = 1;
+  S.radioQ = S.queue;
+  S.radioCont = 'OLD-TOKEN-xxx';
+  S.chips = CHIPS;
+  const q = S.queue;
+  p.ctx.pickChip(1);
+  await chipSettle(p);
+  assert.deepEqual(p.asked, [CHIP_PATH('b')]);
+  assert.equal(S.queue, q, 'the same queue, changed in place');
+  // a (before) and b (playing) stay; the old c is gone, d comes back from the answer; b and a are not queued twice
+  assert.deepEqual(ids(S.queue), ['a', 'b', 'x1', 'x2', 'x3', 'd']);
+  assert.equal(S.radioCont, 'CHIP-TOKEN-xx');
+  assert.equal(S.radioParams, 'fakeFam%3D');
+  assert.equal(S.radioPid, 'RDATfakefam');
+  assert.deepEqual(Array.from(S.chips, (c) => c.title + c.selected), ['Allfalse', 'Familiartrue']);
+  // the next extension goes on with the chip answer's token
+  S.index = 4;
+  p.ctx.extendQueue();
+  await settle(p);
+  assert.ok(p.asked[1].startsWith('/api/queue?c=CHIP-TOKEN-xx'), p.asked[1]);
+});
+
+test('picking a chip: a failure keeps the queue and says so; an answer of only known songs still gives songs', async () => {
+  const p = page(() => new Error('offline'));
+  const S = p.ctx.S;
+  S.queue = [item('a'), item('b'), item('c')];
+  S.index = 0;
+  S.radioQ = S.queue;
+  S.radioCont = 'OLD-TOKEN-xxx';
+  S.chips = CHIPS;
+  p.ctx.pickChip(1);
+  await chipSettle(p);
+  assert.deepEqual(ids(S.queue), ['a', 'b', 'c']);
+  assert.equal(S.radioCont, 'OLD-TOKEN-xxx');
+  assert.equal(S.chips[1].selected, false);
+  assert.equal(p.ctx.toasts.length, 1);
+  // everything the answer has was heard lately: those songs come back rather than none
+  const p2 = page(() => answer(['a', 'h1', 'h2'], ''), { history: ['h1', 'h2'] });
+  const S2 = p2.ctx.S;
+  S2.queue = [item('a'), item('z')];
+  S2.index = 0;
+  S2.radioQ = S2.queue;
+  S2.chips = CHIPS;
+  p2.ctx.pickChip(1);
+  await chipSettle(p2);
+  assert.deepEqual(ids(S2.queue), ['a', 'h1', 'h2']);
+});
+
+test('a chosen list that runs out goes on with its automix; without one, with a radio from the last song', async () => {
+  const AM = { playlistId: 'RDAMPLfake', params: 'fakeAm%3D' };
+  const run = async (automix, cont) => {
+    const p = page(() => answer(['c', 'd', 'e'], 'TOKEN-NEW-xx'));
+    const S = p.ctx.S;
+    S.queue = [item('a'), item('b')];
+    S.index = 1;
+    S.radioQ = S.queue;
+    S.radioCont = cont || '';
+    S.automixQ = S.queue;
+    S.automix = automix;
+    p.ctx.extendQueue();
+    await settle(p);
+    return p;
+  };
+  const withAm = await run(AM);
+  assert.deepEqual(withAm.asked, ['/api/queue?videoId=' + vid('b') + '&playlistId=RDAMPLfake&params=fakeAm%253D']);
+  assert.deepEqual(ids(withAm.ctx.S.queue), ['a', 'b', 'c', 'd', 'e']);
+  assert.equal(withAm.ctx.S.automix, null, 'used once');
+  assert.equal(withAm.ctx.S.radioCont, 'TOKEN-NEW-xx');
+  assert.equal(withAm.ctx.S.radioPid, 'RDAMPLfake');
+  assert.equal(withAm.ctx.S.radioParams, 'fakeAm%3D');
+  const without = await run(null);
+  assert.deepEqual(without.asked, ['/api/queue?videoId=' + vid('b')]);
+  // the list's own continuation, when it has one, comes first
+  const own = await run(AM, 'LIST-TOKEN-xx');
+  assert.deepEqual(own.asked, ['/api/queue?c=LIST-TOKEN-xx']);
+  // an automix that cannot be had is dropped; the next time is a radio from the last song
+  const bad = page((q) => (q.includes('RDAMPLfake') ? new Error('gone') : answer(['c', 'd', 'e'], '')));
+  const S = bad.ctx.S;
+  S.queue = [item('a'), item('b')];
+  S.index = 1;
+  S.radioQ = S.queue;
+  S.automixQ = S.queue;
+  S.automix = AM;
+  bad.ctx.extendQueue();
+  await settle(bad);
+  assert.equal(S.automix, null);
+  bad.ctx.extendQueue();
+  await settle(bad);
+  assert.equal(bad.asked[1], '/api/queue?videoId=' + vid('b'));
+  assert.deepEqual(ids(S.queue), ['a', 'b', 'c', 'd', 'e']);
+});
+
+test('a list with repeated songs is queued with each once, the first stays', () => {
+  const p = page(() => ({}));
+  const l = ['l1', 'l2', 'l1', 'l3', 'l2'].map((n) => item(n));
+  p.ctx.playFromList(l, l[1]);
+  assert.deepEqual(ids(p.ctx.S.queue), ['l2', 'l3']);
+  p.ctx.playFromList(l, l[0]);
+  assert.deepEqual(ids(p.ctx.S.queue), ['l1', 'l2', 'l3']);
+  p.ctx.playAll(l, null);
+  assert.deepEqual(ids(p.ctx.S.queue), ['l1', 'l2', 'l3']);
+});
+
+test('the chips and the chosen one are saved with the radio and come back after a restart', () => {
+  const p = page(() => ({}));
+  const S = p.ctx.S;
+  S.queue = [item('a'), item('b')];
+  S.index = 0;
+  S.cur = S.queue[0];
+  S.ready = true;
+  S.radioQ = S.queue;
+  S.radioCont = 'TOKEN-SAVED-';
+  S.radioSeen = [vid('a')];
+  S.radioParams = 'fakeFam%3D';
+  S.radioPid = 'RDATfakefam';
+  S.chips = CHIPS.map((c) => Object.assign({}, c, { selected: c.title === 'Familiar' }));
+  p.ctx.saveState(true);
+  const p2 = page(() => ({}));
+  p2.store.ytm_state = p.store.ytm_state;
+  p2.ctx.restoreState();
+  const S2 = p2.ctx.S;
+  assert.deepEqual(JSON.parse(JSON.stringify(S2.chips)), JSON.parse(JSON.stringify(S.chips)));
+  assert.equal(S2.chips[1].selected, true);
+  assert.equal(S2.radioPid, 'RDATfakefam');
+  assert.equal(S2.radioParams, 'fakeFam%3D');
+  // a queue that does not own the radio keeps no chips
+  S.radioQ = [];
+  p.ctx.saveState(true);
+  assert.equal(JSON.parse(p.store.ytm_state).radio, null);
 });
