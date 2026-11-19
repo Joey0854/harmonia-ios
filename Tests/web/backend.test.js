@@ -57,6 +57,18 @@ test('/api/queue: a radio and its continuation token', async () => {
   assert.equal(b.sent[0].body.params, undefined);
 });
 
+test('/api/queue: a song offered with its music video is queued once, in its first answer and in a continuation', async () => {
+  const b = backend((ep, body) => {
+    if (ep === 'next' && body.continuation === 'RADIO-CONT-TWO') return F.nextMore([F.wrappedSong('d'), 'e'], '');
+    if (ep === 'next' && body.videoId === F.vid('a')) return F.nextFirst(['a', F.wrappedSong('b'), 'c'], 'RADIO-CONT-TWO');
+    return null;
+  });
+  const r = await b.get('/api/queue?videoId=' + F.vid('a'));
+  assert.deepEqual(ids(r.json.items), ['a', 'b', 'c']);
+  const more = await b.get('/api/queue?c=RADIO-CONT-TWO');
+  assert.deepEqual(ids(more.json.items), ['d', 'e']);
+});
+
 test('/api/queue?c=: the rest of the same radio, by its token (no new radio)', async () => {
   const b = backend((ep, body) => (ep === 'next' && body.continuation === 'RADIO-CONT-TWO' ? F.nextMore(['d', 'e'], 'RADIO-CONT-THREE') : null));
   const r = await b.get('/api/queue?c=RADIO-CONT-TWO');

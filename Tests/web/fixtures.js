@@ -15,20 +15,25 @@ function panelSong(name, artist) {
   };
 }
 const radioToken = (t) => ({ nextRadioContinuationData: { continuation: t } });
+// a song offered in two versions: the song itself, and its music video as the counterpart
+function wrappedSong(name) {
+  return { playlistPanelVideoWrapperRenderer: { primaryRenderer: panelSong(name), counterpart: [{ counterpartRenderer: panelSong('mv-' + name) }] } };
+}
+const entry = (n) => (typeof n === 'string' ? panelSong(n) : n);
 
 // the first answer of a radio: the queue panel with the token for the rest
 function nextFirst(names, token) {
   return {
     contents: { singleColumnMusicWatchNextResultsRenderer: { tabbedRenderer: { watchNextTabbedResultsRenderer: { tabs: [{
       tabRenderer: { content: { musicQueueRenderer: { content: { playlistPanelRenderer: {
-        contents: names.map((n) => panelSong(n)), continuations: token ? [radioToken(token)] : [],
+        contents: names.map(entry), continuations: token ? [radioToken(token)] : [],
       } } } } },
     }] } } } },
   };
 }
 // the answer to a radio's continuation
 function nextMore(names, token) {
-  return { continuationContents: { playlistPanelContinuation: { contents: names.map((n) => panelSong(n)), continuations: token ? [radioToken(token)] : [] } } };
+  return { continuationContents: { playlistPanelContinuation: { contents: names.map(entry), continuations: token ? [radioToken(token)] : [] } } };
 }
 
 // one song in a list (playlist, liked songs)
@@ -73,4 +78,4 @@ function item(name, extra) {
   return Object.assign({ kind: 'song', title: 'Song ' + name, subtitle: 'Artist ' + name, thumb: '', videoId: vid(name), playlistId: '', browseId: '', duration: '3:30' }, extra || {});
 }
 
-module.exports = { vid, nextFirst, nextMore, browseFirst, browseMore, browseMoreOld, item };
+module.exports = { vid, wrappedSong, nextFirst, nextMore, browseFirst, browseMore, browseMoreOld, item };

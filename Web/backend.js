@@ -3854,6 +3854,10 @@ function parseQueue(json) {
   const items = [];
   (function walk(o) {
     if (!o || typeof o !== 'object') return;
+    /* a song offered in two versions (the song, and its music video as the "counterpart") is one
+       entry of the queue: only the primary one is taken, or the same song would play twice */
+    const w = o.playlistPanelVideoWrapperRenderer;
+    if (w) { walk(w.primaryRenderer); return; }
     const r = o.playlistPanelVideoRenderer;
     if (r && r.videoId) {
       items.push({
