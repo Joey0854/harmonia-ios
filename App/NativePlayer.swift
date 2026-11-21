@@ -681,7 +681,8 @@ final class NativePlayer: NSObject {
     /// pan / send in dB, rear true or false, width 0 ... 2, stereo true or false (missing: false, as
     /// from a page or a stored setting from before it); amb: on, db, rt60, pre (ms), lo, hi (Hz), hf
     /// (damping factor), lowFront, split (Hz), style ("decorrelated" / "half" / "anti"), gate (0 ... 1),
-    /// dryGate; early: on, db, min, max (ms); xover (Hz).
+    /// dryGate; early: on, db, min, max (ms); xover (Hz); stereoHi (Hz, 0 = off; missing: 0, as from
+    /// a stored setting from before it).
     static func carBand(from car: [String: Any]) -> CarBandParams {
         let base = CarBandParams.v2b
         func number(_ v: Any?, _ def: Float) -> Float {
@@ -707,7 +708,8 @@ final class NativePlayer: NSObject {
                              hfDamping: number(amb["hf"], base.hfDamping), lowReverbFront: amb["lowFront"] as? Bool ?? base.lowReverbFront,
                              lowSplitHz: number(amb["split"], base.lowSplitHz),
                              reverbStyle: (amb["style"] as? String).flatMap { CarReverbStyle(rawValue: $0) } ?? base.reverbStyle,
-                             sendGate: number(amb["gate"], base.sendGate), dryGate: amb["dryGate"] as? Bool ?? base.dryGate).clamped()
+                             sendGate: number(amb["gate"], base.sendGate), dryGate: amb["dryGate"] as? Bool ?? base.dryGate,
+                             stereoAboveHz: number(car["stereoHi"], 0)).clamped()
     }
 
     /// Reads a page `fx` command (also the copy kept on disk).

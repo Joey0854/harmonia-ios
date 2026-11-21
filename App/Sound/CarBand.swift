@@ -51,8 +51,9 @@ public enum CarReverbStyle: String, Equatable, CaseIterable {
     /// Left +w1, right −w1 (the behaviour before 1.3.17: the most in the rear windows).
     case anti
 
-    /// (left from w1, left from w2, right from w1, right from w2).
-    var mix: SIMD4<Float> {
+    /// (left from w1, left from w2, right from w1, right from w2). The squares add up to 2 in
+    /// every style (the bus has the same energy).
+    public var mix: SIMD4<Float> {
         switch self {
         case .decorrelated: return SIMD4<Float>(1, 0, 0, 1)
         case .anti: return SIMD4<Float>(1, 0, -1, 0)
@@ -109,12 +110,20 @@ public struct CarBandParams: Equatable {
     /// True: the dry sound takes the gated parts as well (same strength). The four dry parts
     /// then no longer add up to the song exactly.
     public var dryGate: Bool
+    /// Above this (Hz) every part not in `stereo` keeps its own left / right again (left as left,
+    /// right as right, times its pan gains, see `CarBandMixer`); between `crossoverHz` and this it is made as before
+    /// (mono or spread by `width`). Split with a Linkwitz-Riley pair, so the bands add up flat.
+    /// 0: off (the whole band above the crossover as before). The car's Centerpoint barely acts
+    /// above about 4 kHz, so the parts' own stereo can stay there without reaching the rear
+    /// windows. Its reverb send and the early reflections still take the mono sound.
+    public var stereoAboveHz: Float
 
     public init(tracks: [CarBandTrack], ambienceOn: Bool = true, ambienceDb: Float = -15, rt60: Float = 1.4,
                 predelayMs: Float = 12, lowHz: Float = 250, highHz: Float = 4000, crossoverHz: Float = 150,
                 earlyOn: Bool = false, earlyDb: Float = -10, earlyMinMs: Float = 15, earlyMaxMs: Float = 30,
                 hfDamping: Float = 1, lowReverbFront: Bool = false, lowSplitHz: Float = 250,
-                reverbStyle: CarReverbStyle = .decorrelated, sendGate: Float = 1, dryGate: Bool = false) {
+                reverbStyle: CarReverbStyle = .decorrelated, sendGate: Float = 1, dryGate: Bool = false,
+                stereoAboveHz: Float = 0) {
         self.tracks = tracks
         self.ambienceOn = ambienceOn
         self.ambienceDb = ambienceDb
@@ -133,6 +142,7 @@ public struct CarBandParams: Equatable {
         self.reverbStyle = reverbStyle
         self.sendGate = sendGate
         self.dryGate = dryGate
+        self.stereoAboveHz = stereoAboveHz
     }
 
     /// The one chosen by ear in the car (make.py v2b): vocals dry in the centre with a little
@@ -154,6 +164,19 @@ public struct CarBandParams: Equatable {
     public static let v2c: CarBandParams = {
         var p = CarBandParams.v2b
         for t in 0..<p.tracks.count { p.tracks[t].stereo = true }
+        return p
+    }()
+
+    /// "v2d, rebuilt mid band, original highs": v2b's placement, sends and reverb, with every
+    /// part at width 1 (`CarSpreader`: each frequency keeps its level difference, left and right
+    /// in phase, the energy kept) between the crossover and 4 kHz, so nothing is made mono there
+    /// (no comb filtering, the width kept) and nothing in opposite phase reaches Centerpoint's
+    /// rear-window band (about 250 Hz - 4 kHz); above 4 kHz (`stereoAboveHz`), where Centerpoint
+    /// barely acts, each part keeps its own left / right; below the crossover mono as in v2b.
+    public static let v2d: CarBandParams = {
+        var p = CarBandParams.v2b
+        for t in 0..<p.tracks.count { p.tracks[t].width = 1 }
+        p.stereoAboveHz = 4000
         return p
     }()
 
@@ -200,12 +223,15 @@ public struct CarBandParams: Equatable {
                                  width: c($0.width, 0, 2), stereo: $0.stereo) }
         let lo = c(lowHz, 120, 1000)
         let e0 = c(earlyMinMs, 5, 60)
+        /* 0 (or anything not above 0) is off; otherwise 1 - 12 kHz (well above the crossover) */
+        let above: Float = stereoAboveHz.isFinite && stereoAboveHz > 0 ? c(stereoAboveHz, 1000, 12000) : 0
         return CarBandParams(tracks: t, ambienceOn: ambienceOn, ambienceDb: c(ambienceDb, -30, -3),
                              rt60: c(rt60, 0.3, 3), predelayMs: c(predelayMs, 12, 80),
                              lowHz: lo, highHz: c(highHz, max(1500, lo * 2), 10000), crossoverHz: c(crossoverHz, 60, 300),
                              earlyOn: earlyOn, earlyDb: c(earlyDb, -30, -3), earlyMinMs: e0, earlyMaxMs: c(earlyMaxMs, e0, 80),
                              hfDamping: c(hfDamping, 0.25, 2), lowReverbFront: lowReverbFront, lowSplitHz: c(lowSplitHz, 80, 500),
-                             reverbStyle: reverbStyle, sendGate: c(sendGate, 0, 1), dryGate: dryGate)
+                             reverbStyle: reverbStyle, sendGate: c(sendGate, 0, 1), dryGate: dryGate,
+                             stereoAboveHz: above)
     }
 }
 
@@ -239,6 +265,26 @@ struct CarBiquad {
         a2 = (1 - alpha) / a0
     }
 
+    /// New all-pass coefficients (RBJ); the state is kept. With q = √0.5 this is exactly the
+    /// Linkwitz-Riley (24 dB/oct) low-pass plus high-pass at `frequency`.
+    mutating func designAllpass(frequency: Double, q: Double, sampleRate: Double) {
+        let f = min(max(frequency, 10), 0.45 * sampleRate)
+        let w = 2 * Double.pi * f / sampleRate
+        let c = cos(w), alpha = sin(w) / (2 * q)
+        let a0 = 1 + alpha
+        b0 = (1 - alpha) / a0
+        b1 = -2 * c / a0
+        b2 = 1
+        a1 = -2 * c / a0
+        a2 = (1 - alpha) / a0
+    }
+
+    /// Back to silence (the coefficients kept).
+    mutating func clear() {
+        z1 = 0
+        z2 = 0
+    }
+
     /// Butterworth of order 2 × `qs.count`.
     static func butterworth(_ qs: [Double], highpass: Bool, frequency: Double, sampleRate: Double) -> [CarBiquad] {
         return qs.map { q in
@@ -251,6 +297,51 @@ struct CarBiquad {
     static let q2: [Double] = [0.70710678]
     static let q4: [Double] = [0.54119610, 1.30656296]
     static let q8: [Double] = [0.50979558, 0.60134489, 0.89997622, 2.56291545]
+}
+
+/// One part's upper split (`CarBandParams.stereoAboveHz`): Linkwitz-Riley (24 dB/oct) sections
+/// at the split frequency, a plain struct (no arrays) so that copying it in and out of the
+/// render loop allocates nothing.
+struct CarSplit {
+    /* the split's all-pass (low-pass plus high-pass), on the part's band below the crossover */
+    var allpass = CarBiquad()
+    /* low-pass on the mono high band */
+    var mono0 = CarBiquad(), mono1 = CarBiquad()
+    /* high-pass on the part's own left / right (already high-passed at the crossover) */
+    var highL0 = CarBiquad(), highL1 = CarBiquad(), highR0 = CarBiquad(), highR1 = CarBiquad()
+    /* low-pass on what goes into the spreader, left / right */
+    var spreadL0 = CarBiquad(), spreadL1 = CarBiquad(), spreadR0 = CarBiquad(), spreadR1 = CarBiquad()
+
+    /// New coefficients; the state is kept.
+    mutating func design(frequency f: Double, sampleRate sr: Double) {
+        let q = CarBiquad.q2[0]
+        allpass.designAllpass(frequency: f, q: q, sampleRate: sr)
+        mono0.design(highpass: false, frequency: f, q: q, sampleRate: sr)
+        mono1.design(highpass: false, frequency: f, q: q, sampleRate: sr)
+        highL0.design(highpass: true, frequency: f, q: q, sampleRate: sr)
+        highL1.design(highpass: true, frequency: f, q: q, sampleRate: sr)
+        highR0.design(highpass: true, frequency: f, q: q, sampleRate: sr)
+        highR1.design(highpass: true, frequency: f, q: q, sampleRate: sr)
+        spreadL0.design(highpass: false, frequency: f, q: q, sampleRate: sr)
+        spreadL1.design(highpass: false, frequency: f, q: q, sampleRate: sr)
+        spreadR0.design(highpass: false, frequency: f, q: q, sampleRate: sr)
+        spreadR1.design(highpass: false, frequency: f, q: q, sampleRate: sr)
+    }
+
+    /// Back to silence.
+    mutating func clear() {
+        allpass.clear()
+        mono0.clear(); mono1.clear()
+        highL0.clear(); highL1.clear(); highR0.clear(); highR1.clear()
+        spreadL0.clear(); spreadL1.clear(); spreadR0.clear(); spreadR1.clear()
+    }
+
+    @inline(__always) mutating func low(_ x: Double) -> Double { return allpass.step(x) }
+    @inline(__always) mutating func mono(_ x: Double) -> Double { return mono1.step(mono0.step(x)) }
+    @inline(__always) mutating func highLeft(_ x: Double) -> Double { return highL1.step(highL0.step(x)) }
+    @inline(__always) mutating func highRight(_ x: Double) -> Double { return highR1.step(highR0.step(x)) }
+    @inline(__always) mutating func spreadLeft(_ x: Double) -> Double { return spreadL1.step(spreadL0.step(x)) }
+    @inline(__always) mutating func spreadRight(_ x: Double) -> Double { return spreadR1.step(spreadR0.step(x)) }
 }
 
 /// Convolution of several channels with one long response, with no delay at all: the
@@ -891,6 +982,23 @@ final class CarGate {
 ///   early reflections take the mono sound. `width` is not used then. Switching cross-fades
 ///   (about 20 ms); the side filters always run, so they are settled when a switch comes.
 ///
+/// - with `stereoAboveHz` above 0 the band above the crossover of every part not in `stereo`
+///   is split again there (Linkwitz-Riley, 24 dB/oct): below it the part goes the way it would
+///   without the split (mono and panned, or spread: what goes into `CarSpreader` is low-passed
+///   there first, the spreader only rescales and re-pans each bin, so it stays in that band),
+///   above it the part's own left and right (through the crossover's high-pass as in `stereo`,
+///   then the split's high-pass), times the pan gains of the share it replaces (the mono share
+///   10^(∓pan/40) as in the mono path, the spread share the spreader's power-kept gains
+///   √2·√(x / (1 + x)), x = 10^(∓pan/10)), so for a part the same on both sides the two bands
+///   meet at the same level. The band below the crossover goes through the split's all-pass,
+///   so the three bands add up to the two all-passes (flat). All of it is added where the
+///   mono part goes, before the delay line, so it has the same latency as every other path
+///   (the spreader's output, the same `latency` behind, gets the low-passed input's sound).
+///   Switching on and off cross-fades (about 20 ms); its filters run only while it is on or
+///   fading and start from silence when it comes on (they settle in a few milliseconds, at
+///   1 kHz and above, while the fade is still near 0). The sends and the early reflections
+///   still take the mono sound.
+///
 /// - the rear bus comes out as `reverbStyle` says: w1 (the response above) and w2 (the same
 ///   kind of response, another seed) mixed per side; the front bus and the low part always
 ///   take w1 alone, the same on both sides. Changing the style glides (about 20 ms).
@@ -918,6 +1026,9 @@ public final class CarBandMixer {
        and right (2, 3), for `stereo`; how much of the high band is taken from it (glides 0 ... 1) */
     private var stereoHigh: [[CarBiquad]] = []
     private var stereoAmount: [Float] = [0, 0, 0, 0]
+    /* per track: the upper split (`stereoAboveHz`), how much of it is used (glides 0 ... 1) */
+    private var splits: [CarSplit] = [CarSplit](repeating: CarSplit(), count: 4)
+    private var splitAmount: [Float] = [0, 0, 0, 0]
     private var band: [[CarBiquad]]
     /* per track: pan factors above the crossover (left, right), front send (left, right), rear send */
     private var now: [[Float]]
@@ -1006,6 +1117,8 @@ public final class CarBandMixer {
         now = (0..<4).map { targets(track: $0) }
         spreadAmount = (0..<4).map { self.params.tracks[$0].width > 0 && !self.params.tracks[$0].stereo ? 1 : 0 }
         stereoAmount = (0..<4).map { self.params.tracks[$0].stereo ? 1 : 0 }
+        let splitOn: Float = self.params.stereoAboveHz > 0 ? 1 : 0
+        splitAmount = [splitOn, splitOn, splitOn, splitOn]
         dryAmount = self.params.dryGate ? 1 : 0
         /* before the first sample there is only silence, so a gate started now is filled */
         let p = self.params
@@ -1143,6 +1256,10 @@ public final class CarBandMixer {
         earlyHigh = keep(earlyHigh, CarBiquad.butterworth(CarBiquad.q2 + CarBiquad.q2, highpass: true, frequency: x, sampleRate: sr))
         let high = CarBiquad.butterworth(CarBiquad.q2 + CarBiquad.q2, highpass: true, frequency: x, sampleRate: sr)
         spreadHigh = (0..<2).map { c in keep(c < spreadHigh.count ? spreadHigh[c] : [], high) }
+        /* the upper split keeps the last frequency it had while it is switched off (and fades) */
+        if params.stereoAboveHz > 0 {
+            for t in 0..<4 { splits[t].design(frequency: Double(params.stereoAboveHz), sampleRate: sr) }
+        }
         let count = CarBandMixer.earlyGains.count
         earlyTaps = (0..<count).map { i in
             let ms = Double(params.earlyMinMs) + Double(params.earlyMaxMs - params.earlyMinMs) * Double(i) / Double(count - 1)
@@ -1191,6 +1308,12 @@ public final class CarBandMixer {
             let stereoAim: Float = stereo ? 1 : 0
             var sa = stereoAmount[t]
             var sl0 = stereoHigh[t][0], sl1 = stereoHigh[t][1], sr0 = stereoHigh[t][2], sr1 = stereoHigh[t][3]
+            /* the upper split (`stereoAboveHz`), weight h; off and faded out: the path as before */
+            let splitAim: Float = params.stereoAboveHz > 0 ? 1 : 0
+            var h = splitAmount[t]
+            let splitting = splitAim > 0 || h > 0
+            var sp = splits[t]
+            if splitting && h == 0 { sp.clear() }
             let idle = spreadTail[t] <= 0
             let spreading = aim > 0 || a > 0 || !idle
             /* what goes into the spreader: the part's stereo sound × a */
@@ -1214,7 +1337,31 @@ public final class CarBandMixer {
                 let lo = Float(lp1.step(lp0.step(md)))
                 let hl = Float(sl1.step(sl0.step(Double(left[j]))))
                 let hr = Float(sr1.step(sr0.step(Double(right[j]))))
-                if sa == 0 {
+                /* what goes into the spreader (times a below) */
+                var xl = left[j], xr = right[j]
+                if splitting {
+                    if h != splitAim {
+                        h += (splitAim - h) * k
+                        if splitAim == 0 && h < 1e-4 { h = 0 } else if splitAim == 1 && h > 1 - 1e-5 { h = 1 }
+                    }
+                    /* the shares of the band above the crossover: mono wm, spread a, stereo sa */
+                    let wm = max(0, 1 - a - sa)
+                    let mh = Float(hp1.step(hp0.step(md)))
+                    /* mono and spread: below the split only (h of them; the rest as before) */
+                    let monoHigh = mh + h * (Float(sp.mono(Double(mh))) - mh)
+                    xl += h * (Float(sp.spreadLeft(Double(xl))) - xl)
+                    xr += h * (Float(sp.spreadRight(Double(xr))) - xr)
+                    /* the band below the crossover through the split's all-pass, for the shares
+                       that are split (not the stereo one, whose bands add up as they are) */
+                    let below = lo + h * (1 - sa) * (Float(sp.low(Double(lo))) - lo)
+                    /* above the split: the part's own left / right, at the mono share's pan
+                       gains and the spreader's (power kept) for the spread share */
+                    let norm = (2 / (g[0] * g[0] + g[1] * g[1])).squareRoot()
+                    let ownL = h * (wm + a * norm) * g[0], ownR = h * (wm + a * norm) * g[1]
+                    let ul = Float(sp.highLeft(Double(hl))), ur = Float(sp.highRight(Double(hr)))
+                    dryL[j] += below + g[0] * (wm * monoHigh + sa * hl) + ownL * ul
+                    dryR[j] += below + g[1] * (wm * monoHigh + sa * hr) + ownR * ur
+                } else if sa == 0 {
                     let hi = (1 - a) * Float(hp1.step(hp0.step(md)))
                     dryL[j] += lo + g[0] * hi
                     dryR[j] += lo + g[1] * hi
@@ -1231,14 +1378,18 @@ public final class CarBandMixer {
                 buses[2][j] += ms * g[4]
                 earlyIn[j] += ms
                 if spreading {
-                    inL[j] = left[j] * a
-                    inR[j] = right[j] * a
+                    inL[j] = xl * a
+                    inR[j] = xr * a
                 }
             }
             lowpass[t][0] = lp0; lowpass[t][1] = lp1; highpass[t][0] = hp0; highpass[t][1] = hp1
             now[t] = g
             spreadAmount[t] = a
             stereoAmount[t] = sa
+            if splitting {
+                splits[t] = sp
+                splitAmount[t] = h
+            }
             stereoHigh[t] = [sl0, sl1, sr0, sr1]
             if spreading {
                 let s = spreaders[t] ?? CarSpreader(sampleRate: sampleRate)

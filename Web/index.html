@@ -2067,6 +2067,12 @@ var CAR_PRESETS = {
     piano: { pan: -6, send: 0, rear: true, width: 0 },
     amb: { on: true, db: -15, rt60: 1.4, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250, style: 'decorrelated', gate: 1, dryGate: false },
     early: { on: false, db: -10, min: 15, max: 30 }, xover: 150 } },
+  /* CarBandParams.v2d: v2b with every part spread (width 1) up to 4 kHz, its own stereo above (stereoHi) */
+  v2d: { name: 'v2d 中頻重建＋高頻原樣', desc: '同 v2b 的擺位與殘響；分頻點到 4 kHz 之間每一軌都照原曲位置重建（只留左右音量差、左右同相，不混成單聲道也不會送進後窗），4 kHz 以上保留這一軌原本的左右聲道（Centerpoint 在這段幾乎不作用）；分頻點以下仍左右相同', p: {
+    tracks: { vocals: carTrack(0, -10, true, 1), drums: carTrack(-2, CAR_SEND_OFF, true, 1), bass: carTrack(0, CAR_SEND_OFF, true, 1), other: carTrack(6, 0, true, 1) },
+    piano: { pan: -6, send: 0, rear: true, width: 0 },
+    amb: { on: true, db: -15, rt60: 1.4, pre: 12, lo: 250, hi: 4000, hf: 1, lowFront: false, split: 250, style: 'decorrelated', gate: 1, dryGate: false },
+    early: { on: false, db: -10, min: 15, max: 30 }, xover: 150, stereoHi: 4000 } },
   v3: { name: 'v3 全前方（對照）', p: {
     tracks: { vocals: carTrack(0, CAR_SEND_OFF, false), drums: carTrack(-2, CAR_SEND_OFF, false), bass: carTrack(0, CAR_SEND_OFF, false), other: carTrack(4, 0, false, 1) },
     piano: { pan: -4, send: 0, rear: false, width: 0 },
@@ -2109,6 +2115,9 @@ function carNormalize(p) {
   out.early = { on: bool(e.on, de.on), db: num(e.db, de.db, -30, -3), min: num(e.min, de.min, 5, 60), max: num(e.max, de.max, 5, 80) };
   if (out.early.max < out.early.min) out.early.max = out.early.min;
   out.xover = num(p.xover, d.xover, 60, 300);
+  /* stereoHi: the parts' own stereo above this (Hz); 0 (or missing, as in a setting from before it) is off */
+  var sh = +p.stereoHi;
+  out.stereoHi = isFinite(sh) && sh > 0 ? Math.max(1000, Math.min(12000, sh)) : 0;
   return out;
 }
 function carUserPresets() {
@@ -2132,7 +2141,7 @@ function carMixSetting() {
     tracks[cp[0]] = { pan: t.pan, send: t.send, rear: t.rear, width: t.width, stereo: t.stereo };
   });
   return { mode: 'bandCar', parts: parts, low: 0,
-    car: { tracks: tracks, amb: p.amb, early: p.early, xover: p.xover } };
+    car: { tracks: tracks, amb: p.amb, early: p.early, xover: p.xover, stereoHi: p.stereoHi } };
 }
 function carControls(body) {
   var st = carState(), p = st.p;
@@ -2233,7 +2242,7 @@ function carControls(body) {
   var fill = function () {
     sel.innerHTML = '';
     var add = function (v, t) { var o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); };
-    ['v2b', 'v2c', 'v3', 'hall', 'plain'].forEach(function (k) { add(k, CAR_PRESETS[k].name); });
+    ['v2b', 'v2c', 'v2d', 'v3', 'hall', 'plain'].forEach(function (k) { add(k, CAR_PRESETS[k].name); });
     var u = carUserPresets();
     Object.keys(u).sort().forEach(function (k) { add('user:' + k, '自訂：' + k); });
     sel.value = st.preset;
@@ -2377,6 +2386,9 @@ function carControls(body) {
 
   var xb = section('低頻置中');
   slider(xb, '分頻點（以下各軌左右相同）', function () { return p.xover; }, function (v) { p.xover = v; }, 60, 300, 10, hz);
+  /* stereoHi: 0 (the slider's left end) is off, otherwise 1 - 12 kHz */
+  slider(xb, '高頻保留原樣立體聲（此頻率以上；最左＝關）', function () { return p.stereoHi; },
+    function (v) { p.stereoHi = v < 1000 ? 0 : v; }, 500, 12000, 100, function (v) { return +v > 0 ? (+v / 1000).toFixed(1) + ' kHz' : '關'; });
 }
 /* the HRIR set the headphone band uses: the style editor's base */
 function bandIrQuery() {

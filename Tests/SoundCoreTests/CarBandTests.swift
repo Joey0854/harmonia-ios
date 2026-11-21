@@ -267,22 +267,89 @@ final class CarBandTests: XCTestCase {
         XCTAssertLessThan(abs(db), 0.5, "energy changed by \(db) dB")
     }
 
-    /// Changing width while playing (0 -> 2 -> 0) gives no jumps and nothing non-finite.
+    /// The 8 stem channels with only "other" playing.
+    private func otherOnly(_ left: [Float], _ right: [Float]) -> [[Float]] {
+        var stems = [[Float]](repeating: [Float](repeating: 0, count: left.count), count: 8)
+        stems[CarBandTests.other * 2] = left
+        stems[CarBandTests.other * 2 + 1] = right
+        return stems
+    }
+
+    /// `stems` through `mixer` in blocks of `block` samples; `changes[sample]` is set just before
+    /// the block that starts at that sample.
+    private func runSwitching(_ mixer: CarBandMixer, _ changes: [Int: CarBandParams], stems: [[Float]],
+                              block: Int = 441) -> (left: [Float], right: [Float]) {
+        var outL: [Float] = [], outR: [Float] = []
+        let total = stems[0].count
+        var done = 0
+        while done < total {
+            if let q = changes[done] { mixer.set(q) }
+            let n = min(block, total - done)
+            let part = stems.map { Array($0[done..<done + n]) }
+            let zero = [Float](repeating: 0, count: n)
+            let out = mixer.process(stems: part, standIn: (zero, zero))
+            XCTAssertEqual(out.left.count, n)
+            outL += out.left
+            outR += out.right
+            done += n
+        }
+        return (outL, outR)
+    }
+
+    /// RMS of `x` in windows of `window` samples from `from` on.
+    private func rms(_ x: [Float], from: Int, window: Int) -> [Double] {
+        var out: [Double] = []
+        var at = from
+        while at + window <= x.count {
+            var e = 0.0
+            for j in at..<(at + window) { e += Double(x[j]) * Double(x[j]) }
+            out.append((e / Double(window)).squareRoot())
+            at += window
+        }
+        return out
+    }
+
+    /// The largest change from one window's RMS to the next, in dB.
+    private func maxJumpDb(_ r: [Double]) -> Double {
+        var worst = 0.0
+        for i in 1..<r.count { worst = max(worst, abs(20 * log10(max(r[i], 1e-20) / max(r[i - 1], 1e-20)))) }
+        return worst
+    }
+
+    /// Changing width while playing (0 -> 2 -> 0, a second each): nothing non-finite; the RMS
+    /// per 100 ms never jumps by more than the two widths' own level difference (+ 1 dB) and per
+    /// 10 ms not more than the steady sound's own jumps (+ 1 dB); and in every window the level
+    /// stays between those of the two widths played steadily (within 1 dB): no click, no dip.
     func testWidthChangeGlides() {
         let n = 44100
         let x = noiseStereo(3 * n)
+        let stems = otherOnly(x.left, x.right)
+        let w0 = runSwitching(CarBandMixer(sampleRate: 44100, params: dryParams(width: 0)), [:], stems: stems, block: n)
+        let w2 = runSwitching(CarBandMixer(sampleRate: 44100, params: dryParams(width: 2)), [:], stems: stems, block: n)
         let mixer = CarBandMixer(sampleRate: 44100, params: dryParams(width: 0))
-        var out: [Float] = []
-        for (i, w) in [Float(0), 2, 0].enumerated() {
-            mixer.set(dryParams(width: w))
-            var stems = [[Float]](repeating: [Float](repeating: 0, count: n), count: 8)
-            stems[CarBandTests.other * 2] = Array(x.left[i * n..<(i + 1) * n])
-            stems[CarBandTests.other * 2 + 1] = Array(x.right[i * n..<(i + 1) * n])
-            let zero = [Float](repeating: 0, count: n)
-            out += mixer.process(stems: stems, standIn: (zero, zero)).left
+        let sw = runSwitching(mixer, [n: dryParams(width: 2), 2 * n: dryParams(width: 0)], stems: stems, block: n)
+        XCTAssertTrue(sw.left.allSatisfy { $0.isFinite })
+        XCTAssertLessThan(sw.left.map { abs($0) }.max() ?? 0, 2)
+        let from = mixer.latency + 882
+        for window in [4410, 441] {
+            let r0 = rms(w0.left, from: from, window: window), r2 = rms(w2.left, from: from, window: window)
+            let rs = rms(sw.left, from: from, window: window)
+            XCTAssertEqual(rs.count, r0.count)
+            var levelDiff = 0.0, outside = -100.0
+            for i in 0..<min(rs.count, r0.count, r2.count) {
+                levelDiff = max(levelDiff, abs(20 * log10(r2[i] / r0[i])))
+                let lo = min(r0[i], r2[i]), hi = max(r0[i], r2[i])
+                outside = max(outside, 20 * log10(lo / rs[i]), 20 * log10(rs[i] / hi))
+            }
+            let jump = maxJumpDb(rs)
+            if window == 4410 {
+                XCTAssertLessThan(jump, levelDiff + 1, "per 100 ms: a jump of \(jump) dB (widths \(levelDiff) dB apart)")
+            } else {
+                let own = max(maxJumpDb(r0), maxJumpDb(r2))
+                XCTAssertLessThan(jump, own + 1, "per 10 ms: a jump of \(jump) dB (steady: \(own) dB)")
+            }
+            XCTAssertLessThan(outside, 1, "window \(window): \(outside) dB outside the two widths' levels")
         }
-        XCTAssertTrue(out.allSatisfy { $0.isFinite })
-        XCTAssertLessThan(out.map { abs($0) }.max() ?? 0, 2)
     }
 
     // MARK: - bleed removal (sendGate / dryGate) and reverb style
@@ -399,9 +466,15 @@ final class CarBandTests: XCTestCase {
     }
 
     /// (b) The rear reverb's mid-band left / right correlation per style, and (all three) the
-    /// same reverb energy within 0.5 dB.
+    /// same bus energy: the style's mix (left from w1 and w2, right from w1 and w2, w1 and w2
+    /// uncorrelated with the same energy) has squares adding up to 2. (The reverb's level in the
+    /// output is held at ambienceDb whatever the style, so the output energy cannot show it.)
     func testReverbStyleCorrelationAndEnergy() {
-        var energies: [CarReverbStyle: Double] = [:]
+        for style in CarReverbStyle.allCases {
+            let m = style.mix
+            let sum = m[0] * m[0] + m[1] * m[1] + m[2] * m[2] + m[3] * m[3]
+            XCTAssertEqual(sum, 2, accuracy: 1e-5, "\(style): the bus energy changes (squares add up to \(sum))")
+        }
         for style in CarReverbStyle.allCases {
             let w = rearReverb(style)
             let l = midBand(w.left), r = midBand(w.right)
@@ -421,10 +494,7 @@ final class CarBandTests: XCTestCase {
                 XCTAssertLessThan(corr, -0.5, "half: r = \(corr)")
                 XCTAssertGreaterThan(corr, -0.85, "half: r = \(corr)")
             }
-            energies[style] = e
         }
-        let values = energies.values.map { 10 * log10($0) }
-        XCTAssertLessThan((values.max() ?? 0) - (values.min() ?? 0), 0.5, "reverb energy per style: \(energies)")
     }
 
     /// (c) "Other" plays 1 kHz with 3 kHz bleeding in 20 dB down, the vocals 3 kHz; only "other"
@@ -828,5 +898,283 @@ final class CarBandTests: XCTestCase {
         let oa = a.process(stems: stems, standIn: (zero, zero)).left
         XCTAssertTrue(oa.allSatisfy { $0.isFinite })
         XCTAssertGreaterThan(oa.map { abs($0) }.max() ?? 0, 0.01)
+    }
+
+    // MARK: - bleed removal over all four parts, switching it while playing
+
+    /// All four parts play the same 1 kHz tone (the same on both sides) at levels 1 : 2 : 3 : 4.
+    /// With dryGate on, each part keeps |S_i|² / Σ_j |S_j|² of itself, the sum over all four:
+    /// the dry sound comes out Σ a³ / Σ a² instead of Σ a (1/3 here, -9.5 dB, within 0.2 dB). A
+    /// sum over fewer parts would leave more of it.
+    func testGateSharesOverAllFourParts() {
+        let n = 3 * 44100
+        let amps: [Float] = [0.02, 0.04, 0.06, 0.08]
+        var stems = [[Float]](repeating: [Float](repeating: 0, count: n), count: 8)
+        for j in 0..<n {
+            let s = sin(2 * Float.pi * 1000 * Float(j) / 44100)
+            for t in 0..<4 {
+                stems[2 * t][j] = amps[t] * s
+                stems[2 * t + 1][j] = amps[t] * s
+            }
+        }
+        func level(dryGate: Bool) -> Double {
+            var p = dryParams(width: 0)
+            p.sendGate = 1
+            p.dryGate = dryGate
+            let out = runAll(CarBandMixer(sampleRate: 44100, params: p), stems: stems)
+            let t = tone(out.left, 1000, from: 2 * 44100, count: 44100)
+            return (t.re * t.re + t.im * t.im).squareRoot()
+        }
+        let a = amps.map { Double($0) }
+        let sum = a.reduce(0, +)
+        let want = a.map { $0 * $0 * $0 }.reduce(0, +) / a.map { $0 * $0 }.reduce(0, +)
+        let plain = level(dryGate: false), gated = level(dryGate: true)
+        XCTAssertEqual(plain, sum, accuracy: 0.002, "without dryGate the four parts add up")
+        let db = 20 * log10(gated / plain), wantDb = 20 * log10(want / sum)
+        XCTAssertEqual(db, wantDb, accuracy: 0.2, "gated dry sound \(db) dB, \(wantDb) dB expected")
+    }
+
+    /// Switching dryGate and sendGate while playing (dryGate on at 1 s, sendGate 0 at 2 s, 1 again
+    /// at 3 s), "other" alone (so the gate keeps it whole, factor 1): the output stays sample-
+    /// aligned with a mixer that never gates (within -60 dB, through every cross-fade), each call
+    /// gives as many samples as went in, and `flush` gives exactly `latency` more, the same tail.
+    func testGateSwitchKeepsAlignmentAndFlush() {
+        let n = 4 * 44100
+        let x = noiseStereo(n)
+        let stems = otherOnly(x.left, x.right)
+        var plain = dryParams(width: 1)
+        plain.sendGate = 0
+        var gated = dryParams(width: 1)
+        gated.sendGate = 1
+        gated.dryGate = true
+        var ungated = gated
+        ungated.sendGate = 0
+        let ref = CarBandMixer(sampleRate: 44100, params: plain)
+        let mixer = CarBandMixer(sampleRate: 44100, params: plain)
+        let a = runSwitching(ref, [:], stems: stems, block: 1000)
+        let b = runSwitching(mixer, [44000: gated, 88000: ungated, 132000: gated], stems: stems, block: 1000)
+        let fa = ref.flush(), fb = mixer.flush()
+        XCTAssertEqual(b.left.count, n)
+        XCTAssertEqual(fb.left.count, mixer.latency)
+        XCTAssertEqual(fb.right.count, mixer.latency)
+        let l = b.left + fb.left, r = b.right + fb.right
+        let rl = a.left + fa.left, rr = a.right + fa.right
+        var err = 0.0, energy = 0.0, tail = 0.0
+        for j in 0..<min(l.count, rl.count) {
+            let el = Double(l[j] - rl[j]), er = Double(r[j] - rr[j])
+            err += el * el + er * er
+            energy += Double(rl[j] * rl[j] + rr[j] * rr[j])
+        }
+        for j in 0..<fb.left.count { tail += Double(fb.left[j] * fb.left[j]) }
+        XCTAssertGreaterThan(energy, 1)
+        XCTAssertGreaterThan(tail, 1e-3, "the flush should carry the song's last `latency` samples")
+        let db = 10 * log10(max(err, 1e-30) / energy)
+        XCTAssertLessThan(db, -60, "switching the gate moved the sound: \(db) dB")
+    }
+
+    // MARK: - the parts' own stereo above a split (CarBandParams.stereoAboveHz, v2d)
+
+    /// v2d's dry sound (no reverb, no early reflections), the split at `above` Hz.
+    private func v2dDry(above: Float = 4000) -> CarBandParams {
+        var p = CarBandParams.v2d
+        p.ambienceOn = false
+        p.earlyOn = false
+        p.stereoAboveHz = above
+        return p
+    }
+
+    /// (a) stereoAboveHz 0 is the path from before it, sample for sample: v2b and v2c (all four
+    /// parts playing, reverb on) come out the same with the field left out, set to 0 or to
+    /// values that clamp to 0; and a mixer switched from v2d's split back to 0 comes out as one
+    /// that never had it once the fade and the spreader have run out (dry only, so no level
+    /// follower remembers the time it was on; within -120 dB, as the spread sum's high-pass, an
+    /// IIR filter, still holds a trace of that time at the level of double rounding).
+    func testStereoAboveZeroIsTheOldPath() {
+        let n = 2 * 44100
+        let stems = bandNoise(n, seed: 51)
+        for (name, preset) in [("v2b", CarBandParams.v2b), ("v2c", CarBandParams.v2c)] {
+            XCTAssertEqual(preset.stereoAboveHz, 0, name)
+            let base = runAll(CarBandMixer(sampleRate: 44100, params: preset), stems: stems, piece: 777)
+            for value in [Float(0), -5, Float.nan] {
+                var p = preset
+                p.stereoAboveHz = value
+                XCTAssertEqual(p.clamped(), preset.clamped(), "\(name), \(value)")
+                let out = runAll(CarBandMixer(sampleRate: 44100, params: p), stems: stems, piece: 777)
+                var differ = 0
+                for j in 0..<n where out.left[j] != base.left[j] || out.right[j] != base.right[j] { differ += 1 }
+                XCTAssertEqual(differ, 0, "\(name), stereoAboveHz \(value): \(differ) samples differ")
+            }
+        }
+        let m = 3 * 44100
+        let s2 = bandNoise(m, seed: 52)
+        let off = v2dDry(above: 0)
+        let never = runSwitching(CarBandMixer(sampleRate: 44100, params: off), [:], stems: s2)
+        let back = runSwitching(CarBandMixer(sampleRate: 44100, params: v2dDry()), [44100: off], stems: s2)
+        var before = 0
+        for j in 0..<44100 where back.left[j] != never.left[j] { before += 1 }
+        XCTAssertGreaterThan(before, 1000, "the split should change the sound while it is on")
+        var err = 0.0, energy = 0.0
+        for j in (5 * 22050)..<m {
+            let el = Double(back.left[j] - never.left[j]), er = Double(back.right[j] - never.right[j])
+            err += el * el + er * er
+            energy += Double(never.left[j] * never.left[j] + never.right[j] * never.right[j])
+        }
+        XCTAssertGreaterThan(energy, 1)
+        let db = 10 * log10(max(err, 1e-300) / energy)
+        XCTAssertLessThan(db, -120, "after switching the split off: \(db) dB from never having it")
+    }
+
+    /// (b) v2d is v2b with every part at width 1 and the split at 4 kHz; clamped keeps it; the
+    /// field is off by default and clamps to 0 or 1 ... 12 kHz.
+    func testV2dPreset() {
+        let p = CarBandParams.v2d, b = CarBandParams.v2b
+        XCTAssertEqual(p.stereoAboveHz, 4000)
+        XCTAssertEqual(p.tracks.map { $0.width }, [1, 1, 1, 1])
+        XCTAssertEqual(p.tracks.map { $0.stereo }, [false, false, false, false])
+        XCTAssertEqual(p.tracks.map { $0.panDb }, [-2, 0, 6, 0])
+        XCTAssertEqual(p.tracks.map { $0.sendDb }, b.tracks.map { $0.sendDb })
+        XCTAssertEqual(p.tracks.map { $0.rear }, b.tracks.map { $0.rear })
+        var back = p
+        for t in 0..<back.tracks.count { back.tracks[t].width = b.tracks[t].width }
+        back.stereoAboveHz = 0
+        XCTAssertEqual(back, b)
+        XCTAssertEqual(p, p.clamped())
+        XCTAssertEqual(CarBandParams(tracks: []).stereoAboveHz, 0)
+        for q in [CarBandParams.v2b, .v2c, .v3, .concertHall, .plainStereo] { XCTAssertEqual(q.stereoAboveHz, 0) }
+        let cases: [(Float, Float)] = [(500, 1000), (20000, 12000), (6000, 6000), (0, 0), (-1, 0), (.nan, 0), (.infinity, 0)]
+        for (value, want) in cases {
+            var q = p
+            q.stereoAboveHz = value
+            XCTAssertEqual(q.clamped().stereoAboveHz, want, "\(value)")
+        }
+    }
+
+    /// (c) Flat: a part the same on both sides (v2d's "other", 6 dB to the right, and in the
+    /// centre) comes out at the same level at every frequency from 50 Hz to 16 kHz with the
+    /// split as without it (within 0.2 dB), on both sides, at the same latency.
+    func testStereoAboveIsFlat() {
+        let n = 3 * 44100
+        let freqs: [Double] = [50, 90, 150, 220, 500, 1000, 2500, 3500, 4000, 4500, 6000, 9000, 12000, 16000]
+        var x = [Float](repeating: 0, count: n)
+        for j in 0..<n {
+            var v = 0.0
+            for (i, f) in freqs.enumerated() { v += 0.05 * sin(2 * Double.pi * f * Double(j) / 44100 + Double(i)) }
+            x[j] = Float(v)
+        }
+        func mag(_ t: (re: Double, im: Double)) -> Double { return (t.re * t.re + t.im * t.im).squareRoot() }
+        for pan in [Float(6), 0] {
+            var on = v2dDry()
+            on.tracks[CarBandTests.other].panDb = pan
+            var off = on
+            off.stereoAboveHz = 0
+            let a = runOther(off, left: x, right: x), b = runOther(on, left: x, right: x)
+            XCTAssertEqual(a.latency, b.latency)
+            let from = a.latency + 44100
+            for f in freqs {
+                for (sa, sb) in [(a.left, b.left), (a.right, b.right)] {
+                    let ma = mag(tone(sa, f, from: from, count: 44100)), mb = mag(tone(sb, f, from: from, count: 44100))
+                    XCTAssertGreaterThan(ma, 0.01, "pan \(pan), \(f) Hz: no sound")
+                    let db = 20 * log10(mb / ma)
+                    XCTAssertLessThan(abs(db), 0.2, "pan \(pan), \(f) Hz: \(db) dB with the split")
+                }
+            }
+        }
+    }
+
+    /// `x` through four second-order high-passes at `lo` and four low-passes at `hi` (either
+    /// left out when nil).
+    private func band(_ x: [Float], lo: Double?, hi: Double?) -> [Double] {
+        var y = x.map { Double($0) }
+        func pass(_ highpass: Bool, _ f: Double) {
+            let w = 2 * Double.pi * f / 44100
+            let c = cos(w), alpha = sin(w) / (2 * 0.70710678), a0 = 1 + alpha
+            let b0 = (highpass ? (1 + c) : (1 - c)) / 2 / a0, b1 = (highpass ? -(1 + c) : (1 - c)) / a0
+            let a1 = -2 * c / a0, a2 = (1 - alpha) / a0
+            var z1 = 0.0, z2 = 0.0
+            for j in 0..<y.count {
+                let v = y[j]
+                let o = b0 * v + z1
+                z1 = b1 * v - a1 * o + z2
+                z2 = b0 * v - a2 * o
+                y[j] = o
+            }
+        }
+        for _ in 0..<4 {
+            if let f = lo { pass(true, f) }
+            if let f = hi { pass(false, f) }
+        }
+        return y
+    }
+
+    private func correlation(_ l: [Double], _ r: [Double], from: Int) -> Double {
+        var sl = 0.0, sr = 0.0, slr = 0.0
+        for j in from..<min(l.count, r.count) {
+            sl += l[j] * l[j]
+            sr += r[j] * r[j]
+            slr += l[j] * r[j]
+        }
+        return slr / max(1e-30, (sl * sr).squareRoot())
+    }
+
+    /// (d) What Centerpoint would send to the rear windows: left / right noise with nothing in
+    /// common into v2d's "other". In 300 Hz - 3 kHz the output's left / right correlation is high
+    /// (the spreader: level differences in phase; above 0.85, and at most 0.03 below the same
+    /// part without the split, so the split adds next to nothing different there); above 6 kHz
+    /// it is the input's own (about 0) within 0.1. (The spreader alone, as in v2b's "other",
+    /// gives about 0.9 for noise this uncorrelated: its level difference changes from bin to bin
+    /// and frame to frame, so 0.95 is out of reach for any setting of the split.)
+    func testStereoAboveKeepsTheMidBandInPhase() {
+        let n = 4 * 44100
+        var ra = TestRandom(seed: 41), rb = TestRandom(seed: 42)
+        var l = [Float](repeating: 0, count: n), r = l
+        for j in 0..<n {
+            l[j] = 0.2 * ra.next()
+            r[j] = 0.2 * rb.next()
+        }
+        let on = runOther(v2dDry(), left: l, right: r)
+        let off = runOther(v2dDry(above: 0), left: l, right: r)
+        let from = on.latency + 22050
+        let mid = correlation(band(on.left, lo: 300, hi: 3000), band(on.right, lo: 300, hi: 3000), from: from)
+        let midOff = correlation(band(off.left, lo: 300, hi: 3000), band(off.right, lo: 300, hi: 3000), from: from)
+        let high = correlation(band(on.left, lo: 6000, hi: nil), band(on.right, lo: 6000, hi: nil), from: from)
+        let highIn = correlation(band(l, lo: 6000, hi: nil), band(r, lo: 6000, hi: nil), from: 22050)
+        XCTAssertLessThan(abs(highIn), 0.05, "the input should be uncorrelated (\(highIn))")
+        XCTAssertGreaterThan(mid, 0.85, "300 Hz - 3 kHz: r = \(mid)")
+        XCTAssertGreaterThan(mid, midOff - 0.03, "300 Hz - 3 kHz: r = \(mid) with the split, \(midOff) without")
+        XCTAssertLessThan(abs(high - highIn), 0.1, "above 6 kHz: r = \(high), input \(highIn)")
+        let highOff = correlation(band(off.left, lo: 6000, hi: nil), band(off.right, lo: 6000, hi: nil), from: from)
+        XCTAssertGreaterThan(highOff, 0.5, "without the split the highs are spread in phase too (\(highOff))")
+    }
+
+    /// (e) Switching the split while playing (0 -> 4 kHz -> 8 kHz -> 0, a second each, v2d's
+    /// "other" with stereo noise): nothing non-finite, the RMS per 10 ms never jumps by more
+    /// than the steady sound's own jumps (+ 1 dB), and in every window the level stays near
+    /// those of the three settings played steadily: at most 1 dB above, at most 3.5 dB below
+    /// (the cross-fade between the two paths, which differ in phase, dips by up to about 2 dB
+    /// for some 30 ms).
+    func testStereoAboveSwitchGlides() {
+        let n = 4 * 44100
+        let x = noiseStereo(n)
+        let stems = otherOnly(x.left, x.right)
+        let refs = [Float(0), 4000, 8000].map { runSwitching(CarBandMixer(sampleRate: 44100, params: v2dDry(above: $0)), [:], stems: stems) }
+        let mixer = CarBandMixer(sampleRate: 44100, params: v2dDry(above: 0))
+        let sw = runSwitching(mixer, [44100: v2dDry(above: 4000), 88200: v2dDry(above: 8000), 132300: v2dDry(above: 0)], stems: stems)
+        XCTAssertTrue(sw.left.allSatisfy { $0.isFinite } && sw.right.allSatisfy { $0.isFinite })
+        let from = mixer.latency + 882
+        for side in 0..<2 {
+            let rr = refs.map { rms(side == 0 ? $0.left : $0.right, from: from, window: 441) }
+            let rs = rms(side == 0 ? sw.left : sw.right, from: from, window: 441)
+            let own = rr.map { maxJumpDb($0) }.max() ?? 0
+            let jump = maxJumpDb(rs)
+            XCTAssertLessThan(jump, own + 1, "side \(side): a jump of \(jump) dB per 10 ms (steady: \(own) dB)")
+            var above = -100.0, below = 100.0
+            for i in 0..<rs.count {
+                let levels = rr.map { $0[i] }
+                above = max(above, 20 * log10(rs[i] / (levels.max() ?? 1)))
+                below = min(below, 20 * log10(rs[i] / (levels.min() ?? 1)))
+            }
+            XCTAssertLessThan(above, 1, "side \(side): \(above) dB above the steady levels")
+            XCTAssertGreaterThan(below, -3.5, "side \(side): \(below) dB below the steady levels")
+        }
     }
 }

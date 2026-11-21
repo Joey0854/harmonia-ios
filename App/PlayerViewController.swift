@@ -450,11 +450,11 @@ final class PlayerViewController: UIViewController, WKScriptMessageHandler, WKNa
                            t.sendDb <= CarBandParams.sendOff ? "off" : String(format: "%.1f", t.sendDb), t.rear ? " rear" : " front",
                            t.stereo ? " stereo" : "")
                 }.joined(separator: ", ")
-                carText += String(format: "; reverb %@ %.1f dB RT60 %.2f s pre %.0f ms %.0f-%.0f Hz hf %.2f low %@ %.0f Hz reverbStyle %@ sendGate %.2f dryGate %@; early %@ %.1f dB %.0f-%.0f ms; xover %.0f Hz",
+                carText += String(format: "; reverb %@ %.1f dB RT60 %.2f s pre %.0f ms %.0f-%.0f Hz hf %.2f low %@ %.0f Hz reverbStyle %@ sendGate %.2f dryGate %@; early %@ %.1f dB %.0f-%.0f ms; xover %.0f Hz; stereoAbove %.0f Hz",
                                   c.ambienceOn ? "on" : "off", c.ambienceDb, c.rt60, c.predelayMs, c.lowHz, c.highHz, c.hfDamping,
                                   c.lowReverbFront ? "front" : "cut", c.lowSplitHz, c.reverbStyle.rawValue, c.sendGate,
                                   c.dryGate ? "on" : "off", c.earlyOn ? "on" : "off", c.earlyDb,
-                                  c.earlyMinMs, c.earlyMaxMs, c.crossoverHz)
+                                  c.earlyMinMs, c.earlyMaxMs, c.crossoverHz, c.stereoAboveHz)
             }
             Diag.shared.log("band: mixer " + text + (mix.irs != nil ? ", new responses" : "") + carText)
         case "fx":
